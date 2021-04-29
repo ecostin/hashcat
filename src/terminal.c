@@ -919,7 +919,8 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   printf ("STATUS\t%d\t", hashcat_status->status_number);
 
   printf ("SPEED\t");
-
+  printf ("%" PRIu64 "\t", (u64) (status_get_hashes_msec_all(hashcat_ctx) * 1000));
+/*
   for (int device_id = 0; device_id < hashcat_status->device_info_cnt; device_id++)
   {
     const device_info_t *device_info = hashcat_status->device_info_buf + device_id;
@@ -948,7 +949,7 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   }
 
   printf ("CURKU\t%" PRIu64 "\t", hashcat_status->restore_point);
-
+*/
   printf ("PROGRESS\t%" PRIu64 "\t%" PRIu64 "\t", hashcat_status->progress_cur_relative_skip, hashcat_status->progress_end_relative_skip);
 
   printf ("RECHASH\t%d\t%d\t", hashcat_status->digests_done, hashcat_status->digests_cnt);
@@ -974,7 +975,7 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   }
 
   printf ("REJECTED\t%" PRIu64 "\t", hashcat_status->progress_rejected);
-
+/*
   printf ("UTIL\t");
 
   for (int device_id = 0; device_id < hashcat_status->device_info_cnt; device_id++)
@@ -991,7 +992,12 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
 
     printf ("%d\t", util);
   }
-
+*/
+  time_t sec_etc = status_get_sec_etc (hashcat_ctx);
+  printf ("LEFT_RUNTIME\t%" PRIu64 "\t", sec_etc);
+  printf ("FSPEED\t%9sH/S\t", hashcat_status->speed_sec_all);
+  printf ("FPROGRESS\t%.02f%%\t",hashcat_status->progress_finished_percent);
+  
   fwrite (EOL, strlen (EOL), 1, stdout);
 
   fflush (stdout);

@@ -27,7 +27,7 @@ bool hc_fopen (HCFILE *fp, const char *path, char *mode)
 
   int oflag = -1;
 
-  int fmode = S_IRUSR|S_IWUSR;
+  int fmode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH;
 
   if (strncmp (mode, "a", 1) == 0 || strncmp (mode, "ab", 2) == 0)
   {

@@ -554,7 +554,7 @@ void setup_environment_variables (const folder_config_t *folder_config)
 
 void setup_umask ()
 {
-  umask (077);
+  umask (0002);
 }
 
 void setup_seeding (const bool rp_gen_seed_chgd, const u32 rp_gen_seed)

@@ -158,6 +158,10 @@ static void main_log_info (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED
 
 static void main_log_warning (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
 {
+  const user_options_t *user_options = hashcat_ctx->user_options;
+  
+  if (user_options->advice_disable == true) return;
+  
   main_log (hashcat_ctx, stdout, LOGLEVEL_WARNING);
 }
 

@@ -3,10 +3,11 @@
 ## License.....: MIT
 ##
 
+LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath,/epas/utilities/epas-opencl/lib/system -Wl,-rpath,/epas/utilities/epas-opencl/lib/cuda
 SHARED                  ?= 0
 DEBUG                   := 0
-PRODUCTION              := 0
-PRODUCTION_VERSION      := v6.1.1
+PRODUCTION              := 1
+PRODUCTION_VERSION      := v6.1.1-epas
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1
 USE_SYSTEM_LZMA         ?= 0
@@ -58,9 +59,9 @@ MODULE_INTERFACE_VERSION := 620
 ## Native compiler paths
 ##
 
-CC                      := gcc
-CXX                     := g++
-AR                      := ar
+CC                      := /usr/local/bin/gcc-8
+CXX                     := /usr/local/bin/g++
+AR                      := /usr/local/bin/ar
 FIND                    := find
 INSTALL                 := install
 RM                      := rm
