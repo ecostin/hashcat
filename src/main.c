@@ -415,12 +415,12 @@ static void main_potfile_num_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, M
   {
     if (potfile_remove_cracks == 1)
     {
-      event_log_info (hashcat_ctx, "INFO: Removed 1 hash found in potfile.");
+      event_log_info (hashcat_ctx, "INFO: Removed 1 hash found as potfile entry or as empty hash.");
       event_log_info (hashcat_ctx, NULL);
     }
     else
     {
-      event_log_info (hashcat_ctx, "INFO: Removed %d hashes found in potfile.", potfile_remove_cracks);
+      event_log_info (hashcat_ctx, "INFO: Removed %d hashes found as potfile entries or as empty hashes.", potfile_remove_cracks);
       event_log_info (hashcat_ctx, NULL);
     }
   }
@@ -480,7 +480,7 @@ static void main_outerloop_mainscreen (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, 
 
   if (hashconfig->opti_type)
   {
-    event_log_info (hashcat_ctx, "Applicable optimizers applied:");
+    event_log_info (hashcat_ctx, "Optimizers applied:");
 
     for (u32 i = 0; i < 32; i++)
     {

@@ -62,6 +62,7 @@
   MAYBE_UNUSED           const u32            digests_cnt,          \
   MAYBE_UNUSED           const u32            digests_offset_host,  \
   MAYBE_UNUSED           const u32            combs_mode,           \
+  MAYBE_UNUSED           const u32            salt_repeat,          \
   MAYBE_UNUSED           const u64            pws_pos,              \
   MAYBE_UNUSED           const u64            gid_max
 #else
@@ -100,6 +101,7 @@
   MAYBE_UNUSED           const u32            digests_cnt,          \
   MAYBE_UNUSED           const u32            digests_offset_host,  \
   MAYBE_UNUSED           const u32            combs_mode,           \
+  MAYBE_UNUSED           const u32            salt_repeat,          \
   MAYBE_UNUSED           const u64            pws_pos,              \
   MAYBE_UNUSED           const u64            gid_max
 #endif
@@ -234,6 +236,8 @@ DECLSPEC int hash_comp (const u32 *d1, GLOBAL_AS const u32 *d2);
 DECLSPEC int find_hash (const u32 *digest, const u32 digests_cnt, GLOBAL_AS const digest_t *digests_buf);
 #endif
 
+DECLSPEC int utf8_to_utf16le (const u32 *src_buf, int src_len, int src_size, u32 *dst_buf, int dst_size);
+DECLSPEC int utf8_to_utf16le_global (GLOBAL_AS const u32 *src_buf, int src_len, int src_size, u32 *dst_buf, int dst_size);
 DECLSPEC int pkcs_padding_bs8 (const u32 *data_buf, const int data_len);
 DECLSPEC int pkcs_padding_bs16 (const u32 *data_buf, const int data_len);
 DECLSPEC int asn1_detect (const u32 *buf, const int len);

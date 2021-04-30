@@ -2183,6 +2183,7 @@ int ocl_init (hashcat_ctx_t *hashcat_ctx)
   if (ocl->lib == NULL) return -1;
 
   HC_LOAD_FUNC (ocl, clBuildProgram,            OCL_CLBUILDPROGRAM,             OpenCL, 1);
+  HC_LOAD_FUNC (ocl, clCompileProgram,          OCL_CLCOMPILEPROGRAM,           OpenCL, 1);
   HC_LOAD_FUNC (ocl, clCreateBuffer,            OCL_CLCREATEBUFFER,             OpenCL, 1);
   HC_LOAD_FUNC (ocl, clCreateCommandQueue,      OCL_CLCREATECOMMANDQUEUE,       OpenCL, 1);
   HC_LOAD_FUNC (ocl, clCreateContext,           OCL_CLCREATECONTEXT,            OpenCL, 1);
@@ -2205,6 +2206,7 @@ int ocl_init (hashcat_ctx_t *hashcat_ctx)
   HC_LOAD_FUNC (ocl, clGetPlatformInfo,         OCL_CLGETPLATFORMINFO,          OpenCL, 1);
   HC_LOAD_FUNC (ocl, clGetProgramBuildInfo,     OCL_CLGETPROGRAMBUILDINFO,      OpenCL, 1);
   HC_LOAD_FUNC (ocl, clGetProgramInfo,          OCL_CLGETPROGRAMINFO,           OpenCL, 1);
+  HC_LOAD_FUNC (ocl, clLinkProgram,             OCL_CLLINKPROGRAM,              OpenCL, 1);
   HC_LOAD_FUNC (ocl, clReleaseCommandQueue,     OCL_CLRELEASECOMMANDQUEUE,      OpenCL, 1);
   HC_LOAD_FUNC (ocl, clReleaseContext,          OCL_CLRELEASECONTEXT,           OpenCL, 1);
   HC_LOAD_FUNC (ocl, clReleaseKernel,           OCL_CLRELEASEKERNEL,            OpenCL, 1);
@@ -2564,6 +2566,44 @@ int hc_clBuildProgram (hashcat_ctx_t *hashcat_ctx, cl_program program, cl_uint n
   if (CL_err != CL_SUCCESS)
   {
     event_log_error (hashcat_ctx, "clBuildProgram(): %s", val2cstr_cl (CL_err));
+
+    return -1;
+  }
+
+  return 0;
+}
+
+int hc_clCompileProgram (hashcat_ctx_t *hashcat_ctx, cl_program program, cl_uint num_devices, const cl_device_id *device_list, const char *options, cl_uint num_input_headers, const cl_program *input_headers, const char **header_include_names, void (CL_CALLBACK *pfn_notify) (cl_program program, void *user_data), void *user_data)
+{
+  backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
+
+  OCL_PTR *ocl = (OCL_PTR *) backend_ctx->ocl;
+
+  const cl_int CL_err = ocl->clCompileProgram (program, num_devices, device_list, options, num_input_headers, input_headers, header_include_names, pfn_notify, user_data);
+
+  if (CL_err != CL_SUCCESS)
+  {
+    event_log_error (hashcat_ctx, "clCompileProgram(): %s", val2cstr_cl (CL_err));
+
+    return -1;
+  }
+
+  return 0;
+}
+
+int hc_clLinkProgram (hashcat_ctx_t *hashcat_ctx, cl_context context, cl_uint num_devices, const cl_device_id *device_list, const char *options, cl_uint num_input_programs, const cl_program *input_programs, void (CL_CALLBACK *pfn_notify) (cl_program program, void *user_data), void *user_data, cl_program *program)
+{
+  backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
+
+  OCL_PTR *ocl = (OCL_PTR *) backend_ctx->ocl;
+
+  cl_int CL_err;
+
+  *program = ocl->clLinkProgram (context, num_devices, device_list, options, num_input_programs, input_programs, pfn_notify, user_data, &CL_err);
+
+  if (CL_err != CL_SUCCESS)
+  {
+    event_log_error (hashcat_ctx, "clLinkProgram(): %s", val2cstr_cl (CL_err));
 
     return -1;
   }
@@ -2958,11 +2998,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
   }
   else
   {
-    bool run_init = true;
-    bool run_loop = true;
-    bool run_comp = true;
-
-    if (run_init == true)
+    if (true)
     {
       if (device_param->is_cuda == true)
       {
@@ -3049,165 +3085,190 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
       }
     }
 
-    if (run_loop == true)
+    if (true)
     {
-      u32 iter = hashes->salts_buf[salt_pos].salt_iter;
+      const u32 salt_repeats = hashes->salts_buf[salt_pos].salt_repeats;
 
-      u32 loop_step = device_param->kernel_loops;
-
-      for (u32 loop_pos = 0, slow_iteration = 0; loop_pos < iter; loop_pos += loop_step, slow_iteration++)
+      for (u32 salt_repeat = 0; salt_repeat <= salt_repeats; salt_repeat++)
       {
-        u32 loop_left = iter - loop_pos;
+        device_param->kernel_params_buf32[34] = salt_repeat;
 
-        loop_left = MIN (loop_left, loop_step);
-
-        device_param->kernel_params_buf32[28] = loop_pos;
-        device_param->kernel_params_buf32[29] = loop_left;
-
-        if (run_kernel (hashcat_ctx, device_param, KERN_RUN_2, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
         {
-          if (run_kernel (hashcat_ctx, device_param, KERN_RUN_2E, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
+          if (run_kernel (hashcat_ctx, device_param, KERN_RUN_2P, pws_pos, pws_cnt, false, 0) == -1) return -1;
         }
 
-        //bug?
-        //while (status_ctx->run_thread_level2 == false) break;
-        if (status_ctx->run_thread_level2 == false) break;
-
-        /**
-         * speed
-         */
-
-        const float iter_part = (float) (loop_pos + loop_left) / iter;
-
-        const u64 perf_sum_all = (u64) (pws_cnt * iter_part);
-
-        double speed_msec = hc_timer_get (device_param->timer_speed);
-
-        const u32 speed_pos = device_param->speed_pos;
-
-        device_param->speed_cnt[speed_pos] = perf_sum_all;
-
-        device_param->speed_msec[speed_pos] = speed_msec;
-
-        if (user_options->speed_only == true)
+        if (true)
         {
-          if (speed_msec > 4000)
+          const u32 iter = hashes->salts_buf[salt_pos].salt_iter;
+
+          const u32 loop_step = device_param->kernel_loops;
+
+          for (u32 loop_pos = 0, slow_iteration = 0; loop_pos < iter; loop_pos += loop_step, slow_iteration++)
           {
-            device_param->outerloop_multi *= (double) iter / (double) (loop_pos + loop_left);
+            u32 loop_left = iter - loop_pos;
 
-            device_param->speed_pos = 1;
+            loop_left = MIN (loop_left, loop_step);
 
-            device_param->speed_only_finish = true;
+            device_param->kernel_params_buf32[28] = loop_pos;
+            device_param->kernel_params_buf32[29] = loop_left;
 
-            return 0;
+            if (run_kernel (hashcat_ctx, device_param, KERN_RUN_2, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
+
+            if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+            {
+              if (run_kernel (hashcat_ctx, device_param, KERN_RUN_2E, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
+            }
+
+            //bug?
+            //while (status_ctx->run_thread_level2 == false) break;
+            if (status_ctx->run_thread_level2 == false) break;
+
+            /**
+             * speed
+             */
+
+            const float iter_part = (float) (loop_pos + loop_left) / iter;
+
+            const u64 perf_sum_all = (u64) (pws_cnt * iter_part);
+
+            double speed_msec = hc_timer_get (device_param->timer_speed);
+
+            const u32 speed_pos = device_param->speed_pos;
+
+            device_param->speed_cnt[speed_pos] = perf_sum_all;
+
+            device_param->speed_msec[speed_pos] = speed_msec;
+
+            if (user_options->speed_only == true)
+            {
+              if (speed_msec > 4000)
+              {
+                device_param->outerloop_multi *= (double) iter / (double) (loop_pos + loop_left);
+
+                device_param->speed_pos = 1;
+
+                device_param->speed_only_finish = true;
+
+                return 0;
+              }
+            }
+          }
+
+          if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
+          {
+            if (run_kernel (hashcat_ctx, device_param, KERN_RUN_23, pws_pos, pws_cnt, false, 0) == -1) return -1;
+
+            if (device_param->is_cuda == true)
+            {
+              if (hc_cuMemcpyDtoH (hashcat_ctx, device_param->hooks_buf, device_param->cuda_d_hooks, pws_cnt * hashconfig->hook_size) == -1) return -1;
+            }
+
+            if (device_param->is_opencl == true)
+            {
+              if (hc_clEnqueueReadBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_hooks, CL_TRUE, 0, pws_cnt * hashconfig->hook_size, device_param->hooks_buf, 0, NULL, NULL) == -1) return -1;
+            }
+
+            const int hook_threads = (int) user_options->hook_threads;
+
+            hook_thread_param_t *hook_threads_param = (hook_thread_param_t *) hccalloc (hook_threads, sizeof (hook_thread_param_t));
+
+            for (int i = 0; i < hook_threads; i++)
+            {
+              hook_thread_param_t *hook_thread_param = hook_threads_param + i;
+
+              hook_thread_param->tid = i;
+              hook_thread_param->tsz = hook_threads;
+
+              hook_thread_param->module_ctx = module_ctx;
+              hook_thread_param->status_ctx = status_ctx;
+
+              hook_thread_param->device_param = device_param;
+
+              hook_thread_param->hook_extra_param = module_ctx->hook_extra_params[i];
+              hook_thread_param->hook_salts_buf = hashes->hook_salts_buf;
+
+              hook_thread_param->salt_pos = salt_pos;
+
+              hook_thread_param->pws_cnt = pws_cnt;
+            }
+
+            hc_thread_t *c_threads = (hc_thread_t *) hccalloc (hook_threads, sizeof (hc_thread_t));
+
+            for (int i = 0; i < hook_threads; i++)
+            {
+              hook_thread_param_t *hook_thread_param = hook_threads_param + i;
+
+              hc_thread_create (c_threads[i], hook23_thread, hook_thread_param);
+            }
+
+            hc_thread_wait (hook_threads, c_threads);
+
+            hcfree (c_threads);
+
+            hcfree (hook_threads_param);
+
+            if (device_param->is_cuda == true)
+            {
+              if (hc_cuMemcpyHtoD (hashcat_ctx, device_param->cuda_d_hooks, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
+            }
+
+            if (device_param->is_opencl == true)
+            {
+              if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_hooks, CL_TRUE, 0, pws_cnt * hashconfig->hook_size, device_param->hooks_buf, 0, NULL, NULL) == -1) return -1;
+            }
           }
         }
       }
-
-      if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
-      {
-        if (run_kernel (hashcat_ctx, device_param, KERN_RUN_23, pws_pos, pws_cnt, false, 0) == -1) return -1;
-
-        if (device_param->is_cuda == true)
-        {
-          if (hc_cuMemcpyDtoH (hashcat_ctx, device_param->hooks_buf, device_param->cuda_d_hooks, pws_cnt * hashconfig->hook_size) == -1) return -1;
-        }
-
-        if (device_param->is_opencl == true)
-        {
-          if (hc_clEnqueueReadBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_hooks, CL_TRUE, 0, pws_cnt * hashconfig->hook_size, device_param->hooks_buf, 0, NULL, NULL) == -1) return -1;
-        }
-
-        const int hook_threads = (int) user_options->hook_threads;
-
-        hook_thread_param_t *hook_threads_param = (hook_thread_param_t *) hccalloc (hook_threads, sizeof (hook_thread_param_t));
-
-        for (int i = 0; i < hook_threads; i++)
-        {
-          hook_thread_param_t *hook_thread_param = hook_threads_param + i;
-
-          hook_thread_param->tid = i;
-          hook_thread_param->tsz = hook_threads;
-
-          hook_thread_param->module_ctx = module_ctx;
-          hook_thread_param->status_ctx = status_ctx;
-
-          hook_thread_param->device_param = device_param;
-
-          hook_thread_param->hook_extra_param = module_ctx->hook_extra_params[i];
-          hook_thread_param->hook_salts_buf = hashes->hook_salts_buf;
-
-          hook_thread_param->salt_pos = salt_pos;
-
-          hook_thread_param->pws_cnt = pws_cnt;
-        }
-
-        hc_thread_t *c_threads = (hc_thread_t *) hccalloc (hook_threads, sizeof (hc_thread_t));
-
-        for (int i = 0; i < hook_threads; i++)
-        {
-          hook_thread_param_t *hook_thread_param = hook_threads_param + i;
-
-          hc_thread_create (c_threads[i], hook23_thread, hook_thread_param);
-        }
-
-        hc_thread_wait (hook_threads, c_threads);
-
-        hcfree (c_threads);
-
-        hcfree (hook_threads_param);
-
-        if (device_param->is_cuda == true)
-        {
-          if (hc_cuMemcpyHtoD (hashcat_ctx, device_param->cuda_d_hooks, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
-        }
-
-        if (device_param->is_opencl == true)
-        {
-          if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_hooks, CL_TRUE, 0, pws_cnt * hashconfig->hook_size, device_param->hooks_buf, 0, NULL, NULL) == -1) return -1;
-        }
-      }
     }
 
-    // init2 and loop2 are kind of special, we use run_loop for them, too
+    // note: they also do not influence the performance screen
+    // in case you want to use this, this cane make sense only if your input data comes out of tmps[]
 
-    if (run_loop == true)
+    if (hashconfig->opts_type & OPTS_TYPE_INIT2)
     {
-      // note: they also do not influence the performance screen
-      // in case you want to use this, this cane make sense only if your input data comes out of tmps[]
+      if (run_kernel (hashcat_ctx, device_param, KERN_RUN_INIT2, pws_pos, pws_cnt, false, 0) == -1) return -1;
+    }
 
-      if (hashconfig->opts_type & OPTS_TYPE_INIT2)
+    if (true)
+    {
+      const u32 salt_repeats = hashes->salts_buf[salt_pos].salt_repeats;
+
+      for (u32 salt_repeat = 0; salt_repeat <= salt_repeats; salt_repeat++)
       {
-        if (run_kernel (hashcat_ctx, device_param, KERN_RUN_INIT2, pws_pos, pws_cnt, false, 0) == -1) return -1;
-      }
+        device_param->kernel_params_buf32[34] = salt_repeat;
 
-      if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
-      {
-        u32 iter = hashes->salts_buf[salt_pos].salt_iter2;
-
-        u32 loop_step = device_param->kernel_loops;
-
-        for (u32 loop_pos = 0, slow_iteration = 0; loop_pos < iter; loop_pos += loop_step, slow_iteration++)
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
         {
-          u32 loop_left = iter - loop_pos;
+          if (run_kernel (hashcat_ctx, device_param, KERN_RUN_LOOP2P, pws_pos, pws_cnt, false, 0) == -1) return -1;
+        }
 
-          loop_left = MIN (loop_left, loop_step);
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
+        {
+          u32 iter = hashes->salts_buf[salt_pos].salt_iter2;
 
-          device_param->kernel_params_buf32[28] = loop_pos;
-          device_param->kernel_params_buf32[29] = loop_left;
+          u32 loop_step = device_param->kernel_loops;
 
-          if (run_kernel (hashcat_ctx, device_param, KERN_RUN_LOOP2, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
+          for (u32 loop_pos = 0, slow_iteration = 0; loop_pos < iter; loop_pos += loop_step, slow_iteration++)
+          {
+            u32 loop_left = iter - loop_pos;
 
-          //bug?
-          //while (status_ctx->run_thread_level2 == false) break;
-          if (status_ctx->run_thread_level2 == false) break;
+            loop_left = MIN (loop_left, loop_step);
+
+            device_param->kernel_params_buf32[28] = loop_pos;
+            device_param->kernel_params_buf32[29] = loop_left;
+
+            if (run_kernel (hashcat_ctx, device_param, KERN_RUN_LOOP2, pws_pos, pws_cnt, true, slow_iteration) == -1) return -1;
+
+            //bug?
+            //while (status_ctx->run_thread_level2 == false) break;
+            if (status_ctx->run_thread_level2 == false) break;
+          }
         }
       }
     }
 
-    if (run_comp == true)
+    if (true)
     {
       if (hashconfig->opts_type & OPTS_TYPE_DEEP_COMP_KERNEL)
       {
@@ -3485,6 +3546,10 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
       kernel_threads     = device_param->kernel_wgs12;
       dynamic_shared_mem = device_param->kernel_dynamic_local_mem_size12;
       break;
+    case KERN_RUN_2P:
+      kernel_threads     = device_param->kernel_wgs2p;
+      dynamic_shared_mem = device_param->kernel_dynamic_local_mem_size2p;
+      break;
     case KERN_RUN_2:
       kernel_threads     = device_param->kernel_wgs2;
       dynamic_shared_mem = device_param->kernel_dynamic_local_mem_size2;
@@ -3508,6 +3573,10 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
     case KERN_RUN_INIT2:
       kernel_threads     = device_param->kernel_wgs_init2;
       dynamic_shared_mem = device_param->kernel_dynamic_local_mem_size_init2;
+      break;
+    case KERN_RUN_LOOP2P:
+      kernel_threads     = device_param->kernel_wgs_loop2p;
+      dynamic_shared_mem = device_param->kernel_dynamic_local_mem_size_loop2p;
       break;
     case KERN_RUN_LOOP2:
       kernel_threads     = device_param->kernel_wgs_loop2;
@@ -3550,8 +3619,8 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
 
   kernel_threads = MIN (kernel_threads, device_param->kernel_threads);
 
-  device_param->kernel_params_buf64[34] = pws_pos;
-  device_param->kernel_params_buf64[35] = num;
+  device_param->kernel_params_buf64[35] = pws_pos;
+  device_param->kernel_params_buf64[36] = num;
 
   u64 num_elements = num;
 
@@ -3563,19 +3632,21 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
     {
       switch (kern_run)
       {
-        case KERN_RUN_1:      cuda_function = device_param->cuda_function1;      break;
-        case KERN_RUN_12:     cuda_function = device_param->cuda_function12;     break;
-        case KERN_RUN_2:      cuda_function = device_param->cuda_function2;      break;
-        case KERN_RUN_2E:     cuda_function = device_param->cuda_function2e;     break;
-        case KERN_RUN_23:     cuda_function = device_param->cuda_function23;     break;
-        case KERN_RUN_3:      cuda_function = device_param->cuda_function3;      break;
-        case KERN_RUN_4:      cuda_function = device_param->cuda_function4;      break;
-        case KERN_RUN_INIT2:  cuda_function = device_param->cuda_function_init2; break;
-        case KERN_RUN_LOOP2:  cuda_function = device_param->cuda_function_loop2; break;
-        case KERN_RUN_AUX1:   cuda_function = device_param->cuda_function_aux1;  break;
-        case KERN_RUN_AUX2:   cuda_function = device_param->cuda_function_aux2;  break;
-        case KERN_RUN_AUX3:   cuda_function = device_param->cuda_function_aux3;  break;
-        case KERN_RUN_AUX4:   cuda_function = device_param->cuda_function_aux4;  break;
+        case KERN_RUN_1:      cuda_function = device_param->cuda_function1;       break;
+        case KERN_RUN_12:     cuda_function = device_param->cuda_function12;      break;
+        case KERN_RUN_2P:     cuda_function = device_param->cuda_function2p;      break;
+        case KERN_RUN_2:      cuda_function = device_param->cuda_function2;       break;
+        case KERN_RUN_2E:     cuda_function = device_param->cuda_function2e;      break;
+        case KERN_RUN_23:     cuda_function = device_param->cuda_function23;      break;
+        case KERN_RUN_3:      cuda_function = device_param->cuda_function3;       break;
+        case KERN_RUN_4:      cuda_function = device_param->cuda_function4;       break;
+        case KERN_RUN_INIT2:  cuda_function = device_param->cuda_function_init2;  break;
+        case KERN_RUN_LOOP2P: cuda_function = device_param->cuda_function_loop2p; break;
+        case KERN_RUN_LOOP2:  cuda_function = device_param->cuda_function_loop2;  break;
+        case KERN_RUN_AUX1:   cuda_function = device_param->cuda_function_aux1;   break;
+        case KERN_RUN_AUX2:   cuda_function = device_param->cuda_function_aux2;   break;
+        case KERN_RUN_AUX3:   cuda_function = device_param->cuda_function_aux3;   break;
+        case KERN_RUN_AUX4:   cuda_function = device_param->cuda_function_aux4;   break;
       }
 
       if (hc_cuFuncSetAttribute (hashcat_ctx, cuda_function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shared_mem) == -1) return -1;
@@ -3660,19 +3731,21 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
     {
       switch (kern_run)
       {
-        case KERN_RUN_1:      opencl_kernel = device_param->opencl_kernel1;      break;
-        case KERN_RUN_12:     opencl_kernel = device_param->opencl_kernel12;     break;
-        case KERN_RUN_2:      opencl_kernel = device_param->opencl_kernel2;      break;
-        case KERN_RUN_2E:     opencl_kernel = device_param->opencl_kernel2e;     break;
-        case KERN_RUN_23:     opencl_kernel = device_param->opencl_kernel23;     break;
-        case KERN_RUN_3:      opencl_kernel = device_param->opencl_kernel3;      break;
-        case KERN_RUN_4:      opencl_kernel = device_param->opencl_kernel4;      break;
-        case KERN_RUN_INIT2:  opencl_kernel = device_param->opencl_kernel_init2; break;
-        case KERN_RUN_LOOP2:  opencl_kernel = device_param->opencl_kernel_loop2; break;
-        case KERN_RUN_AUX1:   opencl_kernel = device_param->opencl_kernel_aux1;  break;
-        case KERN_RUN_AUX2:   opencl_kernel = device_param->opencl_kernel_aux2;  break;
-        case KERN_RUN_AUX3:   opencl_kernel = device_param->opencl_kernel_aux3;  break;
-        case KERN_RUN_AUX4:   opencl_kernel = device_param->opencl_kernel_aux4;  break;
+        case KERN_RUN_1:      opencl_kernel = device_param->opencl_kernel1;       break;
+        case KERN_RUN_12:     opencl_kernel = device_param->opencl_kernel12;      break;
+        case KERN_RUN_2P:     opencl_kernel = device_param->opencl_kernel2p;      break;
+        case KERN_RUN_2:      opencl_kernel = device_param->opencl_kernel2;       break;
+        case KERN_RUN_2E:     opencl_kernel = device_param->opencl_kernel2e;      break;
+        case KERN_RUN_23:     opencl_kernel = device_param->opencl_kernel23;      break;
+        case KERN_RUN_3:      opencl_kernel = device_param->opencl_kernel3;       break;
+        case KERN_RUN_4:      opencl_kernel = device_param->opencl_kernel4;       break;
+        case KERN_RUN_INIT2:  opencl_kernel = device_param->opencl_kernel_init2;  break;
+        case KERN_RUN_LOOP2P: opencl_kernel = device_param->opencl_kernel_loop2p; break;
+        case KERN_RUN_LOOP2:  opencl_kernel = device_param->opencl_kernel_loop2;  break;
+        case KERN_RUN_AUX1:   opencl_kernel = device_param->opencl_kernel_aux1;   break;
+        case KERN_RUN_AUX2:   opencl_kernel = device_param->opencl_kernel_aux2;   break;
+        case KERN_RUN_AUX3:   opencl_kernel = device_param->opencl_kernel_aux3;   break;
+        case KERN_RUN_AUX4:   opencl_kernel = device_param->opencl_kernel_aux4;   break;
       }
     }
 
@@ -3681,12 +3754,12 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
       if (hc_clSetKernelArg (hashcat_ctx, opencl_kernel, i, sizeof (cl_mem), device_param->kernel_params[i]) == -1) return -1;
     }
 
-    for (u32 i = 24; i <= 33; i++)
+    for (u32 i = 24; i <= 34; i++)
     {
       if (hc_clSetKernelArg (hashcat_ctx, opencl_kernel, i, sizeof (cl_uint), device_param->kernel_params[i]) == -1) return -1;
     }
 
-    for (u32 i = 34; i <= 35; i++)
+    for (u32 i = 35; i <= 36; i++)
     {
       if (hc_clSetKernelArg (hashcat_ctx, opencl_kernel, i, sizeof (cl_ulong), device_param->kernel_params[i]) == -1) return -1;
     }
@@ -3746,17 +3819,19 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
         {
           switch (kern_run)
           {
-            case KERN_RUN_1:      if (device_param->exec_us_prev1[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev1[iterationm]      * device_param->spin_damp)); break;
-            case KERN_RUN_2:      if (device_param->exec_us_prev2[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev2[iterationm]      * device_param->spin_damp)); break;
-            case KERN_RUN_2E:     if (device_param->exec_us_prev2e[iterationm]     > 0) usleep ((useconds_t) (device_param->exec_us_prev2e[iterationm]     * device_param->spin_damp)); break;
-            case KERN_RUN_3:      if (device_param->exec_us_prev3[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev3[iterationm]      * device_param->spin_damp)); break;
-            case KERN_RUN_4:      if (device_param->exec_us_prev4[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev4[iterationm]      * device_param->spin_damp)); break;
-            case KERN_RUN_INIT2:  if (device_param->exec_us_prev_init2[iterationm] > 0) usleep ((useconds_t) (device_param->exec_us_prev_init2[iterationm] * device_param->spin_damp)); break;
-            case KERN_RUN_LOOP2:  if (device_param->exec_us_prev_loop2[iterationm] > 0) usleep ((useconds_t) (device_param->exec_us_prev_loop2[iterationm] * device_param->spin_damp)); break;
-            case KERN_RUN_AUX1:   if (device_param->exec_us_prev_aux1[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux1[iterationm]  * device_param->spin_damp)); break;
-            case KERN_RUN_AUX2:   if (device_param->exec_us_prev_aux2[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux2[iterationm]  * device_param->spin_damp)); break;
-            case KERN_RUN_AUX3:   if (device_param->exec_us_prev_aux3[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux3[iterationm]  * device_param->spin_damp)); break;
-            case KERN_RUN_AUX4:   if (device_param->exec_us_prev_aux4[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux4[iterationm]  * device_param->spin_damp)); break;
+            case KERN_RUN_1:      if (device_param->exec_us_prev1[iterationm]       > 0) usleep ((useconds_t) (device_param->exec_us_prev1[iterationm]       * device_param->spin_damp)); break;
+            case KERN_RUN_2P:     if (device_param->exec_us_prev2p[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev2p[iterationm]      * device_param->spin_damp)); break;
+            case KERN_RUN_2:      if (device_param->exec_us_prev2[iterationm]       > 0) usleep ((useconds_t) (device_param->exec_us_prev2[iterationm]       * device_param->spin_damp)); break;
+            case KERN_RUN_2E:     if (device_param->exec_us_prev2e[iterationm]      > 0) usleep ((useconds_t) (device_param->exec_us_prev2e[iterationm]      * device_param->spin_damp)); break;
+            case KERN_RUN_3:      if (device_param->exec_us_prev3[iterationm]       > 0) usleep ((useconds_t) (device_param->exec_us_prev3[iterationm]       * device_param->spin_damp)); break;
+            case KERN_RUN_4:      if (device_param->exec_us_prev4[iterationm]       > 0) usleep ((useconds_t) (device_param->exec_us_prev4[iterationm]       * device_param->spin_damp)); break;
+            case KERN_RUN_INIT2:  if (device_param->exec_us_prev_init2[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_init2[iterationm]  * device_param->spin_damp)); break;
+            case KERN_RUN_LOOP2P: if (device_param->exec_us_prev_loop2p[iterationm] > 0) usleep ((useconds_t) (device_param->exec_us_prev_loop2p[iterationm] * device_param->spin_damp)); break;
+            case KERN_RUN_LOOP2:  if (device_param->exec_us_prev_loop2[iterationm]  > 0) usleep ((useconds_t) (device_param->exec_us_prev_loop2[iterationm]  * device_param->spin_damp)); break;
+            case KERN_RUN_AUX1:   if (device_param->exec_us_prev_aux1[iterationm]   > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux1[iterationm]   * device_param->spin_damp)); break;
+            case KERN_RUN_AUX2:   if (device_param->exec_us_prev_aux2[iterationm]   > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux2[iterationm]   * device_param->spin_damp)); break;
+            case KERN_RUN_AUX3:   if (device_param->exec_us_prev_aux3[iterationm]   > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux3[iterationm]   * device_param->spin_damp)); break;
+            case KERN_RUN_AUX4:   if (device_param->exec_us_prev_aux4[iterationm]   > 0) usleep ((useconds_t) (device_param->exec_us_prev_aux4[iterationm]   * device_param->spin_damp)); break;
           }
         }
         else
@@ -3790,17 +3865,19 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
       {
         switch (kern_run)
         {
-          case KERN_RUN_1:      device_param->exec_us_prev1[iterationm]      = exec_us; break;
-          case KERN_RUN_2:      device_param->exec_us_prev2[iterationm]      = exec_us; break;
-          case KERN_RUN_2E:     device_param->exec_us_prev2e[iterationm]     = exec_us; break;
-          case KERN_RUN_3:      device_param->exec_us_prev3[iterationm]      = exec_us; break;
-          case KERN_RUN_4:      device_param->exec_us_prev4[iterationm]      = exec_us; break;
-          case KERN_RUN_INIT2:  device_param->exec_us_prev_init2[iterationm] = exec_us; break;
-          case KERN_RUN_LOOP2:  device_param->exec_us_prev_loop2[iterationm] = exec_us; break;
-          case KERN_RUN_AUX1:   device_param->exec_us_prev_aux1[iterationm]  = exec_us; break;
-          case KERN_RUN_AUX2:   device_param->exec_us_prev_aux2[iterationm]  = exec_us; break;
-          case KERN_RUN_AUX3:   device_param->exec_us_prev_aux3[iterationm]  = exec_us; break;
-          case KERN_RUN_AUX4:   device_param->exec_us_prev_aux4[iterationm]  = exec_us; break;
+          case KERN_RUN_1:      device_param->exec_us_prev1[iterationm]       = exec_us; break;
+          case KERN_RUN_2P:     device_param->exec_us_prev2p[iterationm]      = exec_us; break;
+          case KERN_RUN_2:      device_param->exec_us_prev2[iterationm]       = exec_us; break;
+          case KERN_RUN_2E:     device_param->exec_us_prev2e[iterationm]      = exec_us; break;
+          case KERN_RUN_3:      device_param->exec_us_prev3[iterationm]       = exec_us; break;
+          case KERN_RUN_4:      device_param->exec_us_prev4[iterationm]       = exec_us; break;
+          case KERN_RUN_INIT2:  device_param->exec_us_prev_init2[iterationm]  = exec_us; break;
+          case KERN_RUN_LOOP2P: device_param->exec_us_prev_loop2p[iterationm] = exec_us; break;
+          case KERN_RUN_LOOP2:  device_param->exec_us_prev_loop2[iterationm]  = exec_us; break;
+          case KERN_RUN_AUX1:   device_param->exec_us_prev_aux1[iterationm]   = exec_us; break;
+          case KERN_RUN_AUX2:   device_param->exec_us_prev_aux2[iterationm]   = exec_us; break;
+          case KERN_RUN_AUX3:   device_param->exec_us_prev_aux3[iterationm]   = exec_us; break;
+          case KERN_RUN_AUX4:   device_param->exec_us_prev_aux4[iterationm]   = exec_us; break;
         }
       }
     }
@@ -7134,6 +7211,7 @@ void backend_ctx_devices_destroy (hashcat_ctx_t *hashcat_ctx)
 void backend_ctx_devices_sync_tuning (hashcat_ctx_t *hashcat_ctx)
 {
   backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
+  hashconfig_t  *hashconfig  = hashcat_ctx->hashconfig;
 
   if (backend_ctx->enabled == false) return;
 
@@ -7159,7 +7237,7 @@ void backend_ctx_devices_sync_tuning (hashcat_ctx_t *hashcat_ctx)
       device_param_dst->kernel_loops   = device_param_src->kernel_loops;
       device_param_dst->kernel_threads = device_param_src->kernel_threads;
 
-      const u32 hardware_power = device_param_dst->device_processors * device_param_dst->kernel_threads;
+      const u32 hardware_power = ((hashconfig->opts_type & OPTS_TYPE_MP_MULTI_DISABLE) ? 1 : device_param_dst->device_processors) * device_param_dst->kernel_threads;
 
       device_param_dst->hardware_power = hardware_power;
 
@@ -7707,17 +7785,17 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
 
     if (device_param->is_opencl == true)
     {
-      if (hc_clCreateProgramWithSource (hashcat_ctx, device_param->opencl_context, 1, (const char **) kernel_sources, NULL, opencl_program) == -1) return false;
-
-      const int CL_rc = hc_clBuildProgram (hashcat_ctx, *opencl_program, 1, &device_param->opencl_device, build_options_buf, NULL, NULL);
-
-      //if (CL_rc == -1) return -1;
-
       size_t build_log_size = 0;
 
-      hc_clGetProgramBuildInfo (hashcat_ctx, *opencl_program, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+      int CL_rc;
 
-      //if (CL_rc == -1) return -1;
+      cl_program p1 = NULL;
+
+      if (hc_clCreateProgramWithSource (hashcat_ctx, device_param->opencl_context, 1, (const char **) kernel_sources, NULL, &p1) == -1) return false;
+
+      CL_rc = hc_clCompileProgram (hashcat_ctx, p1, 1, &device_param->opencl_device, build_options_buf, 0, NULL, NULL, NULL, NULL);
+
+      hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
 
       #if defined (DEBUG)
       if ((build_log_size > 1) || (CL_rc == -1))
@@ -7727,7 +7805,7 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
       {
         char *build_log = (char *) hcmalloc (build_log_size + 1);
 
-        const int rc_clGetProgramBuildInfo = hc_clGetProgramBuildInfo (hashcat_ctx, *opencl_program, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+        const int rc_clGetProgramBuildInfo = hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
 
         if (rc_clGetProgramBuildInfo == -1) return false;
 
@@ -7737,6 +7815,21 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
       }
 
       if (CL_rc == -1) return false;
+
+      cl_program t2[1];
+
+      t2[0] = p1;
+
+      cl_program fin;
+
+      if (hc_clLinkProgram (hashcat_ctx, device_param->opencl_context, 1, &device_param->opencl_device, NULL, 1, t2, NULL, NULL, &fin) == -1) return false;
+
+      // it seems errors caused by clLinkProgram() do not go into CL_PROGRAM_BUILD
+      // I couldn't find any information on the web explaining how else to retrieve the error messages from the linker
+
+      *opencl_program = fin;
+
+      hc_clReleaseProgram (hashcat_ctx, p1);
 
       if (cache_disable == false)
       {
@@ -8014,12 +8107,20 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         const u32 _kernel_accel = tuningdb_entry->kernel_accel;
 
-        if (_kernel_accel)
+        if (_kernel_accel == (u32) -1) // native, makes sense if OPTS_TYPE_MP_MULTI_DISABLE is used
         {
-          if ((_kernel_accel >= device_param->kernel_accel_min) && (_kernel_accel <= device_param->kernel_accel_max))
+          device_param->kernel_accel_min = device_param->device_processors;
+          device_param->kernel_accel_max = device_param->device_processors;
+        }
+        else
+        {
+          if (_kernel_accel)
           {
-            device_param->kernel_accel_min = _kernel_accel;
-            device_param->kernel_accel_max = _kernel_accel;
+            if ((_kernel_accel >= device_param->kernel_accel_min) && (_kernel_accel <= device_param->kernel_accel_max))
+            {
+              device_param->kernel_accel_min = _kernel_accel;
+              device_param->kernel_accel_max = _kernel_accel;
+            }
           }
         }
       }
@@ -8109,6 +8210,51 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
      */
 
     const u32 device_processors = device_param->device_processors;
+
+    /**
+     * device threads
+     */
+
+    if (hashconfig->opts_type & OPTS_TYPE_NATIVE_THREADS)
+    {
+      u32 native_threads = 0;
+
+      if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
+      {
+        native_threads = 1;
+      }
+      else if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
+      {
+        // for GPU we need to distinguish by vendor
+
+        if (device_param->opencl_device_vendor_id == VENDOR_ID_INTEL_SDK)
+        {
+          native_threads = 8;
+        }
+        else if (device_param->opencl_device_vendor_id == VENDOR_ID_AMD)
+        {
+          native_threads = 64;
+        }
+        else
+        {
+          native_threads = 32;
+        }
+      }
+      else
+      {
+        // abort?
+      }
+
+      if ((native_threads >= device_param->kernel_threads_min) && (native_threads <= device_param->kernel_threads_max))
+      {
+        device_param->kernel_threads_min = native_threads;
+        device_param->kernel_threads_max = native_threads;
+      }
+      else
+      {
+        // abort?
+      }
+    }
 
     /**
      * create context for each device
@@ -8235,6 +8381,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     device_param->size_st_salts   = size_st_salts;
     device_param->size_st_esalts  = size_st_esalts;
 
+    // extra buffer
+
     u64 size_extra_buffer = 4;
 
     if (module_ctx->module_extra_buffer_size != MODULE_DEFAULT)
@@ -8251,7 +8399,20 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       device_param->extra_buffer_size = extra_buffer_size;
 
-      size_extra_buffer = extra_buffer_size;
+      // for the size we actually allocate we need to cheat a bit in order to make it more easy for plugin developer.
+      //
+      // we will divide this size by 4 to workaround opencl limitation.
+      // this collides with a theoretical scenario (like -n1 -T1) where there's only one workitem,
+      // because inside the kernel the target buffer is selected by workitem_id / 4.
+      // but the maximum size of the buffer would be only 1/4 of what is needed -> overflow.
+      //
+      // to workaround this we make sure that there's always a full buffer in each of the 4 allocated buffers available.
+
+      const u64 kernel_power_max = ((hashconfig->opts_type & OPTS_TYPE_MP_MULTI_DISABLE) ? 1 : device_param->device_processors) * device_param->kernel_threads_max * device_param->kernel_accel_max;
+
+      const u64 extra_buffer_size_one = extra_buffer_size / kernel_power_max;
+
+      size_extra_buffer = extra_buffer_size + (extra_buffer_size_one * 4);
     }
 
     // kern type
@@ -8406,6 +8567,11 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     {
       cache_disable = module_ctx->module_jit_cache_disable (hashconfig, user_options, user_options_extra, hashes, device_param);
     }
+
+    #if defined (DEBUG)
+    // https://github.com/hashcat/hashcat/issues/2750
+    cache_disable = true;
+    #endif
 
     /**
      * shared kernel with no hashconfig dependencies
@@ -8964,8 +9130,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     device_param->kernel_params_buf32[31] = 0; // digests_cnt
     device_param->kernel_params_buf32[32] = 0; // digests_offset
     device_param->kernel_params_buf32[33] = 0; // combs_mode
-    device_param->kernel_params_buf64[34] = 0; // pws_pos
-    device_param->kernel_params_buf64[35] = 0; // gid_max
+    device_param->kernel_params_buf32[34] = 0; // salt_repeat
+    device_param->kernel_params_buf64[35] = 0; // pws_pos
+    device_param->kernel_params_buf64[36] = 0; // gid_max
 
     if (device_param->is_cuda == true)
     {
@@ -9033,8 +9200,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     device_param->kernel_params[31] = &device_param->kernel_params_buf32[31];
     device_param->kernel_params[32] = &device_param->kernel_params_buf32[32];
     device_param->kernel_params[33] = &device_param->kernel_params_buf32[33];
-    device_param->kernel_params[34] = &device_param->kernel_params_buf64[34];
+    device_param->kernel_params[34] = &device_param->kernel_params_buf32[34];
     device_param->kernel_params[35] = &device_param->kernel_params_buf64[35];
+    device_param->kernel_params[36] = &device_param->kernel_params_buf64[36];
 
     if (user_options->slow_candidates == true)
     {
@@ -9432,6 +9600,23 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
         device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
 
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+        {
+          // kernel2p
+
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2p, device_param->cuda_module, kernel_name) == -1) return -1;
+
+          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+          if (get_cuda_kernel_dynamic_local_mem_size (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_dynamic_local_mem_size2p) == -1) return -1;
+
+          device_param->kernel_preferred_wgs_multiple2p = device_param->cuda_warp_size;
+        }
+
         if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
         {
           // kernel2e
@@ -9498,6 +9683,23 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
           if (get_cuda_kernel_dynamic_local_mem_size (hashcat_ctx, device_param->cuda_function_init2, &device_param->kernel_dynamic_local_mem_size_init2) == -1) return -1;
 
           device_param->kernel_preferred_wgs_multiple_init2 = device_param->cuda_warp_size;
+        }
+
+        // loop2 prepare
+
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_loop2p, device_param->cuda_module, kernel_name) == -1) return -1;
+
+          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+          if (get_cuda_kernel_dynamic_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_dynamic_local_mem_size_loop2p) == -1) return -1;
+
+          device_param->kernel_preferred_wgs_multiple_loop2p = device_param->cuda_warp_size;
         }
 
         // loop2
@@ -10020,6 +10222,21 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
         // aux1
 
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2p) == -1) return -1;
+
+          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_dynamic_local_mem_size2p) == -1) return -1;
+
+          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_preferred_wgs_multiple2p) == -1) return -1;
+        }
+
         if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
         {
           snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
@@ -10084,6 +10301,23 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
           if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_dynamic_local_mem_size_init2) == -1) return -1;
 
           if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_preferred_wgs_multiple_init2) == -1) return -1;
+        }
+
+        // loop2 prepare
+
+        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_loop2p) == -1) return -1;
+
+          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_dynamic_local_mem_size_loop2p) == -1) return -1;
+
+          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_preferred_wgs_multiple_loop2p) == -1) return -1;
         }
 
         // loop2
@@ -10379,7 +10613,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     // this is required because inside the kernels there is this:
     // __local pw_t s_pws[64];
 
-    if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+    if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT)
+     || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+     || (user_options->slow_candidates == true))
     {
       if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
       {
@@ -10411,7 +10647,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     device_param->kernel_threads = kernel_threads;
 
-    device_param->hardware_power = device_processors * kernel_threads;
+    device_param->hardware_power = ((hashconfig->opts_type & OPTS_TYPE_MP_MULTI_DISABLE) ? 1 : device_processors) * kernel_threads;
 
     u32 kernel_accel_min = device_param->kernel_accel_min;
     u32 kernel_accel_max = device_param->kernel_accel_max;
@@ -10452,16 +10688,6 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     // note we're allocating 3 blocks of that size.
 
     const u64 PWS_SPACE = 1024ULL * 1024ULL * 1024ULL;
-
-    // sometimes device_available_mem and device_maxmem_alloc reported back from the opencl runtime are a bit inaccurate.
-    // let's add some extra space just to be sure.
-
-    //const u64 EXTRA_SPACE = 64ULL * 1024ULL * 1024ULL;
-
-    // it seems the returned values to device_available_mem are inaccurate
-    // we need more room
-
-    const u64 EXTRA_SPACE = device_param->device_maxmem_alloc / 4;
 
     while (kernel_accel_max >= kernel_accel_min)
     {
@@ -10513,6 +10739,15 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       int memory_limit_hit = 0;
 
       if (size_pws > PWS_SPACE) memory_limit_hit = 1;
+
+      // sometimes device_available_mem and device_maxmem_alloc reported back from the opencl runtime are a bit inaccurate.
+      // let's add some extra space just to be sure.
+      // now depends on the kernel-accel value (where scrypt and similar benefits), but also hard minimum 64mb and maximum 1024mb limit
+
+      u64 EXTRA_SPACE = (1024ULL * 1024ULL) * kernel_accel_max;
+
+      EXTRA_SPACE = MAX (EXTRA_SPACE, (  64ULL * 1024ULL * 1024ULL));
+      EXTRA_SPACE = MIN (EXTRA_SPACE, (1024ULL * 1024ULL * 1024ULL));
 
       if ((size_pws   + EXTRA_SPACE) > device_param->device_maxmem_alloc) memory_limit_hit = 1;
       if ((size_tmps  + EXTRA_SPACE) > device_param->device_maxmem_alloc) memory_limit_hit = 1;
@@ -10950,12 +11185,14 @@ void backend_session_destroy (hashcat_ctx_t *hashcat_ctx)
 
       device_param->cuda_function1            = NULL;
       device_param->cuda_function12           = NULL;
+      device_param->cuda_function2p           = NULL;
       device_param->cuda_function2            = NULL;
       device_param->cuda_function2e           = NULL;
       device_param->cuda_function23           = NULL;
       device_param->cuda_function3            = NULL;
       device_param->cuda_function4            = NULL;
       device_param->cuda_function_init2       = NULL;
+      device_param->cuda_function_loop2p      = NULL;
       device_param->cuda_function_loop2       = NULL;
       device_param->cuda_function_mp          = NULL;
       device_param->cuda_function_mp_l        = NULL;
@@ -11018,12 +11255,14 @@ void backend_session_destroy (hashcat_ctx_t *hashcat_ctx)
 
       if (device_param->opencl_kernel1)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel1);
       if (device_param->opencl_kernel12)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel12);
+      if (device_param->opencl_kernel2p)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2p);
       if (device_param->opencl_kernel2)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2);
       if (device_param->opencl_kernel2e)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2e);
       if (device_param->opencl_kernel23)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel23);
       if (device_param->opencl_kernel3)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel3);
       if (device_param->opencl_kernel4)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel4);
       if (device_param->opencl_kernel_init2)     hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_init2);
+      if (device_param->opencl_kernel_loop2p)    hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_loop2p);
       if (device_param->opencl_kernel_loop2)     hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_loop2);
       if (device_param->opencl_kernel_mp)        hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_mp);
       if (device_param->opencl_kernel_mp_l)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_mp_l);
@@ -11084,12 +11323,14 @@ void backend_session_destroy (hashcat_ctx_t *hashcat_ctx)
       device_param->opencl_d_st_esalts_buf     = NULL;
       device_param->opencl_kernel1             = NULL;
       device_param->opencl_kernel12            = NULL;
+      device_param->opencl_kernel2p            = NULL;
       device_param->opencl_kernel2             = NULL;
       device_param->opencl_kernel2e            = NULL;
       device_param->opencl_kernel23            = NULL;
       device_param->opencl_kernel3             = NULL;
       device_param->opencl_kernel4             = NULL;
       device_param->opencl_kernel_init2        = NULL;
+      device_param->opencl_kernel_loop2p       = NULL;
       device_param->opencl_kernel_loop2        = NULL;
       device_param->opencl_kernel_mp           = NULL;
       device_param->opencl_kernel_mp_l         = NULL;
