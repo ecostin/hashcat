@@ -1981,6 +1981,28 @@ DECLSPEC int find_hash (const u32 *digest, const u32 digests_cnt, GLOBAL_AS cons
 }
 #endif
 
+// Input has to be zero padded and buffer size has to be multiple of 4
+
+DECLSPEC int test_any_8th_bit (const u32 *buf, const int len)
+{
+  // we simply ignore buffer length for the first 24 bytes for some extra speed boost :)
+  // number of unrolls found by simply testing what gave best results
+
+  if (buf[0] & 0x80808080) return 1;
+  if (buf[1] & 0x80808080) return 1;
+  if (buf[2] & 0x80808080) return 1;
+  if (buf[3] & 0x80808080) return 1;
+  if (buf[4] & 0x80808080) return 1;
+  if (buf[5] & 0x80808080) return 1;
+
+  for (int i = 24, j = 6; i < len; i += 4, j += 1)
+  {
+    if (buf[j] & 0x80808080) return 1;
+  }
+
+  return 0;
+}
+
 // Constants and some code snippets from unicode.org's ConvertUTF.c
 // Compiler can perfectly translate some of the branches and switch cases this into MOVC
 // which is faster than lookup tables
