@@ -158,7 +158,9 @@ DECLSPEC void sha224_init (sha224_ctx_t *ctx)
 
 DECLSPEC void sha224_update_64 (sha224_ctx_t *ctx, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const int len)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 63;
+  if (len == 0) return;
+
+  const int pos = ctx->len & 63;
 
   ctx->len += len;
 
@@ -422,7 +424,7 @@ DECLSPEC void sha224_update_utf16le (sha224_ctx_t *ctx, const u32 *w, const int 
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[16];
+      u32 enc_buf[16] = { 0 };
 
       const int enc_len = hc_enc_next (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -482,7 +484,7 @@ DECLSPEC void sha224_update_utf16le_swap (sha224_ctx_t *ctx, const u32 *w, const
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[16];
+      u32 enc_buf[16] = { 0 };
 
       const int enc_len = hc_enc_next (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -731,7 +733,7 @@ DECLSPEC void sha224_update_global_utf16le (sha224_ctx_t *ctx, GLOBAL_AS const u
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[16];
+      u32 enc_buf[16] = { 0 };
 
       const int enc_len = hc_enc_next_global (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -791,7 +793,7 @@ DECLSPEC void sha224_update_global_utf16le_swap (sha224_ctx_t *ctx, GLOBAL_AS co
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[16];
+      u32 enc_buf[16] = { 0 };
 
       const int enc_len = hc_enc_next_global (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -894,7 +896,7 @@ DECLSPEC void sha224_update_global_utf16le_swap (sha224_ctx_t *ctx, GLOBAL_AS co
 
 DECLSPEC void sha224_final (sha224_ctx_t *ctx)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 63;
+  const int pos = ctx->len & 63;
 
   append_0x80_4x4_S (ctx->w0, ctx->w1, ctx->w2, ctx->w3, pos ^ 3);
 
@@ -1438,7 +1440,9 @@ DECLSPEC void sha224_init_vector_from_scalar (sha224_ctx_vector_t *ctx, sha224_c
 
 DECLSPEC void sha224_update_vector_64 (sha224_ctx_vector_t *ctx, u32x *w0, u32x *w1, u32x *w2, u32x *w3, const int len)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 63;
+  if (len == 0) return;
+
+  const int pos = ctx->len & 63;
 
   ctx->len += len;
 
@@ -1854,7 +1858,7 @@ DECLSPEC void sha224_update_vector_utf16beN (sha224_ctx_vector_t *ctx, const u32
 
 DECLSPEC void sha224_final_vector (sha224_ctx_vector_t *ctx)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 63;
+  const int pos = ctx->len & 63;
 
   append_0x80_4x4 (ctx->w0, ctx->w1, ctx->w2, ctx->w3, pos ^ 3);
 

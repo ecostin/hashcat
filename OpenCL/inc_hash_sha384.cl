@@ -178,7 +178,9 @@ DECLSPEC void sha384_init (sha384_ctx_t *ctx)
 
 DECLSPEC void sha384_update_128 (sha384_ctx_t *ctx, u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *w4, u32 *w5, u32 *w6, u32 *w7, const int len)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 127;
+  if (len == 0) return;
+
+  const int pos = ctx->len & 127;
 
   ctx->len += len;
 
@@ -630,7 +632,7 @@ DECLSPEC void sha384_update_utf16le (sha384_ctx_t *ctx, const u32 *w, const int 
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[32];
+      u32 enc_buf[32] = { 0 };
 
       const int enc_len = hc_enc_next (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -714,7 +716,7 @@ DECLSPEC void sha384_update_utf16le_swap (sha384_ctx_t *ctx, const u32 *w, const
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[32];
+      u32 enc_buf[32] = { 0 };
 
       const int enc_len = hc_enc_next (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -1139,7 +1141,7 @@ DECLSPEC void sha384_update_global_utf16le (sha384_ctx_t *ctx, GLOBAL_AS const u
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[32];
+      u32 enc_buf[32] = { 0 };
 
       const int enc_len = hc_enc_next_global (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -1223,7 +1225,7 @@ DECLSPEC void sha384_update_global_utf16le_swap (sha384_ctx_t *ctx, GLOBAL_AS co
 
     while (hc_enc_has_next (&hc_enc, len))
     {
-      u32 enc_buf[32];
+      u32 enc_buf[32] = { 0 };
 
       const int enc_len = hc_enc_next_global (&hc_enc, w, len, 256, enc_buf, sizeof (enc_buf));
 
@@ -1398,7 +1400,7 @@ DECLSPEC void sha384_update_global_utf16le_swap (sha384_ctx_t *ctx, GLOBAL_AS co
 
 DECLSPEC void sha384_final (sha384_ctx_t *ctx)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 127;
+  const int pos = ctx->len & 127;
 
   append_0x80_8x4_S (ctx->w0, ctx->w1, ctx->w2, ctx->w3, ctx->w4, ctx->w5, ctx->w6, ctx->w7, pos ^ 3);
 
@@ -2186,7 +2188,9 @@ DECLSPEC void sha384_init_vector_from_scalar (sha384_ctx_vector_t *ctx, sha384_c
 
 DECLSPEC void sha384_update_vector_128 (sha384_ctx_vector_t *ctx, u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *w4, u32x *w5, u32x *w6, u32x *w7, const int len)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 127;
+  if (len == 0) return;
+
+  const int pos = ctx->len & 127;
 
   ctx->len += len;
 
@@ -2894,7 +2898,7 @@ DECLSPEC void sha384_update_vector_utf16beN (sha384_ctx_vector_t *ctx, const u32
 
 DECLSPEC void sha384_final_vector (sha384_ctx_vector_t *ctx)
 {
-  MAYBE_VOLATILE const int pos = ctx->len & 127;
+  const int pos = ctx->len & 127;
 
   append_0x80_8x4 (ctx->w0, ctx->w1, ctx->w2, ctx->w3, ctx->w4, ctx->w5, ctx->w6, ctx->w7, pos ^ 3);
 
