@@ -1019,6 +1019,15 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   printf ("FSPEED\t%9sH/S\t", hashcat_status->speed_sec_all);
   printf ("FPROGRESS\t%.02f%%\t",hashcat_status->progress_finished_percent);
   
+  if ((hashcat_status->guess_mode == GUESS_MODE_STRAIGHT_FILE) && (hashcat_status->guess_base_count > 1))
+  {
+      printf ("FQUEUE\t%d/%d\t",hashcat_status->guess_base_offset,hashcat_status->guess_base_count);
+  }
+  else
+  {
+      printf ("FQUEUE\t1/1\t");
+  }
+  
   fwrite (EOL, strlen (EOL), 1, stdout);
 
   fflush (stdout);
