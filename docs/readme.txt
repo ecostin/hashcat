@@ -7,7 +7,7 @@
            |_____|     /___________/     |_____|  /_____/        /_______|
                  :                             :                         :
 
-hashcat v6.0.0
+hashcat v6.2.1
 ==============
 
 AMD GPUs on Linux require "RadeonOpenCompute (ROCm)" Software Platform (3.1 or later)
@@ -113,6 +113,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - sha512($salt.utf16le($pass))
 - sha512(utf16le($pass).$salt)
 - Ruby on Rails Restful-Authentication
+- MurmurHash
 - HMAC-MD5 (key = $pass)
 - HMAC-MD5 (key = $salt)
 - HMAC-SHA1 (key = $pass)
@@ -189,6 +190,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - Radmin2
 - Samsung Android Password/PIN
 - bcrypt $2*$, Blowfish (Unix)
+- bcrypt(md5($pass)) / bcryptmd5
 - md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
 - descrypt, DES (Unix), Traditional DES
 - sha256crypt $5$, SHA256 (Unix)
@@ -269,6 +271,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - Huawei sha1(md5($pass).$salt)
 - AuthMe sha256
 - eCryptfs
+- Linux Kernel Crypto API (2.4)
 - AES Crypt (SHA256)
 - LUKS
 - VeraCrypt
