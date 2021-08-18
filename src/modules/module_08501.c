@@ -131,14 +131,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
       salt_buf_pc_ptr[i+8] |= hex_convert (hash_pos[(2*i)]) << 4;
   }
 
-  #ifdef DEBUG
-  printf("username in EBCDIC + salt: ");
-  for (int i = 0; i < 24; i++) {
-      printf("%02X", salt_buf_pc_ptr[i] );
-  }
-  printf("\n");
-  #endif
-  
   hash_pos += 32;
   if (is_valid_hex_string (hash_pos, 16) == false) return (PARSER_HASH_ENCODING);
 
@@ -150,17 +142,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   out_digest[2] = hex_to_u32 ((const u8 *) &hash_pos[ 0]);
   out_digest[3] = hex_to_u32 ((const u8 *) &hash_pos[ 8]);
 
-  #ifdef DEBUG
-  printf("binary hash: ");
-  for (int i = 0; i < 4; i++) {
-      u8 hex[9];
-      u32_to_hex_lower(out_digest[i], hex);
-      for (int j = 0; j < 8; j++)
-          printf("%c", hex[j]);  
-  }
-  printf("\n");
-  #endif
-  
   salt->salt_len = 8 + 16;
   generic_salt_decode (hashconfig, username_pos, username_len, (u8 *) salt->salt_buf, (int *) &salt->salt_len);
 
@@ -185,6 +166,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
+  module_ctx->module_deprecated_notice        = MODULE_DEFAULT;
   module_ctx->module_dgst_pos0                = module_dgst_pos0;
   module_ctx->module_dgst_pos1                = module_dgst_pos1;
   module_ctx->module_dgst_pos2                = module_dgst_pos2;
@@ -194,6 +176,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_esalt_size               = MODULE_DEFAULT;
   module_ctx->module_extra_buffer_size        = MODULE_DEFAULT;
   module_ctx->module_extra_tmp_size           = MODULE_DEFAULT;
+  module_ctx->module_extra_tuningdb_block     = MODULE_DEFAULT;
   module_ctx->module_forced_outfile_format    = MODULE_DEFAULT;
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;

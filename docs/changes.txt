@@ -1,4 +1,159 @@
-* changes v6.2.1 -> v6.x.x
+* changes v6.2.3 -> v6.2.x
+
+##
+## Features
+##
+
+- Added option --deprecated-check-disable to enable deprecated plugins
+- Added option --multiply-accel-disable (short: -M) to disable multiplying of the kernel accel with the multiprocessor count
+- Added option --generate-rules-func-sel to specify a pool of operators that the random rule generator is allowed to pick from
+- Added rule function '3' to change the case of the first letter after the occurrence of N of character X
+- Added support for auto tuning --kernel-threads (-T) at startup
+- Added support for HIP version 4.3 or later and removed support for older HIP versions as they are not compatible
+
+##
+## Bugs
+##
+
+- Fixed broken support for --generate-rules-func-min which was ignored under certain conditions
+- Fixed buffer overflow in DPAPI masterkey file v1/v2 module in hash_encode() and hash_decode()
+- Fixed buffer overflow in Stargazer Stellar Wallet XLM module in hash_encode() when a hash was cracked
+- Fixed false negative in all VeraCrypt hash modes if both conditions are met: 1. Use CPU for cracking and 2. PIM area was used
+- Fixed invalid data type in the sha384_hmac_init_vector_128() function that take effect if the vector data type was specified manually
+- Fixed out-of-boundary read in input_tokenizer() if the signature in the hash is longer than the length of the plugin's signature constant
+- Fixed out-of-boundary read in the Stuffit5 module in hash_decode()
+- Fixed out-of-boundary read in PKZIP masterkey kernel if the password candidate has length zero
+- Fixed random rule generator option --generate-rules-func-min by fixing switch() case to not select a not existing option group type
+- Fixed segfault when a combination of the flags --user and --show is given and a hash was specified directly on the command line
+- Fixed syntax check of HAS_VPERM macro in several kernel includes causing invalid error message for AMD GPUs on Windows
+- Fixed uninitialized tmps variable in autotune for slow hashes by calling _init and _prepare kernel before calling _loop kernel
+
+##
+## Performance
+##
+
+- AMD GPUs: Add inline assembly code for md5crypt, sha256crypt, PDF 1.7, 7-Zip, RAR3, Samsung Android and Windows Phone 8+
+- AMD GPUs: On the Apple OpenCL platform, we ask for the preferred kernel thread size rather than hard-coding 32
+- Backend Interface: Replace most of the blocking Compute API functions with asynchronous ones to improve GPU utilization
+- Blake Kernels: Optimize 3/4 BLAKE2B_ROUND() 64-bit rotations with inline assembly hc_byte_perm_S() calls
+- Blowfish Kernels: Backport optimizations to reduce bank conflicts from bcrypt to Password Safe v2 and Open Document Format (ODF) 1.1
+- ECC secp256k1: The inline assembly code for AMD GPUs has been removed as the latest JIT compilers optimize it with the same efficiency
+- HIP Kernels: Enable vector data types for HIP kernels for functionality and performance
+- Kernel threads: Use warp size / wavefront size query instead of hard-coded values as the basis for kernel threads
+- SCRYPT Kernels: Improve Hashcat.hctune entries for many NV and AMD GPUs for hash mode 8900, 9300, 15700 and 22700
+- STDIN Interface: Disable the --stdin-timeout-abort check after 1000 successful reads from stdin
+- Tuning Database: Add new module function module_extra_tuningdb_block() to extend hashcat.hctune content from a module
+
+##
+## Technical
+##
+
+- 7-Zip Hook: Increase the supported data length from 320kb to 8mb
+- ADL: Updated support for AMD Display Library to 15.0, updated data types
+- AMD Driver: Updated requirements for AMD Linux drivers to ROCm 4.3 or later due to new HIP interface
+- AMD Driver: Updated requirements for AMD Windows drivers to Adrenalin 21.2.1 or later due to new ADL library
+- Backend Interface: Implement gpu_bzero() as a gpu_memset() replacement, since all gpu_memset() operations used 0 as the value
+- Backend Interface: Improve the query kernel's dynamic memory size based on DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN instead of BF
+- Brain Session: Adds hashconfig-specific opti_type and opts_type parameters to the session calculation to enable cover functions like -O
+- Commandline: Throw an error if the separator specified by the user with the -p option is not exactly 1 byte
+- Constants: Make const char * pointers actually const char * const pointers
+- Deprecated Plugins: Add new module function module_deprecated_notice() to mark a plugin as deprecated and to return a free text user notice
+- Deprecated Plugins: Marked plugins 2500/2501 and 16800/16801 as deprecated
+- Encoding: Truncate password candidates in UTF8 -> UTF16 conversion if it contains an invalid UTF8 byte sequence
+- Filehandling: Use const char for fopen mode to fix -Wwrite-strings warnings
+- Hardware Monitor: Added support for OverDrive 7 and 8 based GPUs
+- HIP Kernels: Dependency on hip/hip runtime.h has been removed to enable easier integration of the HIP backend under Windows
+- Kernel cache: Add kernel threads for hash calculation, which will later be used in the file name of the kernel cache
+- Memory Management: Refactored the code responsible for limiting kernel accel with the goal to avoid low host memory situations
+- OpenCL Runtime: Workaround for Intel OpenCL runtime: segmentation fault when compiling hc_enc_next() / hc_enc_next_global()
+- RC4 Kernels: Use improved native thread derivation for RC4-based hash modes 7500, 13100, 18200, 25400
+- Shared Memory: Calculate the dynamic memory size of the kernel based on CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN
+- Slow kernels: Set some of the slowest kernels to OPTS_TYPE_MP_MULTI_DISABLE to make it easier to handle small word lists
+- Vendor Discovery: Add "Intel" as a valid vendor name for GPUs on macOS
+
+##
+## Algorithms
+##
+
+- Added hash-mode: SNMPv3 HMAC-MD5-96/HMAC-SHA1-96
+- Added hash-mode: SNMPv3 HMAC-MD5-96
+- Added hash-mode: SNMPv3 HMAC-SHA1-96
+- Added hash-mode: SNMPv3 HMAC-SHA224-128
+- Added hash-mode: SNMPv3 HMAC-SHA256-192
+- Added hash-mode: SNMPv3 HMAC-SHA384-256
+- Added hash-mode: SNMPv3 HMAC-SHA512-384
+- Added hash-mode: VirtualBox (PBKDF2-HMAC-SHA256 & AES-128-XTS)
+- Added hash-mode: VirtualBox (PBKDF2-HMAC-SHA256 & AES-256-XTS)
+
+* changes v6.2.2 -> v6.2.3
+
+##
+## Algorithms
+##
+
+- Added hash-mode: AES-128-ECB NOKDF (PT = $salt, key = $pass)
+- Added hash-mode: AES-192-ECB NOKDF (PT = $salt, key = $pass)
+- Added hash-mode: AES-256-ECB NOKDF (PT = $salt, key = $pass)
+- Added hash-mode: iPhone passcode (UID key + System Keybag)
+- Added hash-mode: MetaMask Wallet
+- Added hash-mode: VeraCrypt PBKDF2-HMAC-Streebog-512 + XTS 512 bit  + boot-mode
+- Added hash-mode: VeraCrypt PBKDF2-HMAC-Streebog-512 + XTS 1024 bit + boot-mode
+- Added hash-mode: VeraCrypt PBKDF2-HMAC-Streebog-512 + XTS 1536 bit + boot-mode
+
+##
+## Features
+##
+
+- Added new backend support for HIP, an OpenCL alternative API for AMD GPUs (similar to CUDA for NVIDIA GPUs)
+- Added option --markov-inverse to inverse markov statistics, with the idea of reversing the order of the password candidates
+- Added temperature watchdog and fanspeed readings for CPU and GPU on macOS using iokit
+- Added temperature watchdog and utilization for CPU on linux using sysfs and procfs
+
+##
+## Bugs
+##
+
+- Fixed access violation in hashconfig_destroy if hashcat_ctx_t is only partially initialized
+- Fixed 'E' rule in pure kernel mode which was ignoring letters that are in positions that are multiples of 4
+- Fixed false negative in hash-mode 15900 (DPAPI masterkey file v2) if password was longer than 64 characters
+- Fixed hashcat_ctx leak and refactor module and kernel existence checks
+- Fixed integer overflow in Recovered/Time status view column caused by division > 0 but < 1
+- Fixed invalid ETA if --limit was specified, several salts are in a hash list and some of them were found in a potfile
+- Fixed memory leak in iconv_ctx and iconv_tmp in backend.c
+- Fixed missing option to automatically disable kernel cache in -m 25600 and -m 25800
+- Fixed out-of-boundary write in slow candidates mode in combinator attack
+
+##
+## Improvements
+##
+
+- Alias Devices: Show a warning in case the user specifically listed a device to use which in a later step is skipped because it is an alias of another active device
+- Backend Information: Added new column showing the PCI Address per CUDA/OpenCL device to easier identify broken cards
+- Bcrypt-SHA1/MD5 Kernels: Get rid of local memory use for binary to hex conversion to avoid false negatives on several OpenCL runtimes
+- CPU Affinity: Allow mask up to 64 processors in Windows and remove call to SetThreadAffinityMask as SetProcessAffinityMask limits all threads in process
+- Debug Rules: HEX-ify rules debug non-rules outputs that contain colons
+- KeePass: Increase supported size for KeePass 1 databases from 300kB to 16MB
+- Potfile: Disable potfile for hash-mode 99999
+- VeraCrypt: Increase password length support for non-boot volumes from 64 to 128
+- WPA Kernels: Increased performance by 3.5% for backend devices controlled by CUDA backend
+
+##
+## Technical
+##
+
+- Autodetect: Limit the number of errors per hash-mode try to 100 to avoid long startup time
+- Brain: Add brain_ctx_t to hashcat_ctx_t to enable runtime check if hashcat was compiled with brain support
+- File handling: Do not abort on seeing a BOM in input files, just warn and ignore the BOM
+- Folders: Do not escape the variable cpath_real to prevent certain OpenCL runtimes from running into an error which do not support escape characters
+- Java Object hashCode: Add OPTS_TYPE_SUGGEST_KG as a default option
+- LM: Workaround JiT compiler bug in -m 3000 on NV leading to false negatives with large amount of hashes
+- OpenCL Runtime: Workaround a problem of the AMD OpenCL GPU driver under macOS which results in false negatives due to changes in the kernel crypto library
+- OpenCL Runtime: Workaround JiT crash (SC failed. No reason given.) on macOS by limiting local memory allocations to 32k
+- Status View: Include time and duration info when pausing and resuming
+- Tests: Changed tests for VeraCrypt from -a 0 to -a 3, because password extension is not available to all shells
+- WinZip Kernel: Increase supported data length from 8k to 16mb
+
+* changes v6.2.1 -> v6.2.2
 
 ##
 ## Algorithms
@@ -6,18 +161,54 @@
 
 - Added hash-mode: bcrypt(md5($pass)) / bcryptmd5
 - Added hash-mode: bcrypt(sha1($pass)) / bcryptsha1
+- Added hash-mode: FortiGate256 (FortiOS256)
 - Added hash-mode: Linux Kernel Crypto API (2.4)
 - Added hash-mode: MurmurHash
+- Added hash-mode: OpenEdge Progress Encode
+- Added hash-mode: md5(utf16le($pass))
+- Added hash-mode: sha1(utf16le($pass))
+- Added hash-mode: sha256(utf16le($pass))
+- Added hash-mode: sha384(utf16le($pass))
+- Added hash-mode: sha512(utf16le($pass))
+- Added hash-mode: md5(md5(md5($pass)))
+- Added hash-mode: sha1(sha1($salt.$pass.$salt))
+- Added hash-mode: sha256($salt.sha256($pass))
+- Added hash-mode: sha384($pass.$salt)
+- Added hash-mode: sha384($salt.$pass)
+- Added hash-mode: sha384($salt.utf16le($pass))
+- Added hash-mode: sha384(utf16le($pass).$salt)
+
+##
+## Features
+##
+
+- Autodetect hash-type: performs an automatic analysis of input hash(es), either listing compatible algorithms, or executing the attack (if only one compatible format is found)
+- Autodetect hash-type: added option --identify to only perform autodetection of hash-type, without back-end device initialization
+
+##
+## Bugs
+##
+
+- Fixed error message in -a 9 mode with rules when number of words from wordlist is not in sync with number of unique salts
+- Fixed error-handling logic in monitor thread to not return in case of error (disk full, permission error, ...) but to retry instead
+- Fixed false negatives with TrueCrypt/VeraCrypt when zip- or gzip-compressed files were used as keyfiles
+- Fixed free memory-size output for skipped GPU (both automatic and manual) of --backend-info information screen
 
 ##
 ## Improvements
 ##
 
-- CUDA Backend: Do not warn about missing CUDA SDK installation if --stdout is used
-- Performance Monitor: Add -S as a user suggestion to improve cracking performance in specific attack configurations
-- Status Screen: Show currently running kernel type (pure, optimized) and generator type (host, device)
-- UTF8-to-UTF16: Replaced naive UTF8 to UTF16 conversion with true conversion for RAR3, AES Crypt, MultiBit HD (scrypt) and Umbraco HMAC-SHA1
 - AES Crypt Plugin: Reduced max password length from 256 to 128 which improved performance by 22%
+- CUDA Backend: If --stdout is used, do not warn about missing CUDA SDK
+- Folder Management: Add support for XDG Base Directory specification when hashcat is installed using 'make install'
+- Hardware Monitor: Add support for GPU device utilization readings from sysfs (AMD on Linux)
+- OpenCL Backend: Use CL_DEVICE_BOARD_NAME_AMD instead of CL_DEVICE_NAME for device name (when supported by OpenCL runtime)
+- Performance Monitor: Suggest -S to improve cracking performance in specific attack configurations
+- RAR3-p (Compressed): Fix workaround in unrar library in AES constant table generation to enable multi-threading support
+- RC4 Kernels: Improved performance by 20%+ with new RC4 code in hash-modes Kerberos 5 (etype 23), MS Office (<= 2003) and PDF (<= 1.6)
+- Scrypt Kernels: Re-enable use of kernel cache in scrypt-based kernels
+- Status Screen: Show currently-running kernel type (pure, optimized) and generator type (host, device)
+- UTF8-to-UTF16: Replaced naive UTF8-to-UTF16 conversion with true conversion for RAR3, AES Crypt, MultiBit HD (scrypt) and Umbraco HMAC-SHA1
 
 ##
 ## Technical
@@ -26,7 +217,15 @@
 - Dependencies: Updated LZMA SDK from 19.00 to 21.02 alpha
 - Dependencies: Updated xxHash from 0.1.0 to v0.8.0 - Stable XXH3
 - Documentation: Update missing documentation in plugin developer guide for OPTS_TYPE_MP_MULTI_DISABLE and OPTS_TYPE_NATIVE_THREADS
-- Kernels: Add standalone true UTF8 to UTF16 converter kernel that runs after amplifier. Use OPTS_TYPE_POST_AMP_UTF16LE from plugin
+- Hashrate: Update inner-loop hashrate prediction to handle new salt_repeats feature and also respect _loop2 kernel runtime
+- Kernels: Add RC4 cipher to crypto library with optimized shared memory access pattern which will not cause any bank conflicts if -u <= 32
+- Kernels: Add standalone true UTF8-to-UTF16 converter kernel that runs after amplifier. Use OPTS_TYPE_POST_AMP_UTF16LE from plugin
+- Kernel Cache: Add module_jit_build_options() string from modules to kernel cache checksum calculation
+- Modules: Recategorized HASH_CATEGORY option in various modules
+- Modules: Added hash categories HASH_CATEGORY_IMS and HASH_CATEGORY_CRYPTOCURRENCY_WALLET
+- Modules: Changed hash category of Python passlib from HASH_CATEGORY_GENERIC_KDF to HASH_CATEGORY_FRAMEWORK
+- Unit-Tests: Added missing support for OPTS_TYPE_LOOP_PREPARE, OPTS_TYPE_LOOP_PREPARE2 and salt_repeats in self-test
+- Unit-Tests: Added missing unit-test for Stargazer Stellar Wallet XLM
 
 * changes v6.2.0 -> v6.2.1
 

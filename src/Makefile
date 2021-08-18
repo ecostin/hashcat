@@ -7,7 +7,7 @@ LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath
 SHARED                  ?= 0
 DEBUG                   := 0
 PRODUCTION              := 1
-PRODUCTION_VERSION      := v6.2.1-epas
+PRODUCTION_VERSION      := v6.2.3-epas
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1
 ENABLE_UNRAR            ?= 1
@@ -54,7 +54,7 @@ endif
 ## Do not modify
 ##
 
-MODULE_INTERFACE_VERSION := 620
+MODULE_INTERFACE_VERSION := 630
 
 ##
 ## Native compiler paths
@@ -190,6 +190,7 @@ endif
 ## because LZMA SDK
 ifeq ($(CC),clang)
 CFLAGS                  += -Wno-enum-conversion
+CFLAGS                  += -Wno-typedef-redefinition
 endif
 
 ## because ZLIB
@@ -203,12 +204,11 @@ endif
 ## because UNRAR
 ifeq ($(ENABLE_UNRAR),1)
 ifeq ($(USE_SYSTEM_UNRAR),0)
-ifneq ($(UNAME),Darwin)
-CFLAGS_UNRAR            += -Wno-misleading-indentation
+ifneq ($(CC),clang)
 CFLAGS_UNRAR            += -Wno-class-memaccess
-else
-CFLAGS_UNRAR            += -Wno-missing-braces
+CFLAGS_UNRAR            += -Wno-misleading-indentation
 endif
+CFLAGS_UNRAR            += -Wno-missing-braces
 CFLAGS_UNRAR            += -Wno-unused-variable
 CFLAGS_UNRAR            += -Wno-unused-parameter
 CFLAGS_UNRAR            += -Wno-unused-function
@@ -252,11 +252,6 @@ CFLAGS                  += -pipe -Iinclude/ -IOpenCL/
 CFLAGS                  += -I$(DEPS_LZMA_PATH)
 ifeq ($(USE_SYSTEM_LZMA),1)
 LFLAGS                  += -llzmasdk
-endif
-
-## LZMA workaround for MSYS2
-ifeq ($(USE_SYSTEM_LZMA),0)
-CFLAGS                  += -Iinclude/workarounds
 endif
 
 # ZLIB
@@ -315,6 +310,7 @@ endif # FreeBSD
 ifeq ($(UNAME),Darwin)
 export MACOSX_DEPLOYMENT_TARGET=10.9
 CFLAGS_NATIVE           := $(CFLAGS)
+CFLAGS_NATIVE           += -DWITH_HWMON
 
 ifeq ($(shell test $(DARWIN_VERSION) -le 15; echo $$?), 0)
 CFLAGS_NATIVE           += -DMISSING_CLOCK_GETTIME
@@ -322,6 +318,7 @@ endif
 
 LFLAGS_NATIVE           := $(LFLAGS)
 LFLAGS_NATIVE           += -framework OpenCL
+LFLAGS_NATIVE           += -framework IOKit
 LFLAGS_NATIVE           += -lpthread
 LFLAGS_NATIVE           += -liconv
 endif # Darwin
@@ -360,11 +357,10 @@ CXXFLAGS                :=
 
 EMU_OBJS_ALL            := emu_general emu_inc_common emu_inc_platform emu_inc_scalar emu_inc_simd
 EMU_OBJS_ALL            += emu_inc_rp emu_inc_rp_optimized
-EMU_OBJS_ALL            += emu_inc_truecrypt_crc32 emu_inc_truecrypt_keyfile emu_inc_truecrypt_xts emu_inc_veracrypt_xts
 EMU_OBJS_ALL            += emu_inc_hash_md4 emu_inc_hash_md5 emu_inc_hash_ripemd160 emu_inc_hash_sha1 emu_inc_hash_sha256 emu_inc_hash_sha384 emu_inc_hash_sha512 emu_inc_hash_streebog256 emu_inc_hash_streebog512 emu_inc_ecc_secp256k1
 EMU_OBJS_ALL            += emu_inc_cipher_aes emu_inc_cipher_camellia emu_inc_cipher_des emu_inc_cipher_kuznyechik emu_inc_cipher_serpent emu_inc_cipher_twofish
 
-OBJS_ALL                := affinity autotune backend benchmark bitmap bitops combinator common convert cpt cpu_crc32 debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_nvapi ext_nvml ext_nvrtc ext_OpenCL ext_sysfs ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
+OBJS_ALL                := affinity autotune backend benchmark bitmap bitops combinator common convert cpt cpu_crc32 debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_hip ext_nvapi ext_nvml ext_nvrtc ext_hiprtc ext_OpenCL ext_sysfs_amdgpu ext_sysfs_cpu ext_iokit ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
 
 ifeq ($(ENABLE_BRAIN),1)
 OBJS_ALL                += brain
