@@ -16,8 +16,8 @@ static const u32   DGST_POS1      = 4;
 static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 1;
 static const u32   DGST_SIZE      = DGST_SIZE_4_5;
-static const u32   HASH_CATEGORY  = HASH_CATEGORY_RAW_HASH_SALTED;
-static const char *HASH_NAME      = "Ruby on Rails Restful Auth (single round, no sitekey)";
+static const u32   HASH_CATEGORY  = HASH_CATEGORY_FRAMEWORK;
+static const char *HASH_NAME      = "Ruby on Rails Restful Auth (one round, no sitekey)";
 static const u64   KERN_TYPE      = 27200;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_PRECOMPUTE_INIT
@@ -174,7 +174,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   out_len += 1;
 
   out_len += generic_salt_encode (hashconfig, (const u8 *) salt->salt_buf, salt->salt_len, out_buf + out_len);
-  
+
   return out_len;
 }
 

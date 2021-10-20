@@ -148,11 +148,23 @@ static int inner2_loop (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
-  const u64 progress_restored = status_ctx->words_off * amplifier_cnt;
-
-  for (u32 i = 0; i < hashes->salts_cnt; i++)
+  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
   {
-    status_ctx->words_progress_restored[i] = progress_restored;
+    const u64 progress_restored = 1 * amplifier_cnt;
+
+    for (u32 i = 0; i < status_ctx->words_off; i++)
+    {
+      status_ctx->words_progress_restored[i] = progress_restored;
+    }
+  }
+  else
+  {
+    const u64 progress_restored = status_ctx->words_off * amplifier_cnt;
+
+    for (u32 i = 0; i < hashes->salts_cnt; i++)
+    {
+      status_ctx->words_progress_restored[i] = progress_restored;
+    }
   }
 
   #ifdef WITH_BRAIN
@@ -910,7 +922,10 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
 
   // clean up
 
+  #ifdef WITH_BRAIN
   brain_ctx_destroy       (hashcat_ctx);
+  #endif
+
   bitmap_ctx_destroy      (hashcat_ctx);
   combinator_ctx_destroy  (hashcat_ctx);
   cpt_ctx_destroy         (hashcat_ctx);
@@ -1078,13 +1093,13 @@ int hashcat_session_init (hashcat_ctx_t *hashcat_ctx, const char *install_folder
     }
   }
   #endif
-  #endif
 
   /**
    * brain
    */
 
   if (brain_ctx_init (hashcat_ctx) == -1) return -1;
+  #endif
 
   /**
    * logfile
@@ -1624,6 +1639,8 @@ int hashcat_session_execute (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->benchmark == true)
   {
+    const bool quiet_sav = user_options->quiet;
+
     user_options->quiet = true;
 
     if (user_options->hash_mode_chgd == true)
@@ -1648,17 +1665,19 @@ int hashcat_session_execute (hashcat_ctx_t *hashcat_ctx)
       }
     }
 
-    user_options->quiet = false;
+    user_options->quiet = quiet_sav;
   }
   else
   {
+    const bool quiet_sav = user_options->quiet;
+
     if (user_options->speed_only == true) user_options->quiet = true;
 
     rc_final = outer_loop (hashcat_ctx);
 
     if (rc_final == -1) myabort (hashcat_ctx);
 
-    if (user_options->speed_only == true) user_options->quiet = false;
+    if (user_options->speed_only == true) user_options->quiet = quiet_sav;
   }
 
   EVENT (EVENT_OUTERLOOP_FINISHED);

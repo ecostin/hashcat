@@ -271,6 +271,7 @@ GeForce_RTX_2080_Ti                             ALIAS_nv_sm50_or_higher
 GeForce_RTX_3060                                ALIAS_nv_sm50_or_higher
 GeForce_RTX_3060_Ti                             ALIAS_nv_sm50_or_higher
 GeForce_RTX_3070                                ALIAS_nv_sm50_or_higher
+GeForce_RTX_3070_Ti                             ALIAS_nv_sm50_or_higher
 GeForce_RTX_3080                                ALIAS_nv_sm50_or_higher
 GeForce_RTX_3090                                ALIAS_nv_sm50_or_higher
 
@@ -384,6 +385,8 @@ GeForce_GTX_TITAN                               3       9900    2       A       
 ##
 
 DEVICE_TYPE_CPU                                 *       3200    1       N       A
+DEVICE_TYPE_CPU                                 *      25600    1       N       A
+DEVICE_TYPE_CPU                                 *      25800    1       N       A
 
 ##
 ## SCRYPT: Tunings for SCRYPT based hash-modes can be found inside the plugin source

@@ -41,6 +41,9 @@ static double TARGET_MSEC_PROFILE[4] = { 2, 12, 96, 480 };
 HC_ALIGN(16)
 static const u32 bzeros[4] = { 0, 0, 0, 0 };
 
+/* forward declarations */
+static void rebuild_pws_compressed_append (hc_device_param_t *device_param, const u64 pws_cnt, const u8 chr);
+
 static bool is_same_device (const hc_device_param_t *src, const hc_device_param_t *dst)
 {
   // First check by PCI address
@@ -161,8 +164,6 @@ static int backend_ctx_find_alias_devices (hashcat_ctx_t *hashcat_ctx)
 
 static bool is_same_device_type (const hc_device_param_t *src, const hc_device_param_t *dst)
 {
-  if (strcmp (src->device_name, dst->device_name) != 0) return false;
-
   if (src->is_cuda   != dst->is_cuda)   return false;
   if (src->is_hip    != dst->is_hip)    return false;
   if (src->is_opencl != dst->is_opencl) return false;
@@ -3555,7 +3556,7 @@ int ocl_init (hashcat_ctx_t *hashcat_ctx)
   HC_LOAD_FUNC (ocl, clWaitForEvents,           OCL_CLWAITFOREVENTS,            OpenCL, 1);
   HC_LOAD_FUNC (ocl, clGetEventProfilingInfo,   OCL_CLGETEVENTPROFILINGINFO,    OpenCL, 1);
   HC_LOAD_FUNC (ocl, clReleaseEvent,            OCL_CLRELEASEEVENT,             OpenCL, 1);
-  HC_LOAD_FUNC (ocl, clUnloadPlatformCompiler,  OCL_CLUNLOADPLATFORMCOMPILER,   OpenCL, 1);
+  //HC_LOAD_FUNC (ocl, clUnloadPlatformCompiler,  OCL_CLUNLOADPLATFORMCOMPILER,   OpenCL, 1);
 
   return 0;
 }
@@ -4224,6 +4225,7 @@ int hc_clReleaseEvent (hashcat_ctx_t *hashcat_ctx, cl_event event)
   return 0;
 }
 
+/*
 int hc_clUnloadPlatformCompiler (hashcat_ctx_t *hashcat_ctx, cl_platform_id platform)
 {
   backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
@@ -4241,6 +4243,7 @@ int hc_clUnloadPlatformCompiler (hashcat_ctx_t *hashcat_ctx, cl_platform_id plat
 
   return 0;
 }
+*/
 
 // Backend
 
@@ -4829,7 +4832,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
   return 0;
 }
 
-void rebuild_pws_compressed_append (hc_device_param_t *device_param, const u64 pws_cnt, const u8 chr)
+static void rebuild_pws_compressed_append (hc_device_param_t *device_param, const u64 pws_cnt, const u8 chr)
 {
   // this function is used if we have to modify the compressed pws buffer in order to
   // append some data to each password candidate
@@ -4873,11 +4876,11 @@ void rebuild_pws_compressed_append (hc_device_param_t *device_param, const u64 p
     pw_idx_dst_next->off = pw_idx_dst->off + pw_idx_dst->cnt;
   }
 
-  memcpy (device_param->pws_comp, tmp_pws_comp, device_param->size_pws_comp);
-  memcpy (device_param->pws_idx,  tmp_pws_idx,  device_param->size_pws_idx);
+  hcfree (device_param->pws_comp);
+  hcfree (device_param->pws_idx);
 
-  hcfree (tmp_pws_comp);
-  hcfree (tmp_pws_idx);
+  device_param->pws_comp = tmp_pws_comp;
+  device_param->pws_idx  = tmp_pws_idx;
 }
 
 int run_cuda_kernel_atinit (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, CUdeviceptr buf, const u64 num)
@@ -5156,6 +5159,15 @@ int run_opencl_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devi
   const u64 num16d = size / 16;
   const u64 num16m = size % 16;
 
+  // with apple GPU clEnqueueWriteBuffer() return CL_INVALID_VALUE, workaround
+
+  if (device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE && \
+     (device_param->opencl_device_vendor_id == VENDOR_ID_INTEL_SDK || device_param->opencl_device_vendor_id == VENDOR_ID_APPLE) && \
+     device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
+  {
+    return run_opencl_kernel_memset (hashcat_ctx, device_param, buf, 0, 0, size);
+  }
+
   if (num16d)
   {
     const u64 kernel_threads = device_param->kernel_wgs_bzero;
@@ -5281,29 +5293,26 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
   {
     CUfunction cuda_function = NULL;
 
-    if (device_param->is_cuda == true)
+    switch (kern_run)
     {
-      switch (kern_run)
-      {
-        case KERN_RUN_1:      cuda_function = device_param->cuda_function1;       break;
-        case KERN_RUN_12:     cuda_function = device_param->cuda_function12;      break;
-        case KERN_RUN_2P:     cuda_function = device_param->cuda_function2p;      break;
-        case KERN_RUN_2:      cuda_function = device_param->cuda_function2;       break;
-        case KERN_RUN_2E:     cuda_function = device_param->cuda_function2e;      break;
-        case KERN_RUN_23:     cuda_function = device_param->cuda_function23;      break;
-        case KERN_RUN_3:      cuda_function = device_param->cuda_function3;       break;
-        case KERN_RUN_4:      cuda_function = device_param->cuda_function4;       break;
-        case KERN_RUN_INIT2:  cuda_function = device_param->cuda_function_init2;  break;
-        case KERN_RUN_LOOP2P: cuda_function = device_param->cuda_function_loop2p; break;
-        case KERN_RUN_LOOP2:  cuda_function = device_param->cuda_function_loop2;  break;
-        case KERN_RUN_AUX1:   cuda_function = device_param->cuda_function_aux1;   break;
-        case KERN_RUN_AUX2:   cuda_function = device_param->cuda_function_aux2;   break;
-        case KERN_RUN_AUX3:   cuda_function = device_param->cuda_function_aux3;   break;
-        case KERN_RUN_AUX4:   cuda_function = device_param->cuda_function_aux4;   break;
-      }
-
-      if (hc_cuFuncSetAttribute (hashcat_ctx, cuda_function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shared_mem) == -1) return -1;
+      case KERN_RUN_1:      cuda_function = device_param->cuda_function1;       break;
+      case KERN_RUN_12:     cuda_function = device_param->cuda_function12;      break;
+      case KERN_RUN_2P:     cuda_function = device_param->cuda_function2p;      break;
+      case KERN_RUN_2:      cuda_function = device_param->cuda_function2;       break;
+      case KERN_RUN_2E:     cuda_function = device_param->cuda_function2e;      break;
+      case KERN_RUN_23:     cuda_function = device_param->cuda_function23;      break;
+      case KERN_RUN_3:      cuda_function = device_param->cuda_function3;       break;
+      case KERN_RUN_4:      cuda_function = device_param->cuda_function4;       break;
+      case KERN_RUN_INIT2:  cuda_function = device_param->cuda_function_init2;  break;
+      case KERN_RUN_LOOP2P: cuda_function = device_param->cuda_function_loop2p; break;
+      case KERN_RUN_LOOP2:  cuda_function = device_param->cuda_function_loop2;  break;
+      case KERN_RUN_AUX1:   cuda_function = device_param->cuda_function_aux1;   break;
+      case KERN_RUN_AUX2:   cuda_function = device_param->cuda_function_aux2;   break;
+      case KERN_RUN_AUX3:   cuda_function = device_param->cuda_function_aux3;   break;
+      case KERN_RUN_AUX4:   cuda_function = device_param->cuda_function_aux4;   break;
     }
+
+    if (hc_cuFuncSetAttribute (hashcat_ctx, cuda_function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shared_mem) == -1) return -1;
 
     if (kernel_threads == 0) kernel_threads = 1;
 
@@ -5353,8 +5362,6 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
 
     if (hc_cuEventSynchronize (hashcat_ctx, device_param->cuda_event2) == -1) return -1;
 
-    if (hc_cuEventSynchronize (hashcat_ctx, device_param->cuda_event1) == -1) return -1;
-
     float exec_ms;
 
     if (hc_cuEventElapsedTime (hashcat_ctx, &exec_ms, device_param->cuda_event1, device_param->cuda_event2) == -1) return -1;
@@ -5380,29 +5387,26 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
   {
     hipFunction_t hip_function = NULL;
 
-    if (device_param->is_hip == true)
+    switch (kern_run)
     {
-      switch (kern_run)
-      {
-        case KERN_RUN_1:      hip_function = device_param->hip_function1;       break;
-        case KERN_RUN_12:     hip_function = device_param->hip_function12;      break;
-        case KERN_RUN_2P:     hip_function = device_param->hip_function2p;      break;
-        case KERN_RUN_2:      hip_function = device_param->hip_function2;       break;
-        case KERN_RUN_2E:     hip_function = device_param->hip_function2e;      break;
-        case KERN_RUN_23:     hip_function = device_param->hip_function23;      break;
-        case KERN_RUN_3:      hip_function = device_param->hip_function3;       break;
-        case KERN_RUN_4:      hip_function = device_param->hip_function4;       break;
-        case KERN_RUN_INIT2:  hip_function = device_param->hip_function_init2;  break;
-        case KERN_RUN_LOOP2P: hip_function = device_param->hip_function_loop2p; break;
-        case KERN_RUN_LOOP2:  hip_function = device_param->hip_function_loop2;  break;
-        case KERN_RUN_AUX1:   hip_function = device_param->hip_function_aux1;   break;
-        case KERN_RUN_AUX2:   hip_function = device_param->hip_function_aux2;   break;
-        case KERN_RUN_AUX3:   hip_function = device_param->hip_function_aux3;   break;
-        case KERN_RUN_AUX4:   hip_function = device_param->hip_function_aux4;   break;
-      }
-
-      //if (hc_hipFuncSetAttribute (hashcat_ctx, hip_function, HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shared_mem) == -1) return -1;
+      case KERN_RUN_1:      hip_function = device_param->hip_function1;       break;
+      case KERN_RUN_12:     hip_function = device_param->hip_function12;      break;
+      case KERN_RUN_2P:     hip_function = device_param->hip_function2p;      break;
+      case KERN_RUN_2:      hip_function = device_param->hip_function2;       break;
+      case KERN_RUN_2E:     hip_function = device_param->hip_function2e;      break;
+      case KERN_RUN_23:     hip_function = device_param->hip_function23;      break;
+      case KERN_RUN_3:      hip_function = device_param->hip_function3;       break;
+      case KERN_RUN_4:      hip_function = device_param->hip_function4;       break;
+      case KERN_RUN_INIT2:  hip_function = device_param->hip_function_init2;  break;
+      case KERN_RUN_LOOP2P: hip_function = device_param->hip_function_loop2p; break;
+      case KERN_RUN_LOOP2:  hip_function = device_param->hip_function_loop2;  break;
+      case KERN_RUN_AUX1:   hip_function = device_param->hip_function_aux1;   break;
+      case KERN_RUN_AUX2:   hip_function = device_param->hip_function_aux2;   break;
+      case KERN_RUN_AUX3:   hip_function = device_param->hip_function_aux3;   break;
+      case KERN_RUN_AUX4:   hip_function = device_param->hip_function_aux4;   break;
     }
+
+    //if (hc_hipFuncSetAttribute (hashcat_ctx, hip_function, HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shared_mem) == -1) return -1;
 
     if (kernel_threads == 0) kernel_threads = 1;
 
@@ -5477,26 +5481,23 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
   {
     cl_kernel opencl_kernel = NULL;
 
-    if (device_param->is_opencl == true)
+    switch (kern_run)
     {
-      switch (kern_run)
-      {
-        case KERN_RUN_1:      opencl_kernel = device_param->opencl_kernel1;       break;
-        case KERN_RUN_12:     opencl_kernel = device_param->opencl_kernel12;      break;
-        case KERN_RUN_2P:     opencl_kernel = device_param->opencl_kernel2p;      break;
-        case KERN_RUN_2:      opencl_kernel = device_param->opencl_kernel2;       break;
-        case KERN_RUN_2E:     opencl_kernel = device_param->opencl_kernel2e;      break;
-        case KERN_RUN_23:     opencl_kernel = device_param->opencl_kernel23;      break;
-        case KERN_RUN_3:      opencl_kernel = device_param->opencl_kernel3;       break;
-        case KERN_RUN_4:      opencl_kernel = device_param->opencl_kernel4;       break;
-        case KERN_RUN_INIT2:  opencl_kernel = device_param->opencl_kernel_init2;  break;
-        case KERN_RUN_LOOP2P: opencl_kernel = device_param->opencl_kernel_loop2p; break;
-        case KERN_RUN_LOOP2:  opencl_kernel = device_param->opencl_kernel_loop2;  break;
-        case KERN_RUN_AUX1:   opencl_kernel = device_param->opencl_kernel_aux1;   break;
-        case KERN_RUN_AUX2:   opencl_kernel = device_param->opencl_kernel_aux2;   break;
-        case KERN_RUN_AUX3:   opencl_kernel = device_param->opencl_kernel_aux3;   break;
-        case KERN_RUN_AUX4:   opencl_kernel = device_param->opencl_kernel_aux4;   break;
-      }
+      case KERN_RUN_1:      opencl_kernel = device_param->opencl_kernel1;       break;
+      case KERN_RUN_12:     opencl_kernel = device_param->opencl_kernel12;      break;
+      case KERN_RUN_2P:     opencl_kernel = device_param->opencl_kernel2p;      break;
+      case KERN_RUN_2:      opencl_kernel = device_param->opencl_kernel2;       break;
+      case KERN_RUN_2E:     opencl_kernel = device_param->opencl_kernel2e;      break;
+      case KERN_RUN_23:     opencl_kernel = device_param->opencl_kernel23;      break;
+      case KERN_RUN_3:      opencl_kernel = device_param->opencl_kernel3;       break;
+      case KERN_RUN_4:      opencl_kernel = device_param->opencl_kernel4;       break;
+      case KERN_RUN_INIT2:  opencl_kernel = device_param->opencl_kernel_init2;  break;
+      case KERN_RUN_LOOP2P: opencl_kernel = device_param->opencl_kernel_loop2p; break;
+      case KERN_RUN_LOOP2:  opencl_kernel = device_param->opencl_kernel_loop2;  break;
+      case KERN_RUN_AUX1:   opencl_kernel = device_param->opencl_kernel_aux1;   break;
+      case KERN_RUN_AUX2:   opencl_kernel = device_param->opencl_kernel_aux2;   break;
+      case KERN_RUN_AUX3:   opencl_kernel = device_param->opencl_kernel_aux3;   break;
+      case KERN_RUN_AUX4:   opencl_kernel = device_param->opencl_kernel_aux4;   break;
     }
 
     for (u32 i = 0; i <= 23; i++)
@@ -6529,7 +6530,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
 
               if (device_param->is_opencl == true)
               {
-                if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_combs_c, CL_TRUE, 0, innerloop_left * sizeof (pw_t), device_param->combs_buf, 0, NULL, NULL) == -1) return -1;
+                if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_combs_c, CL_FALSE, 0, innerloop_left * sizeof (pw_t), device_param->combs_buf, 0, NULL, NULL) == -1) return -1;
               }
             }
             else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
@@ -6876,7 +6877,6 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
        * result
        */
 
-//      check_cracked (hashcat_ctx, device_param, salt_pos);
       check_cracked (hashcat_ctx, device_param);
 
       if (status_ctx->run_thread_level2 == false) break;
@@ -7091,7 +7091,7 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
       if (hip_runtimeVersion < 1000)
       {
-        if (hip_runtimeVersion < 404)
+        if (hip_runtimeVersion < 405)
         {
           event_log_warning (hashcat_ctx, "Unsupported AMD HIP runtime version '%d.%d' detected! Falling back to OpenCL...", hip_runtimeVersion / 100, hip_runtimeVersion % 10);
           event_log_warning (hashcat_ctx, NULL);
@@ -7105,6 +7105,8 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
           backend_ctx->hip    = NULL;
           backend_ctx->hiprtc = NULL;
 
+          backend_ctx->hip = NULL;
+
           // if we call this, opencl stops working?! so we just zero the pointer
           // this causes a memleak and an open filehandle but what can we do?
           // hip_close    (hashcat_ctx);
@@ -7113,28 +7115,28 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
       }
       else
       {
-        // we need to wait for 4.4 to be released to continue here
-        // ignore this backend
+        if (hip_runtimeVersion < 40500000)
+        {
+          int hip_version_major = (hip_runtimeVersion - 0) / 10000000;
+          int hip_version_minor = (hip_runtimeVersion - (hip_version_major * 10000000)) / 100000;
+          int hip_version_patch = (hip_runtimeVersion - (hip_version_major * 10000000) - (hip_version_minor * 100000));
 
-        int hip_version_major = (hip_runtimeVersion - 0) / 10000000;
-        int hip_version_minor = (hip_runtimeVersion - (hip_version_major * 10000000)) / 100000;
-        int hip_version_patch = (hip_runtimeVersion - (hip_version_major * 10000000) - (hip_version_minor * 100000));
+          event_log_warning (hashcat_ctx, "Unsupported AMD HIP runtime version '%d.%d.%d' detected! Falling back to OpenCL...", hip_version_major, hip_version_minor, hip_version_patch);
+          event_log_warning (hashcat_ctx, NULL);
 
-        event_log_warning (hashcat_ctx, "Unsupported AMD HIP runtime version '%d.%d.%d' detected! Falling back to OpenCL...", hip_version_major, hip_version_minor, hip_version_patch);
-        event_log_warning (hashcat_ctx, NULL);
+          rc_hip_init    = -1;
+          rc_hiprtc_init = -1;
 
-        rc_hip_init    = -1;
-        rc_hiprtc_init = -1;
+          backend_ctx->rc_hip_init    = rc_hip_init;
+          backend_ctx->rc_hiprtc_init = rc_hiprtc_init;
 
-        backend_ctx->rc_hip_init    = rc_hip_init;
-        backend_ctx->rc_hiprtc_init = rc_hiprtc_init;
+          backend_ctx->hip = NULL;
 
-        backend_ctx->hip = NULL;
-
-        // if we call this, opencl stops working?! so we just zero the pointer
-        // this causes a memleak and an open filehandle but what can we do?
-        // hip_close    (hashcat_ctx);
-        // hiprtc_close (hashcat_ctx);
+          // if we call this, opencl stops working?! so we just zero the pointer
+          // this causes a memleak and an open filehandle but what can we do?
+          // hip_close    (hashcat_ctx);
+          // hiprtc_close (hashcat_ctx);
+        }
       }
     }
     else
@@ -8618,6 +8620,18 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
 
         device_param->device_processors = device_processors;
 
+        // device_host_unified_memory
+
+        cl_bool device_host_unified_memory = false;
+
+        if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_HOST_UNIFIED_MEMORY, sizeof (device_host_unified_memory), &device_host_unified_memory, NULL) == -1)
+        {
+          device_param->skipped = true;
+          continue;
+        }
+
+        device_param->device_host_unified_memory = (device_host_unified_memory == CL_TRUE) ? 1 : 0;
+
         // device_global_mem
 
         cl_ulong device_global_mem = 0;
@@ -8643,6 +8657,13 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
         }
 
         device_param->device_maxmem_alloc = device_maxmem_alloc;
+
+        if (device_param->device_host_unified_memory == 1)
+        {
+          // so, we actually have only half the memory because we need the same buffers on host side
+
+          device_param->device_maxmem_alloc /= 2;
+        }
 
         // note we'll limit to 2gb, otherwise this causes all kinds of weird errors because of possible integer overflows in opencl runtimes
         // testwise disabling that
@@ -8914,14 +8935,11 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
 
         lowercase ((u8 *) opencl_device_version_lower, strlen (opencl_device_version_lower));
 
-        if ((strstr (opencl_device_version_lower, "neo "))
-         || (strstr (opencl_device_version_lower, " neo"))
-         || (strstr (opencl_device_version_lower, "beignet "))
+        if ((strstr (opencl_device_version_lower, "beignet "))
          || (strstr (opencl_device_version_lower, " beignet"))
          || (strstr (opencl_device_version_lower, "mesa "))
          || (strstr (opencl_device_version_lower, " mesa")))
         {
-          // NEO:     https://github.com/hashcat/hashcat/issues/2342
           // BEIGNET: https://github.com/hashcat/hashcat/issues/2243
           // MESA:    https://github.com/hashcat/hashcat/issues/2269
 
@@ -9694,11 +9712,7 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
 
       device_param->device_available_mem = device_param->device_global_mem - MAX_ALLOC_CHECKS_SIZE;
 
-      #if defined (_WIN)
-      if ((device_param->opencl_device_type & CL_DEVICE_TYPE_GPU) && (device_param->opencl_platform_vendor_id == VENDOR_ID_NV))
-      #else
-      if ((device_param->opencl_device_type & CL_DEVICE_TYPE_GPU) && ((device_param->opencl_platform_vendor_id == VENDOR_ID_NV) || (device_param->opencl_platform_vendor_id == VENDOR_ID_AMD)))
-      #endif
+      if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
       {
         // OK, so the problem here is the following:
         // There's just CL_DEVICE_GLOBAL_MEM_SIZE to ask OpenCL about the total memory on the device,
@@ -9771,6 +9785,13 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
       hc_clReleaseCommandQueue (hashcat_ctx, command_queue);
 
       hc_clReleaseContext (hashcat_ctx, context);
+
+      if (device_param->device_host_unified_memory == 1)
+      {
+        // so, we actually have only half the memory because we need the same buffers on host side
+
+        device_param->device_available_mem /= 2;
+      }
     }
   }
 
@@ -10705,6 +10726,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
   u64 size_total_host_all = 0;
 
+  u32 hardware_power_all = 0;
+
   for (int backend_devices_idx = 0; backend_devices_idx < backend_ctx->backend_devices_cnt; backend_devices_idx++)
   {
     /**
@@ -10731,7 +10754,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       if ((unstable_warning == true) && (user_options->force == false))
       {
-        event_log_warning (hashcat_ctx, "* Device #%u: Skipping hash-mode %u)", device_id + 1, hashconfig->hash_mode);
+        event_log_warning (hashcat_ctx, "* Device #%u: Skipping (hash-mode %u)", device_id + 1, hashconfig->hash_mode);
         event_log_warning (hashcat_ctx, "             This is due to a known CUDA/HIP/OpenCL runtime/driver issue (not a hashcat issue)");
         event_log_warning (hashcat_ctx, "             You can use --force to override, but do not report related errors.");
 
@@ -11345,7 +11368,19 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     }
     else
     {
-      build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-D KERNEL_STATIC -I OpenCL -I \"%s\" ", folder_config->cpath_real);
+      if (device_param->opencl_platform_vendor_id == VENDOR_ID_POCL)
+      {
+        // POCL doesn't like quotes in the include path, see:
+        //   https://github.com/hashcat/hashcat/issues/2950
+        // Maybe related:
+        //   https://github.com/pocl/pocl/issues/962
+
+        build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-D KERNEL_STATIC -I OpenCL -I %s ", folder_config->cpath_real);
+      }
+      else
+      {
+        build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-D KERNEL_STATIC -I OpenCL -I \"%s\" ", folder_config->cpath_real);
+      }
     }
 
     /* currently disabled, hangs NEO drivers since 20.09.
@@ -11904,13 +11939,15 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
      * from opencl specs:
      * Calls to clBuildProgram, clCompileProgram or clLinkProgram after clUnloadPlatformCompiler will reload the compiler, if necessary, to build the appropriate program executable.
      */
-
+    // Disabled after user reporting weird errors like CL_OUT_OF_HOST_MEMORY after calling
+    /*
     if (device_param->is_opencl == true)
     {
       cl_platform_id platform_id = backend_ctx->opencl_platforms[device_param->opencl_platform_id];
 
       if (hc_clUnloadPlatformCompiler (hashcat_ctx, platform_id) == -1) return -1;
     }
+    */
 
     // some algorithm collide too fast, make that impossible
 
@@ -14510,11 +14547,21 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     // In theory this check could be disabled if we check if total video RAM < total host RAM,
     // but at this point of initialization phase we don't have this information available.
 
-    // We need to hard-code some value, let's assume that (in 2021) the host has at least 8GB ram per active GPU
+    // We need to hard-code some value, let's assume that (in 2021) the host has at least 4GB ram per active GPU
 
-    const u64 SIZE_8GB = 8ULL * 1024 * 1024 * 1024;
+    const u64 SIZE_4GB = 4ULL * 1024 * 1024 * 1024;
 
-    u64 accel_limit = SIZE_8GB;
+    u64 accel_limit = SIZE_4GB;
+
+    // in slow candidate mode we need to keep the buffers on the host alive
+    // a high accel value doesn't help much here anyway
+
+    if (user_options->slow_candidates == true)
+    {
+      // Tested with NTLM, almost no difference in performance
+
+      accel_limit /= 8;
+    }
 
     // this is device_processors * kernel_threads
 
@@ -14614,7 +14661,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       u64 EXTRA_SPACE = (1024ULL * 1024ULL) * kernel_accel_max;
 
-      EXTRA_SPACE = MAX (EXTRA_SPACE, (  64ULL * 1024ULL * 1024ULL));
+      EXTRA_SPACE = MAX (EXTRA_SPACE, ( 256ULL * 1024ULL * 1024ULL));
       EXTRA_SPACE = MIN (EXTRA_SPACE, (1024ULL * 1024ULL * 1024ULL));
 
       if ((size_pws   + EXTRA_SPACE) > device_param->device_maxmem_alloc) memory_limit_hit = 1;
@@ -15048,8 +15095,17 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       }
     }
 
+    hardware_power_all += hardware_power_max;
+
     EVENT_DATA (EVENT_BACKEND_DEVICE_INIT_POST, &backend_devices_idx, sizeof (int));
   }
+
+  if (user_options->benchmark == false)
+  {
+    if (hardware_power_all == 0) return -1;
+  }
+
+  backend_ctx->hardware_power_all = hardware_power_all;
 
   EVENT_DATA (EVENT_BACKEND_SESSION_HOSTMEM, &size_total_host_all, sizeof (u64));
 
@@ -15544,7 +15600,6 @@ void backend_session_reset (hashcat_ctx_t *hashcat_ctx)
     device_param->hardware_power = 0;
   }
 
-  backend_ctx->hardware_power_all = 0;
   backend_ctx->kernel_power_all   = 0;
   backend_ctx->kernel_power_final = 0;
 }
@@ -15655,6 +15710,8 @@ int backend_session_update_mp (hashcat_ctx_t *hashcat_ctx)
 
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_FALSE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_FALSE, 0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
+
+      if (hc_clFlush (hashcat_ctx, device_param->opencl_command_queue) == -1) return -1;
     }
   }
 
@@ -15726,6 +15783,8 @@ int backend_session_update_mp_rl (hashcat_ctx_t *hashcat_ctx, const u32 css_cnt_
 
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_FALSE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_FALSE, 0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
+
+      if (hc_clFlush (hashcat_ctx, device_param->opencl_command_queue) == -1) return -1;
     }
   }
 

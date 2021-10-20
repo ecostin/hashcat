@@ -1067,6 +1067,8 @@ typedef struct link_speed
 
 // file handling
 
+typedef struct xzfile xzfile_t;
+
 typedef struct hc_fp
 {
   int         fd;
@@ -1074,9 +1076,8 @@ typedef struct hc_fp
   FILE       *pfp; // plain fp
   gzFile      gfp; //  gzip fp
   unzFile     ufp; //   zip fp
+  xzfile_t   *xfp; //    xz fp
 
-  bool        is_gzip;
-  bool        is_zip;
   int         bom_size;
 
   const char *mode;
@@ -1111,6 +1112,7 @@ typedef struct hc_device_param
   u64     device_maxmem_alloc;
   u64     device_global_mem;
   u64     device_available_mem;
+  int     device_host_unified_memory;
   u32     device_maxclock_frequency;
   size_t  device_maxworkgroup_size;
   u64     device_local_mem_size;
