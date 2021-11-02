@@ -1246,6 +1246,10 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   {
       printf ("FQUEUE\t%d/%d\t",hashcat_status->guess_base_offset,hashcat_status->guess_base_count);
   }
+  else if ((hashcat_status->guess_mode == GUESS_MODE_MASK) || (hashcat_status->guess_mode == GUESS_MODE_MASK_CS))
+  {
+      printf ("FQUEUE\t%d/L\t",hashcat_status->guess_mask_length);
+  }
   else
   {
       printf ("FQUEUE\t1/1\t");
