@@ -1,8 +1,3 @@
-/**
- * Author......: See docs/credits.txt
- * License.....: MIT
- */
-
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
@@ -18,16 +13,7 @@
 
 KERNEL_FQ void m08503_m04 (KERN_ATTR_RULES ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
-
-  /**
-   * base
-   */
-
   const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
@@ -45,10 +31,6 @@ KERNEL_FQ void m08503_m04 (KERN_ATTR_RULES ())
   pw_buf1[3] = pws[gid].i[7];
 
   const u32 pw_len = pws[gid].pw_len & 63;
-
-  /**
-   * salt
-   */
 
   u32 salt_buf0[4];
   u32 salt_buf1[4];
@@ -72,29 +54,10 @@ KERNEL_FQ void m08503_m04 (KERN_ATTR_RULES ())
   salt_buf3[2] = salt_bufs[SALT_POS].salt_buf_pc[14];
   salt_buf3[3] = salt_bufs[SALT_POS].salt_buf_pc[15];
 
-/**
-if (gid == 0 && lid == 0) {
-  printf("xsalt_buf0=");
-  for (int i=0; i<4; i++) {
-	printf("%02x ", salt_buf0[i]);
-  }
-  printf("\n\n");
-  printf("xsalt_buf1=");
-  for (int i=0; i<4; i++) {
-	printf("%02x ", salt_buf1[i]);
-  }
-  printf("\n\n");
-}
-**/
-
   make_utf16be (salt_buf1, salt_buf2, salt_buf3);
   make_utf16be (salt_buf0, salt_buf0, salt_buf1);
 
   const u32 salt_len = salt_bufs[SALT_POS].salt_len_pc * 2;
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
   {
@@ -109,10 +72,6 @@ if (gid == 0 && lid == 0) {
     make_utf16be (w0, w0, w1);
 
     const u32x out_len2 = out_len * 2;
-
-    /**
-     * prepend salt
-     */
 
     const u32x out_salt_len = out_len2 + salt_len;
 
@@ -136,10 +95,6 @@ if (gid == 0 && lid == 0) {
     w3[3] |= salt_buf3[3];
 
     append_0x80_4x4_VV (w0, w1, w2, w3, out_salt_len);
-
-    /**
-     * sha1
-     */
 
     u32x w0_t = hc_swap32 (w0[0]);
     u32x w1_t = hc_swap32 (w0[1]);
@@ -274,15 +229,7 @@ KERNEL_FQ void m08503_m16 (KERN_ATTR_RULES ())
 
 KERNEL_FQ void m08503_s04 (KERN_ATTR_RULES ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
-
-  /**
-   * base
-   */
 
   const u64 gid = get_global_id (0);
 
@@ -301,10 +248,6 @@ KERNEL_FQ void m08503_s04 (KERN_ATTR_RULES ())
   pw_buf1[3] = pws[gid].i[7];
 
   const u32 pw_len = pws[gid].pw_len & 63;
-
-  /**
-   * salt
-   */
 
   u32 salt_buf0[4];
   u32 salt_buf1[4];
@@ -333,25 +276,6 @@ KERNEL_FQ void m08503_s04 (KERN_ATTR_RULES ())
   make_utf16be (salt_buf1, salt_buf2, salt_buf3);
   make_utf16be (salt_buf0, salt_buf0, salt_buf1);
 
-/**
-if (gid == 0 && lid == 0) {
-  printf("salt_buf0=");
-  for (int i=0; i<4; i++) {
-	printf("%02x ", salt_buf0[i]);
-  }
-  printf("\n\n");
-  printf("salt_buf1=");
-  for (int i=0; i<4; i++) {
-	printf("%02x ", salt_buf1[i]);
-  }
-  printf("\n\n");
-}
-**/
-
-  /**
-   * digest
-   */
-
   const u32 search[4] =
   {
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
@@ -360,15 +284,7 @@ if (gid == 0 && lid == 0) {
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
   };
 
-  /**
-   * reverse
-   */
-
   const u32 e_rev = hc_rotl32_S (search[1], 2u);
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
   {
@@ -383,10 +299,6 @@ if (gid == 0 && lid == 0) {
     make_utf16be (w0, w0, w1);
 
     const u32x out_len2 = out_len * 2;
-
-    /**
-     * prepend salt
-     */
 
     const u32x out_salt_len = out_len2 + salt_len;
 
@@ -410,10 +322,6 @@ if (gid == 0 && lid == 0) {
     w3[3] |= salt_buf3[3];
 
     append_0x80_4x4_VV (w0, w1, w2, w3, out_salt_len);
-
-    /**
-     * sha1
-     */
 
     u32x w0_t = hc_swap32 (w0[0]);
     u32x w1_t = hc_swap32 (w0[1]);

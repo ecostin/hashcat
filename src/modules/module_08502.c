@@ -1,5 +1,5 @@
 /**
- * Author......: See docs/credits.txt
+ * Author......: Detack GmbH / part of https://www.detack.de/en/epas
  * License.....: MIT
  */
 
@@ -10,6 +10,7 @@
 #include "convert.h"
 #include "shared.h"
 #include "emu_inc_cipher_des.h"
+#include <openssl/des.h>
 
 static const u32   ATTACK_EXEC    = ATTACK_EXEC_INSIDE_KERNEL;
 static const u32   DGST_POS0      = 0;
@@ -19,11 +20,12 @@ static const u32   DGST_POS3      = 3;
 static const u32   DGST_SIZE      = DGST_SIZE_4_4; // originally DGST_SIZE_4_2;
 static const u32   HASH_CATEGORY  = HASH_CATEGORY_OS;
 static const char *HASH_NAME      = "AS400 DES";
-static const u64   KERN_TYPE      = 8502;
+static const u64   KERN_TYPE      = 8500;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE;
 static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_ST_UPPER
-                                  | OPTS_TYPE_PT_UPPER;
+                                  | OPTS_TYPE_PT_UPPER
+                                  | OPTS_TYPE_HASH_COPY;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "SYS1";
 static const char *ST_HASH        = "OPEN3*EC76FC0DEF5B0A83";
@@ -43,6 +45,58 @@ u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 
+char *tmp_hash;
+
+const u8 ascii_to_ebcdic[] =
+{
+    0x00, 0x01, 0x02, 0x03, 0x37, 0x2d, 0x2e, 0x2f, 0x16, 0x05, 0x25, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13, 0x3c, 0x3d, 0x32, 0x26, 0x18, 0x19, 0x3f, 0x27, 0x1c, 0x1d, 0x1e, 0x1f,
+    0x40, 0x4f, 0x7f, 0x7b, 0x5b, 0x6c, 0x50, 0x7d, 0x4d, 0x5d, 0x5c, 0x4e, 0x6b, 0x60, 0x4b, 0x61,
+    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0x7a, 0x5e, 0x4c, 0x7e, 0x6e, 0x6f,
+    0x7c, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6,
+    0xd7, 0xd8, 0xd9, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0x4a, 0xe0, 0x5a, 0x5f, 0x6d,
+    0x79, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96,
+    0x97, 0x98, 0x99, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xc0, 0x6a, 0xd0, 0xa1, 0x07,
+    0x20, 0x21, 0x22, 0x23, 0x24, 0x15, 0x06, 0x17, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x09, 0x0a, 0x1b,
+    0x30, 0x31, 0x1a, 0x33, 0x34, 0x35, 0x36, 0x08, 0x38, 0x39, 0x3a, 0x3b, 0x04, 0x14, 0x3e, 0xe1,
+    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
+    0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75,
+    0x76, 0x77, 0x78, 0x80, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f, 0x90, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e,
+    0x9f, 0xa0, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf, 0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,
+    0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xda, 0xdb,
+    0xdc, 0xdd, 0xde, 0xdf, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+};
+
+
+void ibmdes(unsigned char *txt, unsigned char *key, unsigned char *out)
+{
+    unsigned long key1, key2;
+    int j;
+    DES_key_schedule sched;
+    
+    key1=(key[0]<<24)|(key[1]<<16)|(key[2]<<8)|key[3];
+    key2=(key[4]<<24)|(key[5]<<16)|(key[6]<<8)|key[7];  
+    key1^=0x55555555;
+    key2^=0x55555555; 
+    if (key2&0x80000000) j=1;
+    key1<<=1;
+    key2<<=1;
+    if (j==1) key1|=1;  
+    key[0]=(key1&0xFF000000)>>24;
+    key[1]=(key1&0x00FF0000)>>16;
+    key[2]=(key1&0x0000FF00)>>8; 
+    key[3]=(key1&0x000000FF);
+    key[4]=(key2&0xFF000000)>>24;
+    key[5]=(key2&0x00FF0000)>>16;
+    key[6]=(key2&0x0000FF00)>>8;
+    key[7]=(key2&0x000000FF);    
+ 
+    DES_set_odd_parity((DES_cblock*)key);
+    DES_set_key((DES_cblock*)key, &sched);
+    DES_ecb_encrypt((DES_cblock*)txt,(DES_cblock*)out, &sched, 1);
+    
+    return;
+}
 
 char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
@@ -71,8 +125,7 @@ char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAY
 
 u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
-  const u32 pw_max = 10; // Underlaying DES max
-
+  const u32 pw_max = 128; // Underlaying DES max NEW: trimming done by rules, leave more keyspace available
   return pw_max;
 }
 
@@ -80,25 +133,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   u32 *digest = (u32 *) digest_buf;
 
-  const u8 ascii_to_ebcdic[] =
-  {
-    0x00, 0x01, 0x02, 0x03, 0x37, 0x2d, 0x2e, 0x2f, 0x16, 0x05, 0x25, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-    0x10, 0x11, 0x12, 0x13, 0x3c, 0x3d, 0x32, 0x26, 0x18, 0x19, 0x3f, 0x27, 0x1c, 0x1d, 0x1e, 0x1f,
-    0x40, 0x4f, 0x7f, 0x7b, 0x5b, 0x6c, 0x50, 0x7d, 0x4d, 0x5d, 0x5c, 0x4e, 0x6b, 0x60, 0x4b, 0x61,
-    0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0x7a, 0x5e, 0x4c, 0x7e, 0x6e, 0x6f,
-    0x7c, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6,
-    0xd7, 0xd8, 0xd9, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0x4a, 0xe0, 0x5a, 0x5f, 0x6d,
-    0x79, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96,
-    0x97, 0x98, 0x99, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xc0, 0x6a, 0xd0, 0xa1, 0x07,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x15, 0x06, 0x17, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x09, 0x0a, 0x1b,
-    0x30, 0x31, 0x1a, 0x33, 0x34, 0x35, 0x36, 0x08, 0x38, 0x39, 0x3a, 0x3b, 0x04, 0x14, 0x3e, 0xe1,
-    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
-    0x58, 0x59, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75,
-    0x76, 0x77, 0x78, 0x80, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f, 0x90, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e,
-    0x9f, 0xa0, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf, 0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,
-    0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xda, 0xdb,
-    0xdc, 0xdd, 0xde, 0xdf, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
-  };
 
   token_t token;
 
@@ -119,8 +153,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (rc_tokenizer != PARSER_OK) return (rc_tokenizer);
 
-  // salt
-
   const u8 *salt_pos = token.buf[0];
   const int salt_len = token.len[0];
 
@@ -128,24 +160,15 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (parse_rc == false) return (PARSER_SALT_LENGTH);
 
-  // salt pc
-
   u8 *salt_buf_ptr    = (u8 *) salt->salt_buf;
   u8 *salt_buf_pc_ptr = (u8 *) salt->salt_buf_pc;
 
-  for (u32 i = 0; i < salt->salt_len; i++)
-  {
-    salt_buf_pc_ptr[i] = ascii_to_ebcdic[(int) salt_buf_ptr[i]];
-  }
+  for (u32 i = 0; i < salt->salt_len; i++) salt_buf_pc_ptr[i] = ascii_to_ebcdic[(int) salt_buf_ptr[i]];
+  for (u32 i = salt_len; i < 8; i++) salt_buf_pc_ptr[i] = 0x40;
 
-  for (u32 i = salt_len; i < 8; i++)
+  if (salt->salt_len > 8)
   {
-    salt_buf_pc_ptr[i] = 0x40;
-  }
-if (salt->salt_len > 8) {
-    if (salt->salt_len == 9) {
-        salt_buf_pc_ptr[9] = 0x40;
-    }
+    if (salt->salt_len == 9) salt_buf_pc_ptr[9] = 0x40;
     salt_buf_pc_ptr[0] ^= salt_buf_pc_ptr[8] & 0xC0;
     salt_buf_pc_ptr[1] ^= (salt_buf_pc_ptr[8] & 0x30) << 2;
     salt_buf_pc_ptr[2] ^= (salt_buf_pc_ptr[8] & 0x0C) << 4;
@@ -156,91 +179,92 @@ if (salt->salt_len > 8) {
     salt_buf_pc_ptr[7] ^= (salt_buf_pc_ptr[9] & 0x03) << 6;
 
     salt->salt_len_pc = 8;
-}
-
+  }
 
   DES_IP (salt->salt_buf_pc[0], salt->salt_buf_pc[1]);
-
   salt->salt_buf_pc[0] = rotl32 (salt->salt_buf_pc[0], 3u);
   salt->salt_buf_pc[1] = rotl32 (salt->salt_buf_pc[1], 3u);
-/*
-token buf = 400EF729AF7D366B6928D8BE798325FF
-
-split:
-token0 = 400EF729AF7D366B
-token1 = 6928D8BE798325FF
-final_token = token0 ^ token1
-*/
-  // hash
 
   const u8 *hash_pos = token.buf[1];
 
   digest[0] = hex_to_u32 (hash_pos + 0);
   digest[1] = hex_to_u32 (hash_pos + 8);
 
-// if (token.len[1] == 32) {
-//   digest[0] = digest[0] ^ hex_to_u32 (hash_pos + 16);
-//   digest[1] = digest[1] ^ hex_to_u32 (hash_pos + 24);
-// }
-
   DES_IP (digest[0], digest[1]);
-
 
   digest[0] = rotr32 (digest[0], 29);
   digest[1] = rotr32 (digest[1], 29);
-
-if (token.len[1] == 32) {
-  digest[2] = hex_to_u32 (hash_pos + 16);
-  digest[3] = hex_to_u32 (hash_pos + 24);
-
-  DES_IP (digest[2], digest[3]);
-
-  digest[2] = rotr32 (digest[2], 29);
-  digest[3] = rotr32 (digest[3], 29);
-
-
-} else {
   digest[2] = 0;
   digest[3] = 0;
-}
-
-
+  
   return (PARSER_OK);
 }
 
 int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const void *digest_buf, MAYBE_UNUSED const salt_t *salt, MAYBE_UNUSED const void *esalt_buf, MAYBE_UNUSED const void *hook_salt_buf, MAYBE_UNUSED const hashinfo_t *hash_info, char *line_buf, MAYBE_UNUSED const int line_size)
 {
-  const u32 *digest = (const u32 *) digest_buf;
-
-  u32 tmp[4];
-
-  tmp[0] = rotl32 (digest[0], 29);
-  tmp[1] = rotl32 (digest[1], 29);
-  tmp[2] = rotl32 (digest[2], 29);
-  tmp[3] = rotl32 (digest[3], 29);
-
-
-
-  DES_FP (tmp[1], tmp[0]);
-  DES_FP (tmp[3], tmp[2]);
-
-  char tmp_salt[SALT_MAX * 2];
-
-  const int salt_len = generic_salt_encode (hashconfig, (const u8 *) salt->salt_buf, (const int) salt->salt_len, (u8 *) tmp_salt);
-
-  tmp_salt[salt_len] = 0;
-
-
-  int line_len; 
-
-if (byte_swap_32 (tmp[2]) != 0 && byte_swap_32(tmp[3]) != 0)
-  line_len = snprintf (line_buf, line_size, "%s*%08X%08X%08X%08X", tmp_salt, byte_swap_32 (tmp[0]), byte_swap_32 (tmp[1]), byte_swap_32 (tmp[2]), byte_swap_32 (tmp[3]));
-else
-
-  line_len = snprintf (line_buf, line_size, "%s*%08X%08X", tmp_salt, byte_swap_32 (tmp[0]), byte_swap_32 (tmp[1]));
-
-
+  const int line_len = snprintf (line_buf, line_size, "%s", hash_info->orighash);
+  tmp_hash=strdup(line_buf);
   return line_len;
+}
+
+int module_build_plain_postprocess (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const void *tmps, const u32 *src_buf, MAYBE_UNUSED const size_t src_sz, MAYBE_UNUSED const int src_len, u32 *dst_buf, MAYBE_UNUSED const size_t dst_sz)
+{
+  unsigned char txt[10],key[8],out[8],xhash[16];
+  int i,n,p0,p1;
+
+  char *salt = strtok(tmp_hash, "*");
+  char *hash = strtok(NULL,"*");
+  char *plain;
+  
+  plain = strdup((char *) src_buf);
+  if(strlen((char *) plain) > 8) plain[7] = 0;
+  
+  if(strlen(hash) == 16)
+  {
+    n = snprintf ((char *) dst_buf, dst_sz, "%s", (char *)plain);
+    free(plain);
+    free(tmp_hash);
+    return n;
+  }
+
+  n = strlen(salt);
+  
+  memset(txt,0x40,10);
+  for (i=0; i<n; i++) txt[i]=ascii_to_ebcdic[salt[i]];
+  
+  if (n > 8)
+  {
+    txt[0] ^= txt[8] & 0xC0;
+    txt[1] ^= (txt[8] & 0x30) << 2;
+    txt[2] ^= (txt[8] & 0x0C) << 4;
+    txt[3] ^= (txt[8] & 0x03) << 6;
+    txt[4] ^= txt[9] & 0xC0;
+    txt[5] ^= (txt[9] & 0x30) << 2;
+    txt[6] ^= (txt[9] & 0x0C) << 4;
+    txt[7] ^= (txt[9] & 0x03) << 6;
+    n=8;
+  }
+
+  hash+=16;
+  for(i=0;i<8;i++) sscanf(hash+2*i,"%2X",&xhash[i]);
+  
+  for(p0 = 0; p0 < 255; p0++)
+  {
+    for(p1 = 0; p1 < 255; p1++)
+    {
+      memset(key,0x40,8);
+      key[0]=ascii_to_ebcdic[p0];
+      key[1]=ascii_to_ebcdic[p1];
+      ibmdes(txt,key,out);
+      if(memcmp(out,xhash,8) == 0) goto end;
+    }
+  }
+  end:
+  
+  n = snprintf ((char *) dst_buf, dst_sz, "%s%c%c", (char *) plain,p0,p1);
+  free(plain);
+  free(tmp_hash);
+  return n;
 }
 
 void module_init (module_ctx_t *module_ctx)
@@ -253,7 +277,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
-  module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
+  module_ctx->module_build_plain_postprocess  = module_build_plain_postprocess;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
   module_ctx->module_deprecated_notice        = MODULE_DEFAULT;
   module_ctx->module_dgst_pos0                = module_dgst_pos0;

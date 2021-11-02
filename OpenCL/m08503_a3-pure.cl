@@ -1,8 +1,3 @@
-/**
- * Author......: See docs/credits.txt
- * License.....: MIT
- */
-
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
@@ -16,18 +11,9 @@
 
 KERNEL_FQ void m08503_mxx (KERN_ATTR_VECTOR ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
-
   if (gid >= gid_max) return;
-
-  /**
-   * base
-   */
 
   const u32 pw_len = pws[gid].pw_len;
 
@@ -43,10 +29,6 @@ KERNEL_FQ void m08503_mxx (KERN_ATTR_VECTOR ())
   sha1_init (&ctx0);
 
   sha1_update_global_utf16be_swap (&ctx0, salt_bufs[SALT_POS].salt_buf_pc, salt_bufs[SALT_POS].salt_len_pc);
-
-  /**
-   * loop
-   */
 
   u32x w0l = w[0];
 
@@ -77,18 +59,9 @@ KERNEL_FQ void m08503_mxx (KERN_ATTR_VECTOR ())
 
 KERNEL_FQ void m08503_sxx (KERN_ATTR_VECTOR ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
-
   if (gid >= gid_max) return;
-
-  /**
-   * digest
-   */
 
   const u32 search[4] =
   {
@@ -97,10 +70,6 @@ KERNEL_FQ void m08503_sxx (KERN_ATTR_VECTOR ())
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
   };
-
-  /**
-   * base
-   */
 
   const u32 pw_len = pws[gid].pw_len;
 
@@ -112,31 +81,21 @@ KERNEL_FQ void m08503_sxx (KERN_ATTR_VECTOR ())
   }
 
   sha1_ctx_t ctx0;
-
   sha1_init (&ctx0);
-
   sha1_update_global_utf16be_swap (&ctx0, salt_bufs[SALT_POS].salt_buf_pc, salt_bufs[SALT_POS].salt_len_pc);
-
-  /**
-   * loop
-   */
 
   u32x w0l = w[0];
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
-
     const u32x w0 = w0l | w0r;
 
     w[0] = w0;
 
     sha1_ctx_vector_t ctx;
-
     sha1_init_vector_from_scalar (&ctx, &ctx0);
-
     sha1_update_vector_utf16leN (&ctx, w, pw_len);
-
     sha1_final_vector (&ctx);
 
     const u32x r0 = ctx.h[DGST_R0];

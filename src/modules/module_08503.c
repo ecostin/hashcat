@@ -1,5 +1,5 @@
 /**
- * Author......: See docs/credits.txt
+ * Author......: Detack GmbH / part of https://www.detack.de/en/epas
  * License.....: MIT
  */
 
@@ -18,7 +18,7 @@ static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 1;
 static const u32   DGST_SIZE      = DGST_SIZE_4_5;
 static const u32   HASH_CATEGORY  = HASH_CATEGORY_OS;
-static const char *HASH_NAME      = "as400_sha1($salt.$pass)";
+static const char *HASH_NAME      = "AS400 SHA1";
 static const u64   KERN_TYPE      = 8503;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_PRECOMPUTE_INIT
@@ -105,15 +105,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   
   const u8 *salt_pos = token.buf[0];
   const int salt_len = token.len[0];
-/*
-  u8 saltx[10];
-  for (u8 j = 0; j<10; j++) saltx[j] = 0x20;
-  for (u8 j=0;j<salt_len;j++) saltx[j] = salt_pos[j];
- 
-  printf("The salt value is: %.*sXX \n", 10, saltx);
-*/
-
-//  printf("The salt is: %.*s \n", salt_len, salt_pos);
 
   const bool parse_rc = generic_salt_decode (hashconfig, salt_pos, salt_len, (u8 *) salt->salt_buf, (int *) &salt->salt_len);
 
@@ -128,27 +119,12 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   for (int i=salt->salt_len; i<salt->salt_len_pc; i++) {
     salt_buf_pc_ptr[i] = 0x20;
   }
-/*  printf("FINALSALT(%d)=", salt->salt_len_pc);
-  for (u32 i = 0; i < salt->salt_len_pc; i++)
-  {
-    printf("%02x", salt_buf_pc_ptr[i]);
-  }
-printf("\n");
-*/
-/*
-  printf("%lu\n", (unsigned long)salt_len);
-  printf("%lu\n", (unsigned long)salt);
-  printf("%lu\n", (unsigned long)digest);
-*/
   return (PARSER_OK);
 }
 
 int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const void *digest_buf, MAYBE_UNUSED const salt_t *salt, MAYBE_UNUSED const void *esalt_buf, MAYBE_UNUSED const void *hook_salt_buf, MAYBE_UNUSED const hashinfo_t *hash_info, char *line_buf, MAYBE_UNUSED const int line_size)
 {
   const u32 *digest = (const u32 *) digest_buf;
-
-  // we can not change anything in the original buffer, otherwise destroying sorting
-  // therefore create some local buffer
 
   u32 tmp[5];
 
@@ -188,10 +164,16 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   u32_to_hex (tmp[2], out_buf + out_len); out_len += 8;
   u32_to_hex (tmp[3], out_buf + out_len); out_len += 8;
   u32_to_hex (tmp[4], out_buf + out_len); out_len += 8;
-
-  printf("Value of out_len: %d\n", out_len);
   
+  uppercase(out_buf, out_len);
+
   return out_len;
+}
+
+u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  const u32 pw_max = 128;
+  return pw_max;
 }
 
 void module_init (module_ctx_t *module_ctx)
@@ -259,7 +241,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_potfile_disable          = MODULE_DEFAULT;
   module_ctx->module_potfile_keep_all_hashes  = MODULE_DEFAULT;
   module_ctx->module_pwdump_column            = MODULE_DEFAULT;
-  module_ctx->module_pw_max                   = MODULE_DEFAULT;
+  module_ctx->module_pw_max                   = module_pw_max;
   module_ctx->module_pw_min                   = MODULE_DEFAULT;
   module_ctx->module_salt_max                 = MODULE_DEFAULT;
   module_ctx->module_salt_min                 = MODULE_DEFAULT;

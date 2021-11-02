@@ -3,7 +3,7 @@
 ## License.....: MIT
 ##
 
-LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath,/epas/utilities/epas-opencl/lib/system -Wl,-rpath,/epas/utilities/epas-opencl/lib/cuda
+LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath,/epas/utilities/epas-opencl/lib/system -Wl,-rpath,/epas/utilities/epas-opencl/lib/cuda -lcrypto
 SHARED                  ?= 0
 DEBUG                   := 0
 PRODUCTION              := 1

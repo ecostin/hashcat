@@ -1,10 +1,3 @@
-/**
- * Author......: See docs/credits.txt
- * License.....: MIT
- */
-
-//#define NEW_SIMD_CODE
-
 #ifdef KERNEL_STATIC
 #include "inc_vendor.h"
 #include "inc_types.h"
@@ -18,18 +11,10 @@
 
 KERNEL_FQ void m08503_mxx (KERN_ATTR_RULES ())
 {  
-   /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
-
-  /**
-   * base
-   */
 
   COPY_PW (pws[gid]);
 
@@ -38,10 +23,6 @@ KERNEL_FQ void m08503_mxx (KERN_ATTR_RULES ())
   sha1_init (&ctx0);
 
   sha1_update_global_utf16be_swap (&ctx0, salt_bufs[SALT_POS].salt_buf_pc, salt_bufs[SALT_POS].salt_len_pc);
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
   {
@@ -66,18 +47,10 @@ KERNEL_FQ void m08503_mxx (KERN_ATTR_RULES ())
 
 KERNEL_FQ void m08503_sxx (KERN_ATTR_RULES ())
 {  
-   /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
-
-  /**
-   * digest
-   */
 
   const u32 search[4] =
   {
@@ -87,21 +60,11 @@ KERNEL_FQ void m08503_sxx (KERN_ATTR_RULES ())
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
   };
 
-  /**
-   * base
-   */
-
   COPY_PW (pws[gid]);
 
   sha1_ctx_t ctx0;
-
   sha1_init (&ctx0);
-
   sha1_update_global_utf16be_swap (&ctx0, salt_bufs[SALT_POS].salt_buf_pc, salt_bufs[SALT_POS].salt_len_pc);
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
   {
@@ -110,9 +73,7 @@ KERNEL_FQ void m08503_sxx (KERN_ATTR_RULES ())
     tmp.pw_len = apply_rules (rules_buf[il_pos].cmds, tmp.i, tmp.pw_len);
 
     sha1_ctx_t ctx = ctx0;
-
     sha1_update_utf16be_swap (&ctx, tmp.i, tmp.pw_len);
-
     sha1_final (&ctx);
 
     const u32 r0 = ctx.h[DGST_R0];

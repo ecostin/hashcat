@@ -71,7 +71,7 @@ char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAY
 
 u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
-  const u32 pw_max = 8; // Underlaying DES max
+  const u32 pw_max = 128; // Underlaying DES max NEW: trimming done by rules, leave more keyspace available
 
   return pw_max;
 }

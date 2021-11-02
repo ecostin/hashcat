@@ -1,8 +1,3 @@
-/**
- * Author......: See docs/credits.txt
- * License.....: MIT
- */
-
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
@@ -16,16 +11,7 @@
 
 KERNEL_FQ void m08503_m04 (KERN_ATTR_BASIC ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
-
-  /**
-   * base
-   */
-
   const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
@@ -43,10 +29,6 @@ KERNEL_FQ void m08503_m04 (KERN_ATTR_BASIC ())
   pw_buf1[3] = pws[gid].i[7];
 
   const u32 pw_l_len = pws[gid].pw_len & 63;
-
-  /**
-   * salt
-   */
 
   u32 salt_buf0[4];
   u32 salt_buf1[4];
@@ -73,58 +55,12 @@ KERNEL_FQ void m08503_m04 (KERN_ATTR_BASIC ())
   make_utf16be (salt_buf1, salt_buf2, salt_buf3);
   make_utf16be (salt_buf0, salt_buf0, salt_buf1);
 
-/*
-  salt_buf0[0] = hc_swap32_S (salt_buf0[0]);
-  salt_buf0[1] = hc_swap32_S (salt_buf0[1]);
-  salt_buf0[2] = hc_swap32_S (salt_buf0[2]);
-  salt_buf0[3] = hc_swap32_S (salt_buf0[0]);
-  salt_buf1[0] = hc_swap32_S (salt_buf1[1]);
-  salt_buf1[1] = hc_swap32_S (salt_buf1[2]);
-  salt_buf1[2] = hc_swap32_S (salt_buf1[3]);
-  salt_buf1[3] = hc_swap32_S (salt_buf1[4]);
-  salt_buf2[0] = hc_swap32_S (salt_buf2[0]);
-  salt_buf2[1] = hc_swap32_S (salt_buf2[1]);
-  salt_buf2[2] = hc_swap32_S (salt_buf2[2]);
-  salt_buf2[3] = hc_swap32_S (salt_buf2[3]);
-  salt_buf3[0] = hc_swap32_S (salt_buf3[0]);
-  salt_buf3[1] = hc_swap32_S (salt_buf3[1]);
-  salt_buf3[2] = hc_swap32_S (salt_buf3[2]);
-  salt_buf3[3] = hc_swap32_S (salt_buf3[3]);
-*/
-
-if (gid == 0 && lid == 0) {
-  printf("xsalt_buf0=");
-  for (int i=0; i<4; i++) {
-        printf("%02x ", salt_buf0[i]);
-  }
-  printf("\n\n");
-  printf("xsalt_buf1=");
-  for (int i=0; i<4; i++) {
-        printf("%02x ", salt_buf1[i]);
-  }
-  printf("\n\n");
-}
-
-
   const u32 salt_len = salt_bufs[SALT_POS].salt_len_pc * 2;
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
-
     const u32x pw_len = (pw_l_len + pw_r_len) & 63;
-
-
-//printf("pw_len: %02x\n", pw_len );
-
-
-    /**
-     * concat password candidate
-     */
 
     u32x wordl0[4] = { 0 };
     u32x wordl1[4] = { 0 };
@@ -190,10 +126,6 @@ if (gid == 0 && lid == 0) {
 
     const u32x pw_len2 = pw_len * 2;
 
-    /**
-     * prepend salt
-     */
-
     switch_buffer_by_offset_be (w0, w1, w2, w3, salt_len);
     
     const u32x pw_salt_len = pw_len2 + salt_len;
@@ -214,12 +146,6 @@ if (gid == 0 && lid == 0) {
     w3[1] |= salt_buf3[1];
     w3[2] |= salt_buf3[2];
     w3[3] |= salt_buf3[3];
-
-    //append_0x80_4x4_VV (w0, w1, w2, w3, pw_salt_len);
-
-    /**
-     * sha1
-     */
 
     u32x w0_t = hc_swap32 (w0[0]);
     u32x w1_t = hc_swap32 (w0[1]);
@@ -354,16 +280,7 @@ KERNEL_FQ void m08503_m16 (KERN_ATTR_BASIC ())
 
 KERNEL_FQ void m08503_s04 (KERN_ATTR_BASIC ())
 {
-  /**
-   * modifier
-   */
-
   const u64 lid = get_local_id (0);
-
-  /**
-   * base
-   */
-
   const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
@@ -381,10 +298,6 @@ KERNEL_FQ void m08503_s04 (KERN_ATTR_BASIC ())
   pw_buf1[3] = pws[gid].i[7];
 
   const u32 pw_l_len = pws[gid].pw_len & 63;
-
-  /**
-   * salt
-   */
 
   u32 salt_buf0[4];
   u32 salt_buf1[4];
@@ -410,47 +323,10 @@ KERNEL_FQ void m08503_s04 (KERN_ATTR_BASIC ())
 
   make_utf16be (salt_buf1, salt_buf2, salt_buf3);
   make_utf16be (salt_buf0, salt_buf0, salt_buf1);
-
-/*
-  salt_buf0[0] = hc_swap32_S (salt_buf0[0]);
-  salt_buf0[1] = hc_swap32_S (salt_buf0[1]);
-  salt_buf0[2] = hc_swap32_S (salt_buf0[2]);
-  salt_buf0[3] = hc_swap32_S (salt_buf0[0]);
-  salt_buf1[0] = hc_swap32_S (salt_buf1[1]);
-  salt_buf1[1] = hc_swap32_S (salt_buf1[2]);
-  salt_buf1[2] = hc_swap32_S (salt_buf1[3]);
-  salt_buf1[3] = hc_swap32_S (salt_buf1[4]);
-  salt_buf2[0] = hc_swap32_S (salt_buf2[0]);
-  salt_buf2[1] = hc_swap32_S (salt_buf2[1]);
-  salt_buf2[2] = hc_swap32_S (salt_buf2[2]);
-  salt_buf2[3] = hc_swap32_S (salt_buf2[3]);
-  salt_buf3[0] = hc_swap32_S (salt_buf3[0]);
-  salt_buf3[1] = hc_swap32_S (salt_buf3[1]);
-  salt_buf3[2] = hc_swap32_S (salt_buf3[2]);
-  salt_buf3[3] = hc_swap32_S (salt_buf3[3]);
-*/
-
-
-if (gid == 0 && lid == 0) {
-  printf("xsalt_buf0=");
-  for (int i=0; i<4; i++) {
-        printf("%02x ", salt_buf0[i]);
-  }
-  printf("\n\n");
-  printf("xsalt_buf1=");
-  for (int i=0; i<4; i++) {
-        printf("%02x ", salt_buf1[i]);
-  }
-  printf("\n\n");
 }
 
 
   const u32 salt_len = salt_bufs[SALT_POS].salt_len_pc * 2;
-
-  /**
-   * digest
-   */
-
   const u32 search[4] =
   {
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
@@ -459,27 +335,13 @@ if (gid == 0 && lid == 0) {
     digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
   };
 
-  /**
-   * reverse
-   */
-
   const u32 e_rev = hc_rotl32_S (search[1], 2u);
-
-  /**
-   * loop
-   */
 
   for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
     const u32x pw_len = (pw_l_len + pw_r_len) & 63;
-
-//printf("pw_len: %02x\n", pw_len );
-
-    /**
-     * concat password candidate
-     */
 
     u32x wordl0[4] = { 0 };
     u32x wordl1[4] = { 0 };
@@ -545,10 +407,6 @@ if (gid == 0 && lid == 0) {
 
     const u32x pw_len2 = pw_len * 2;
 
-    /**
-     * prepend salt
-     */
-
     switch_buffer_by_offset_be (w0, w1, w2, w3, salt_len);
 
     const u32x pw_salt_len = pw_len2 + salt_len;
@@ -569,12 +427,6 @@ if (gid == 0 && lid == 0) {
     w3[1] |= salt_buf3[1];
     w3[2] |= salt_buf3[2];
     w3[3] |= salt_buf3[3];
-
-    //append_0x80_4x4_VV (w0, w1, w2, w3, pw_salt_len);
-
-    /**
-     * sha1
-     */
 
     u32x w0_t = hc_swap32 (w0[0]);
     u32x w1_t = hc_swap32 (w0[1]);
