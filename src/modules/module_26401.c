@@ -22,7 +22,8 @@ static const char *HASH_NAME      = "AES-128-ECB NOKDF (PT = $salt, key = $pass)
 static const u64   KERN_TYPE      = 26401;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE;
 static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
-                                  | OPTS_TYPE_ST_HEX;
+                                  | OPTS_TYPE_ST_HEX
+                                  | OPTS_TYPE_MAXIMUM_THREADS;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
 static const char *ST_HASH        = "e7a32f3210455cc044f26117c4612aab:86046627772965328523223752173724";
@@ -41,13 +42,6 @@ u64         module_opts_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return SALT_TYPE;       }
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
-
-u32 module_pw_min (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
-{
-  const u32 pw_min = 0;  // Underlaying AES-128 min
-
-  return pw_min;
-}
 
 u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
@@ -193,7 +187,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_potfile_keep_all_hashes  = MODULE_DEFAULT;
   module_ctx->module_pwdump_column            = MODULE_DEFAULT;
   module_ctx->module_pw_max                   = module_pw_max;
-  module_ctx->module_pw_min                   = module_pw_min;
+  module_ctx->module_pw_min                   = MODULE_DEFAULT;
   module_ctx->module_salt_max                 = MODULE_DEFAULT;
   module_ctx->module_salt_min                 = MODULE_DEFAULT;
   module_ctx->module_salt_type                = module_salt_type;

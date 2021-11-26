@@ -11,30 +11,40 @@
 #include "inc_platform.cl"
 #include "inc_common.cl"
 #include "inc_simd.cl"
+#include "inc_hash_md4.cl"
 #include "inc_hash_sha256.cl"
-#include "inc_cipher_aes.cl"
+#include "inc_hash_sha512.cl"
 #endif
 
 #define COMPARE_S "inc_comp_single.cl"
 #define COMPARE_M "inc_comp_multi.cl"
 
-typedef struct blocks
+typedef struct winhello
 {
-  u32 b1[4];
-  u32 b2[4];
-  u32 b3[4];
+  // we need a lot of padding here because sha512_update expects them to be multiple of 128
 
-} blocks_t;
+  u32 mk_buf[16];
+  u32 mk_buf_pc[8];
+  u32 hmac_buf[32];
+  u32 blob_buf[256];
+  u32 magicv_buf[32];
 
-typedef struct pbkdf2_sha256_tmp
+  int mk_len;
+  int hmac_len;
+  int blob_len;
+  int magicv_len;
+
+} winhello_t;
+
+typedef struct winhello_tmp
 {
   u32 ipad[8];
   u32 opad[8];
 
-  u32 dgst[32];
-  u32 out[32];
+  u32 dgst[8];
+  u32 out[8];
 
-} pbkdf2_sha256_tmp_t;
+} winhello_tmp_t;
 
 DECLSPEC void hmac_sha256_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
 {
@@ -78,41 +88,50 @@ DECLSPEC void hmac_sha256_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *i
   sha256_transform_vector (w0, w1, w2, w3, digest);
 }
 
-DECLSPEC void aes128_encrypt_cbc (const u32 *aes_ks, u32 *aes_iv, const u32 *in, u32 *out, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
-{
-  u32 in_s[4];
-
-  in_s[0] = in[0];
-  in_s[1] = in[1];
-  in_s[2] = in[2];
-  in_s[3] = in[3];
-
-  in_s[0] ^= aes_iv[0];
-  in_s[1] ^= aes_iv[1];
-  in_s[2] ^= aes_iv[2];
-  in_s[3] ^= aes_iv[3];
-
-  aes128_encrypt (aes_ks, in_s, out, s_te0, s_te1, s_te2, s_te3, s_te4);
-
-  aes_iv[0] = out[0];
-  aes_iv[1] = out[1];
-  aes_iv[2] = out[2];
-  aes_iv[3] = out[3];
-}
-
-KERNEL_FQ void m25900_init (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
+KERNEL_FQ void m28100_init (KERN_ATTR_TMPS_ESALT (winhello_tmp_t, winhello_t))
 {
   /**
    * base
    */
 
-  const u64 gid = get_global_id(0);
+  const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
 
+  /**
+   * base
+   */
+
+  const int pw_len = pws[gid].pw_len & 127;
+
+  u32 w[128] = { 0 };
+
+  for (int i = 0, idx = 0; i < pw_len; i += 4, idx += 1)
+  {
+    w[idx] = pws[gid].i[idx];
+  }
+
+  u8 *w_ptr = (u8 *) w;
+
+  #ifdef _unroll
+  #pragma unroll
+  #endif
+  for (int i = pw_len - 1; i >= 0; i--)
+  {
+    const u8 c = w_ptr[i];
+
+    const u8 c0 = (c >> 0) & 15;
+    const u8 c1 = (c >> 4) & 15;
+
+    w_ptr[(i * 4) + 0] = (c1 < 10) ? '0' + c1 : 'A' - 10 + c1;
+    w_ptr[(i * 4) + 1] = 0;
+    w_ptr[(i * 4) + 2] = (c0 < 10) ? '0' + c0 : 'A' - 10 + c0;
+    w_ptr[(i * 4) + 3] = 0;
+  }
+
   sha256_hmac_ctx_t sha256_hmac_ctx;
 
-  sha256_hmac_init_global_swap(&sha256_hmac_ctx, pws[gid].i, pws[gid].pw_len);
+  sha256_hmac_init_swap (&sha256_hmac_ctx, w, pw_len * 4);
 
   tmps[gid].ipad[0] = sha256_hmac_ctx.ipad.h[0];
   tmps[gid].ipad[1] = sha256_hmac_ctx.ipad.h[1];
@@ -132,7 +151,7 @@ KERNEL_FQ void m25900_init (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
   tmps[gid].opad[6] = sha256_hmac_ctx.opad.h[6];
   tmps[gid].opad[7] = sha256_hmac_ctx.opad.h[7];
 
-  sha256_hmac_update_global_swap(&sha256_hmac_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha256_hmac_update_global (&sha256_hmac_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
 
   for (u32 i = 0, j = 1; i < 8; i += 8, j += 1)
   {
@@ -160,9 +179,9 @@ KERNEL_FQ void m25900_init (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
     w3[2] = 0;
     w3[3] = 0;
 
-    sha256_hmac_update_64(&sha256_hmac_ctx2, w0, w1, w2, w3, 4);
+    sha256_hmac_update_64 (&sha256_hmac_ctx2, w0, w1, w2, w3, 4);
 
-    sha256_hmac_final(&sha256_hmac_ctx2);
+    sha256_hmac_final (&sha256_hmac_ctx2);
 
     tmps[gid].dgst[i + 0] = sha256_hmac_ctx2.opad.h[0];
     tmps[gid].dgst[i + 1] = sha256_hmac_ctx2.opad.h[1];
@@ -184,9 +203,9 @@ KERNEL_FQ void m25900_init (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
   }
 }
 
-KERNEL_FQ void m25900_loop (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
+KERNEL_FQ void m28100_loop (KERN_ATTR_TMPS_ESALT (winhello_tmp_t, winhello_t))
 {
-  const u64 gid = get_global_id(0);
+  const u64 gid = get_global_id (0);
 
   if ((gid * VECT_SIZE) >= gid_max) return;
 
@@ -290,130 +309,149 @@ KERNEL_FQ void m25900_loop (KERN_ATTR_TMPS (pbkdf2_sha256_tmp_t))
   }
 }
 
-KERNEL_FQ void m25900_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, blocks_t))
+KERNEL_FQ void m28100_comp (KERN_ATTR_TMPS_ESALT (winhello_tmp_t, winhello_t))
 {
   /**
    * base
    */
 
-  const u64 gid = get_global_id(0);
-  const u64 lid = get_local_id(0);
-  const u64 lsz = get_local_size(0);
-
-  /**
-   * aes shared
-   */
-
-  #ifdef REAL_SHM
-
-  LOCAL_VK u32 s_td0[256];
-  LOCAL_VK u32 s_td1[256];
-  LOCAL_VK u32 s_td2[256];
-  LOCAL_VK u32 s_td3[256];
-  LOCAL_VK u32 s_td4[256];
-
-  LOCAL_VK u32 s_te0[256];
-  LOCAL_VK u32 s_te1[256];
-  LOCAL_VK u32 s_te2[256];
-  LOCAL_VK u32 s_te3[256];
-  LOCAL_VK u32 s_te4[256];
-
-  for (u32 i = lid; i < 256; i += lsz)
-  {
-    s_td0[i] = td0[i];
-    s_td1[i] = td1[i];
-    s_td2[i] = td2[i];
-    s_td3[i] = td3[i];
-    s_td4[i] = td4[i];
-
-    s_te0[i] = te0[i];
-    s_te1[i] = te1[i];
-    s_te2[i] = te2[i];
-    s_te3[i] = te3[i];
-    s_te4[i] = te4[i];
-  }
-
-  SYNC_THREADS();
-
-  #else
-
-  CONSTANT_AS u32a* s_td0 = td0;
-  CONSTANT_AS u32a* s_td1 = td1;
-  CONSTANT_AS u32a* s_td2 = td2;
-  CONSTANT_AS u32a* s_td3 = td3;
-  CONSTANT_AS u32a* s_td4 = td4;
-
-  CONSTANT_AS u32a* s_te0 = te0;
-  CONSTANT_AS u32a* s_te1 = te1;
-  CONSTANT_AS u32a* s_te2 = te2;
-  CONSTANT_AS u32a* s_te3 = te3;
-  CONSTANT_AS u32a* s_te4 = te4;
-
-  #endif
+  const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
 
-  u32 key[4];
+  const u64 lid = get_local_id (0);
 
-  key[0] = tmps[gid].out[DGST_R0];
-  key[1] = tmps[gid].out[DGST_R1];
-  key[2] = tmps[gid].out[DGST_R2];
-  key[3] = tmps[gid].out[DGST_R3];
+  u32 w[32];
 
-  u32 aes_ks[44];
+  w[0] = hc_swap32_S (tmps[gid].out[0]);
+  w[1] = hc_swap32_S (tmps[gid].out[1]);
+  w[2] = hc_swap32_S (tmps[gid].out[2]);
+  w[3] = hc_swap32_S (tmps[gid].out[3]);
+  w[4] = hc_swap32_S (tmps[gid].out[4]);
+  w[5] = hc_swap32_S (tmps[gid].out[5]);
+  w[6] = hc_swap32_S (tmps[gid].out[6]);
+  w[7] = hc_swap32_S (tmps[gid].out[7]);
 
-  AES128_set_encrypt_key (aes_ks, key, s_te0, s_te1, s_te2, s_te3);
+  u8 *w_ptr = (u8 *) w;
 
-  u32 b0[4] = { 0 };
+  #ifdef _unroll
+  #pragma unroll
+  #endif
+  for (int i = 31; i >= 0; i--)
+  {
+    const u8 c = w_ptr[i];
 
-  u32 aes_cbc_iv[4] = { 0 };
+    const u8 c0 = (c >> 0) & 15;
+    const u8 c1 = (c >> 4) & 15;
 
-  u32 yn[4];
+    w_ptr[(i * 4) + 0] = (c1 < 10) ? '0' + c1 : 'A' - 10 + c1;
+    w_ptr[(i * 4) + 1] = 0;
+    w_ptr[(i * 4) + 2] = (c0 < 10) ? '0' + c0 : 'A' - 10 + c0;
+    w_ptr[(i * 4) + 3] = 0;
+  }
 
-  const u32 digest_pos = loop_pos;
-  const u32 digest_cur = DIGESTS_OFFSET + digest_pos;
+  sha512_ctx_t ctx1;
 
-  u32 b1[4];
+  sha512_init (&ctx1);
 
-  b1[0] = esalt_bufs[digest_cur].b1[0];
-  b1[1] = esalt_bufs[digest_cur].b1[1];
-  b1[2] = esalt_bufs[digest_cur].b1[2];
-  b1[3] = esalt_bufs[digest_cur].b1[3];
+  sha512_update_swap (&ctx1, w, 128);
 
-  u32 b2[4];
+  sha512_final (&ctx1);
 
-  b2[0] = esalt_bufs[digest_cur].b2[0];
-  b2[1] = esalt_bufs[digest_cur].b2[1];
-  b2[2] = esalt_bufs[digest_cur].b2[2];
-  b2[3] = esalt_bufs[digest_cur].b2[3];
+  u32 stage4_sha512[32] = { 0 };
 
-  u32 b3[4];
+  stage4_sha512[ 0] = h32_from_64_S (ctx1.h[0]);
+  stage4_sha512[ 1] = l32_from_64_S (ctx1.h[0]);
+  stage4_sha512[ 2] = h32_from_64_S (ctx1.h[1]);
+  stage4_sha512[ 3] = l32_from_64_S (ctx1.h[1]);
+  stage4_sha512[ 4] = h32_from_64_S (ctx1.h[2]);
+  stage4_sha512[ 5] = l32_from_64_S (ctx1.h[2]);
+  stage4_sha512[ 6] = h32_from_64_S (ctx1.h[3]);
+  stage4_sha512[ 7] = l32_from_64_S (ctx1.h[3]);
+  stage4_sha512[ 8] = h32_from_64_S (ctx1.h[4]);
+  stage4_sha512[ 9] = l32_from_64_S (ctx1.h[4]);
+  stage4_sha512[10] = h32_from_64_S (ctx1.h[5]);
+  stage4_sha512[11] = l32_from_64_S (ctx1.h[5]);
+  stage4_sha512[12] = h32_from_64_S (ctx1.h[6]);
+  stage4_sha512[13] = l32_from_64_S (ctx1.h[6]);
+  stage4_sha512[14] = h32_from_64_S (ctx1.h[7]);
+  stage4_sha512[15] = l32_from_64_S (ctx1.h[7]);
 
-  b3[0] = esalt_bufs[digest_cur].b3[0];
-  b3[1] = esalt_bufs[digest_cur].b3[1];
-  b3[2] = esalt_bufs[digest_cur].b3[2];
-  b3[3] = esalt_bufs[digest_cur].b3[3];
+  // stage4_sha512 ready in ctx.h[]
 
-  aes128_encrypt_cbc (aes_ks, aes_cbc_iv, b0, yn, s_te0, s_te1, s_te2, s_te3, s_te4);
-  aes128_encrypt_cbc (aes_ks, aes_cbc_iv, b1, yn, s_te0, s_te1, s_te2, s_te3, s_te4);
-  aes128_encrypt_cbc (aes_ks, aes_cbc_iv, b2, yn, s_te0, s_te1, s_te2, s_te3, s_te4);
-  aes128_encrypt_cbc (aes_ks, aes_cbc_iv, b3, yn, s_te0, s_te1, s_te2, s_te3, s_te4);
+  u32 sub_digest_seed[32];
 
-  u32 nonce[4];
+  for (int i = 0; i < 32; i++) sub_digest_seed[i] = 0x36363636;
 
-  nonce[0] = 0;
-  nonce[1] = 0;
-  nonce[2] = 0;
-  nonce[3] = 0x00ff0000;  // already swapped
+  sub_digest_seed[0] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[0];
+  sub_digest_seed[1] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[1];
+  sub_digest_seed[2] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[2];
+  sub_digest_seed[3] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[3];
+  sub_digest_seed[4] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[4];
 
-  u32 s0[4];
+  // sub_digest
 
-  aes128_encrypt(aes_ks, nonce, s0, s_te0, s_te1, s_te2, s_te3, s_te4);
+  sha512_ctx_t ctx2;
 
-  const u32 r0 = yn[0] ^ s0[0];
-  const u32 r1 = yn[1] ^ s0[1];
-  const u32 r2 = yn[2] ^ s0[2];
-  const u32 r3 = yn[3] ^ s0[3];
+  sha512_init (&ctx2);
+
+  sha512_update        (&ctx2, sub_digest_seed, 128);
+  sha512_update_global (&ctx2, esalt_bufs[DIGESTS_OFFSET].hmac_buf,
+                               esalt_bufs[DIGESTS_OFFSET].hmac_len);
+  sha512_update_global (&ctx2, esalt_bufs[DIGESTS_OFFSET].magicv_buf,
+                               esalt_bufs[DIGESTS_OFFSET].magicv_len);
+  sha512_update        (&ctx2, stage4_sha512, 64);
+  sha512_update_global (&ctx2, esalt_bufs[DIGESTS_OFFSET].blob_buf,
+                               esalt_bufs[DIGESTS_OFFSET].blob_len);
+
+  sha512_final (&ctx2);
+
+  u32 sub_digest[32] = { 0 };
+
+  sub_digest[ 0] = h32_from_64_S (ctx2.h[0]);
+  sub_digest[ 1] = l32_from_64_S (ctx2.h[0]);
+  sub_digest[ 2] = h32_from_64_S (ctx2.h[1]);
+  sub_digest[ 3] = l32_from_64_S (ctx2.h[1]);
+  sub_digest[ 4] = h32_from_64_S (ctx2.h[2]);
+  sub_digest[ 5] = l32_from_64_S (ctx2.h[2]);
+  sub_digest[ 6] = h32_from_64_S (ctx2.h[3]);
+  sub_digest[ 7] = l32_from_64_S (ctx2.h[3]);
+  sub_digest[ 8] = h32_from_64_S (ctx2.h[4]);
+  sub_digest[ 9] = l32_from_64_S (ctx2.h[4]);
+  sub_digest[10] = h32_from_64_S (ctx2.h[5]);
+  sub_digest[11] = l32_from_64_S (ctx2.h[5]);
+  sub_digest[12] = h32_from_64_S (ctx2.h[6]);
+  sub_digest[13] = l32_from_64_S (ctx2.h[6]);
+  sub_digest[14] = h32_from_64_S (ctx2.h[7]);
+  sub_digest[15] = l32_from_64_S (ctx2.h[7]);
+
+  // main_digest_seed
+
+  u32 main_digest_seed[32];
+
+  for (int i = 0; i < 32; i++) main_digest_seed[i] = 0x5c5c5c5c;
+
+  main_digest_seed[0] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[0];
+  main_digest_seed[1] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[1];
+  main_digest_seed[2] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[2];
+  main_digest_seed[3] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[3];
+  main_digest_seed[4] ^= esalt_bufs[DIGESTS_OFFSET].mk_buf_pc[4];
+
+  // main_digest
+
+  sha512_ctx_t ctx3;
+
+  sha512_init (&ctx3);
+
+  sha512_update (&ctx3, main_digest_seed, 128);
+  sha512_update (&ctx3, sub_digest, 64);
+
+  sha512_final (&ctx3);
+
+  const u32 r0 = l32_from_64_S (ctx3.h[0]);
+  const u32 r1 = h32_from_64_S (ctx3.h[0]);
+  const u32 r2 = l32_from_64_S (ctx3.h[1]);
+  const u32 r3 = h32_from_64_S (ctx3.h[1]);
 
   #define il_pos 0
 

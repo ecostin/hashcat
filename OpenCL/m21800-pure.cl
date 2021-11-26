@@ -35,6 +35,9 @@ typedef struct electrum_tmp
 
 } electrum_tmp_t;
 
+#define MIN_ENTROPY 3.0
+#define MAX_ENTROPY 6.0
+
 DECLSPEC void hmac_sha512_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *w4, u32x *w5, u32x *w6, u32x *w7, u64x *ipad, u64x *opad, u64x *digest)
 {
   digest[0] = ipad[0];
@@ -489,8 +492,8 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
   // #define AES_LEN 1024
   // in my tests it also worked with only 128 input bytes !
-  #define AES_LEN       128
-  #define AES_LEN_DIV_4  32
+  #define AES_LEN       1024
+  #define AES_LEN_DIV_4  256
 
   u32 buf_full[AES_LEN_DIV_4];
 
@@ -513,7 +516,11 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
   // early reject
 
-  if ((buf[0] & 0x0006ffff) != 0x00049c78) return; // allow 0b100 or 0b101 at the end of 3rd byte
+  // changed: 17.11.2021
+  // I had not cracked some sample Salt Type 5 wallets with known passwords provided by the owner.
+  // It was necessary to remove this early rejection and add a new signature
+  // The decrypted data was this: {"seed_version": ...
+  //if ((buf[0] & 0x0006ffff) != 0x00049c78) return; // allow 0b100 or 0b101 at the end of 3rd byte
 
   buf[1] ^= iv[1];
   buf[2] ^= iv[2];
@@ -556,7 +563,6 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
     buf_full[j + 3] = buf[3];
   }
 
-
   /*
    * zlib inflate/decompress:
    */
@@ -572,7 +578,7 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
   // output:
 
-  #define OUT_SIZE 16
+  #define OUT_SIZE 1024
 
   u8 tmp[OUT_SIZE];
 
@@ -593,6 +599,66 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
     return;
   }
 
+  for (int i = 1; i < infstream.total_out; i++)
+  {
+    if (tmp[i] == '\t') continue;
+    if (tmp[i] == '\r') continue;
+    if (tmp[i] == '\n') continue;
+
+    if (tmp[i] < 0x20)
+    {
+      // https://datatracker.ietf.org/doc/html/rfc7159
+      // 7.  Strings
+      // All Unicode characters may be placed within the
+      // quotation marks, except for the characters that must be escaped:
+      // quotation mark, reverse solidus, and the control characters (U+0000
+      // through U+001F).
+
+      if (tmp[i - 1] != '\\') return;
+    }
+  }
+
+  /*
+   * Check with some strange signature.
+   * The main problem is that the (invalid) decrypted data processed by zlib often results in random patterns but with low entropy,
+   * so that a simple entropy check is not sufficient
+   */
+
+  if (tmp[0] == '{')
+  {
+    int qcnt1 = 0;
+    int ccnt1 = 0;
+
+    for (int i = 1; i < 16; i++)
+    {
+      if (tmp[i] == '"') qcnt1++;
+      if (tmp[i] == ':') ccnt1++;
+    }
+
+    int qcnt2 = 0;
+    int ccnt2 = 0;
+
+    for (int i = 1; i < infstream.total_out; i++)
+    {
+      if (tmp[i] == '"') qcnt2++;
+      if (tmp[i] == ':') ccnt2++;
+    }
+
+    if ((qcnt1 >= 1) && (ccnt1 >= 1) && (qcnt2 >= 4) && (ccnt2 >= 3))
+    {
+      const float entropy = hc_get_entropy ((const u32 *) tmp, infstream.total_out / 4);
+
+      if ((entropy >= MIN_ENTROPY) && (entropy <= MAX_ENTROPY))
+      {
+        if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+        {
+          mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, 0, 0, 0);
+        }
+
+        return;
+      }
+    }
+  }
 
   /*
    * Verify if decompressed data is either:

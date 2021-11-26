@@ -125,10 +125,13 @@
 #if defined IS_AMD && defined IS_GPU
 #define DECLSPEC inline static
 #elif defined IS_HIP
-#define DECLSPEC inline static __device__
+#define DECLSPEC __device__
 #else
 #define DECLSPEC
 #endif
+
+#define INLINE0 __attribute__ ((noinline))
+#define INLINE1 __attribute__ ((inline))
 
 /**
  * AMD specific

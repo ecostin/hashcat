@@ -339,15 +339,24 @@ static bool setup_opencl_device_types_filter (hashcat_ctx_t *hashcat_ctx, const 
   }
   else
   {
+    #if defined (__APPLE__)
+
+    // For apple use CPU only, because GPU drivers are not reliable
+    // The user can explicitly enable GPU by setting -D2
+
+    //opencl_device_types_filter = CL_DEVICE_TYPE_ALL & ~CL_DEVICE_TYPE_GPU;
+    opencl_device_types_filter = CL_DEVICE_TYPE_CPU;
+
+    #else
+
     // Do not use CPU by default, this often reduces GPU performance because
     // the CPU is too busy to handle GPU synchronization
-    // Except for apple, because GPU drivers are not reliable
-    // The user can explicitly enable it by setting -D
+    // Do not use FPGA/other by default, this is a rare case and we expect the users to enable this manually.
+    // this is needed since Intel One API started to add FPGA emulated OpenCL device by default and it's just annoying.
 
-    #if defined (__APPLE__)
-    opencl_device_types_filter = CL_DEVICE_TYPE_ALL & ~CL_DEVICE_TYPE_GPU;
-    #else
-    opencl_device_types_filter = CL_DEVICE_TYPE_ALL & ~CL_DEVICE_TYPE_CPU;
+    //opencl_device_types_filter = CL_DEVICE_TYPE_ALL & ~CL_DEVICE_TYPE_CPU;
+    opencl_device_types_filter = CL_DEVICE_TYPE_GPU;
+
     #endif
   }
 
@@ -7091,7 +7100,7 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
       if (hip_runtimeVersion < 1000)
       {
-        if (hip_runtimeVersion < 405)
+        if (hip_runtimeVersion < 404)
         {
           event_log_warning (hashcat_ctx, "Unsupported AMD HIP runtime version '%d.%d' detected! Falling back to OpenCL...", hip_runtimeVersion / 100, hip_runtimeVersion % 10);
           event_log_warning (hashcat_ctx, NULL);
@@ -7115,7 +7124,7 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
       }
       else
       {
-        if (hip_runtimeVersion < 40500000)
+        if (hip_runtimeVersion < 40421401)
         {
           int hip_version_major = (hip_runtimeVersion - 0) / 10000000;
           int hip_version_minor = (hip_runtimeVersion - (hip_version_major * 10000000)) / 100000;
@@ -7188,7 +7197,7 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
       #if defined (__linux__)
       event_log_warning (hashcat_ctx, "* AMD GPUs on Linux require this driver:");
-      event_log_warning (hashcat_ctx, "  \"AMD ROCm\" (4.3 or later)");
+      event_log_warning (hashcat_ctx, "  \"AMD ROCm\" (4.5 or later)");
       #elif defined (_WIN)
       event_log_warning (hashcat_ctx, "* AMD GPUs on Windows require this driver:");
       event_log_warning (hashcat_ctx, "  \"AMD Radeon Adrenalin 2020 Edition\" (21.2.1 or later)");
@@ -7513,7 +7522,7 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
     #if defined (__linux__)
     event_log_warning (hashcat_ctx, "* AMD GPUs on Linux require this driver:");
-    event_log_warning (hashcat_ctx, "  \"AMD ROCm\" (4.3 or later)");
+    event_log_warning (hashcat_ctx, "  \"AMD ROCm\" (4.5 or later)");
     #elif defined (_WIN)
     event_log_warning (hashcat_ctx, "* AMD GPUs on Windows require this driver:");
     event_log_warning (hashcat_ctx, "  \"AMD Radeon Adrenalin 2020 Edition\" (21.2.1 or later)");
@@ -10524,11 +10533,24 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
 
       cl_program p1 = NULL;
 
-      if (hc_clCreateProgramWithSource (hashcat_ctx, device_param->opencl_context, 1, (const char **) kernel_sources, NULL, &p1) == -1) return false;
+      // workaround opencl issue with Apple Silicon
 
-      CL_rc = hc_clCompileProgram (hashcat_ctx, p1, 1, &device_param->opencl_device, build_options_buf, 0, NULL, NULL, NULL, NULL);
+      if (strcmp (device_param->device_name, "Apple M") != 0)
+      {
+        if (hc_clCreateProgramWithSource (hashcat_ctx, device_param->opencl_context, 1, (const char **) kernel_sources, NULL, opencl_program) == -1) return false;
 
-      hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+        CL_rc = hc_clBuildProgram (hashcat_ctx, *opencl_program, 1, &device_param->opencl_device, build_options_buf, NULL, NULL);
+
+        hc_clGetProgramBuildInfo (hashcat_ctx, *opencl_program, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+      }
+      else
+      {
+        if (hc_clCreateProgramWithSource (hashcat_ctx, device_param->opencl_context, 1, (const char **) kernel_sources, NULL, &p1) == -1) return false;
+
+        CL_rc = hc_clCompileProgram (hashcat_ctx, p1, 1, &device_param->opencl_device, build_options_buf, 0, NULL, NULL, NULL, NULL);
+
+        hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, 0, NULL, &build_log_size);
+      }
 
       #if defined (DEBUG)
       if ((build_log_size > 1) || (CL_rc == -1))
@@ -10538,7 +10560,16 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
       {
         char *build_log = (char *) hcmalloc (build_log_size + 1);
 
-        const int rc_clGetProgramBuildInfo = hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+        int rc_clGetProgramBuildInfo;
+
+        if (strcmp (device_param->device_name, "Apple M") != 0)
+        {
+          rc_clGetProgramBuildInfo = hc_clGetProgramBuildInfo (hashcat_ctx, *opencl_program, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+        }
+        else
+        {
+          rc_clGetProgramBuildInfo = hc_clGetProgramBuildInfo (hashcat_ctx, p1, device_param->opencl_device, CL_PROGRAM_BUILD_LOG, build_log_size, build_log, NULL);
+        }
 
         if (rc_clGetProgramBuildInfo == -1)
         {
@@ -10556,20 +10587,28 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
 
       if (CL_rc == -1) return false;
 
-      cl_program t2[1];
+      // workaround opencl issue with Apple Silicon
 
-      t2[0] = p1;
+      if (strcmp (device_param->device_name, "Apple M") != 0)
+      {
+      }
+      else
+      {
+        cl_program t2[1];
 
-      cl_program fin;
+        t2[0] = p1;
 
-      if (hc_clLinkProgram (hashcat_ctx, device_param->opencl_context, 1, &device_param->opencl_device, NULL, 1, t2, NULL, NULL, &fin) == -1) return false;
+        cl_program fin;
 
-      // it seems errors caused by clLinkProgram() do not go into CL_PROGRAM_BUILD
-      // I couldn't find any information on the web explaining how else to retrieve the error messages from the linker
+        if (hc_clLinkProgram (hashcat_ctx, device_param->opencl_context, 1, &device_param->opencl_device, NULL, 1, t2, NULL, NULL, &fin) == -1) return false;
 
-      *opencl_program = fin;
+        // it seems errors caused by clLinkProgram() do not go into CL_PROGRAM_BUILD
+        // I couldn't find any information on the web explaining how else to retrieve the error messages from the linker
 
-      hc_clReleaseProgram (hashcat_ctx, p1);
+        *opencl_program = fin;
+
+        hc_clReleaseProgram (hashcat_ctx, p1);
+      }
 
       if (cache_disable == false)
       {
@@ -11061,7 +11100,13 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
      * device threads
      */
 
-    if (hashconfig->opts_type & OPTS_TYPE_NATIVE_THREADS)
+    if (hashconfig->opts_type & OPTS_TYPE_MAXIMUM_THREADS)
+    {
+      // default for all, because the else branch is doing the same (nothing), but is actually used as a way to
+      // disable the default native thread configuration for HIP
+      // this can have negative performance if not tested on multiple different gpu architectures
+    }
+    else if (hashconfig->opts_type & OPTS_TYPE_NATIVE_THREADS)
     {
       u32 native_threads = 0;
 
@@ -11086,6 +11131,23 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       else
       {
         // abort?
+      }
+    }
+    else
+    {
+      if (device_param->is_hip == true)
+      {
+        const u32 native_threads = device_param->kernel_preferred_wgs_multiple;
+
+        if ((native_threads >= device_param->kernel_threads_min) && (native_threads <= device_param->kernel_threads_max))
+        {
+          device_param->kernel_threads_min = native_threads;
+          device_param->kernel_threads_max = native_threads;
+        }
+        else
+        {
+          // abort?
+        }
       }
     }
 

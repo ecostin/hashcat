@@ -1,4 +1,12 @@
-* changes v6.2.4 -> v6.2.x
+* changes v6.2.5 -> v6.2.x
+
+##
+## Technical
+##
+
+- Usage Screen: On windows console, wait for any keypress if usage_mini_print() is used
+
+* changes v6.2.4 -> v6.2.5
 
 ##
 ## Algorithms
@@ -8,27 +16,43 @@
 - Added hash-mode: CRC64Jones
 - Added hash-mode: MultiBit Classic .wallet (scrypt)
 - Added hash-mode: MurmurHash3
+- Added hash-mode: Windows Hello PIN/Password
+
+##
+## Performance
+##
+
+- PDF Kernel (10700): Improved performance on AMD GPUs by using shared memory for the scratch buffer and disabled inlining to save spilling
 
 ##
 ## Bugs
 ##
 
-- Fixed division by zero because backend_ctx->hardware_power_all was not re-inserted after refactoring device_param->hardware_power
+- Fixed divide by zero error because backend_ctx->hardware_power_all was not re-inserted after refactoring device_param->hardware_power
 - Fixed invalid handling of initialization value for -m 11500
 - Fixed invalid progress counter initialization in attack-mode 9 when using --skip or --restore
 - Fixed out-of-boundary reads in attack-mode 9 that were caused by a missing work item limit in the refactored autotune engine
+- Fixed out-of-boundary reads in hash-mode 22400 (AES Crypt) kernel
 - Fixed strategy for eliminating hashes with zero length in LM when multiple hashes contain a zero hash
 
 ##
 ## Technical
 ##
 
+- AMD Driver: Updated requirements for AMD Linux drivers to ROCm 4.5 or later due to new HIP interface
 - Backend devices: In -S mode, limit the number of workitems so that no more than 2GB of host memory is required per backend device
 - Backend devices: In non -S mode, limit the number of workitems so that no more than 4GB of host memory is required per backend device
+- Backend types: The default filter for the device types is now set so that only the GPU is used, except for APPLE, where we set CPU
+- Benchmark: Update benchmark_deep.pl with new hash modes added (also new hash modes which were added with v6.2.3)
+- Electrum Wallet: Added new entropy-based check to test whether the decryption was successful or not
+- Module Optimizers: Added OPTS_TYPE_MAXIMUM_THREADS to deactivate the else branch route in the section to find -T before compilation
 - Makefile: Added wildcard include src/modules/module_*.mk directive so that plugin developers can add 3rd party libraries for their plugins
 - Rejects: Disabled checking of the minimum and maximum length of the password candidate in attack-mode 9 because they are incompatible
-- POCL: Added a workaround for an issue in POCL that uses a quote character as part of the path itself given to a path for the -I option
+- POCL: Added a workaround for an issue in POCL where a quote character is used as a part of the path itself which is passed as a path for the -I option
+- Device Threads: The default maximum device thread number has been reduced from 1024 to 256, users can still overwrite with the -T option
 - Tuning-DB: Add missing entries for -m 25600 and -m 25800 for CPU cracking
+- OpenCL Backend: added workaround to support Apple Silicon (GPU: M1, M1 Pro, and M1 Max)
+- MacOS v10.8+ (PBKDF2-SHA512): Added support for parsing new mac2john hash format directly in the module for -m 7100
 
 * changes v6.2.3 -> v6.2.4
 

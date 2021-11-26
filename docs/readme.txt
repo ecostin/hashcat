@@ -7,10 +7,10 @@
            |_____|     /___________/     |_____|  /_____/        /_______|
                  :                             :                         :
 
-hashcat v6.2.4
+hashcat v6.2.5
 ==============
 
-AMD GPUs on Linux require "AMD ROCm" (4.3 or later)
+AMD GPUs on Linux require "AMD ROCm" (4.5 or later)
 AMD GPUs on Windows require "AMD Radeon Adrenalin 2020 Edition" (21.2.1 or later)
 Intel CPUs require "OpenCL Runtime for Intel Core and Intel Xeon Processors" (16.1.1 or later)
 NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or later)
@@ -61,6 +61,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - GOST R 34.11-2012 (Streebog) 256-bit, big-endian
 - GOST R 34.11-2012 (Streebog) 512-bit, big-endian
 - GOST R 34.11-94
+- GPG (AES-128/AES-256 (SHA-1($pass)))
 - Half MD5
 - Keccak-224
 - Keccak-256
@@ -203,6 +204,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - NTLM
 - Radmin2
 - Samsung Android Password/PIN
+- Windows Hello PIN/Password
 - Windows Phone 8+ PIN/password
 - Cisco-ASA MD5
 - Cisco-IOS $8$ (PBKDF2-SHA256)
