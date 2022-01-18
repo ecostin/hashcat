@@ -97,15 +97,17 @@ static int inner2_loop (hashcat_ctx_t *hashcat_ctx)
 
     // --restore always overrides --skip
 
-    user_options->skip = 0;
+    // user_options->skip = 0;
+    // fix progress, uses skip value
   }
 
-  if (user_options->skip > 0)
+  else if (user_options->skip > 0)
   {
     status_ctx->words_off = user_options->skip;
     status_ctx->words_cur = status_ctx->words_off;
 
-    user_options->skip = 0;
+    // user_options->skip = 0;
+    // fix progress, uses skip value
   }
 
   backend_session_reset (hashcat_ctx);
