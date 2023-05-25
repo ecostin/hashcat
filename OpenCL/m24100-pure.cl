@@ -6,17 +6,17 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct mongodb_sha1_tmp
 {
@@ -37,7 +37,7 @@ typedef struct mongodb_sha1
 
 } mongodb_sha1_t;
 
-DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha1_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -100,13 +100,13 @@ KERNEL_FQ void m24100_init (KERN_ATTR_TMPS_ESALT (mongodb_sha1_tmp_t, mongodb_sh
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   md5_ctx_t md5_ctx;
 
   md5_init (&md5_ctx);
 
-  md5_update_global (&md5_ctx, esalt_bufs[DIGESTS_OFFSET].user, esalt_bufs[DIGESTS_OFFSET].user_len);
+  md5_update_global (&md5_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].user, esalt_bufs[DIGESTS_OFFSET_HOST].user_len);
   md5_update_global (&md5_ctx, pws[gid].i, pws[gid].pw_len);
 
   md5_final (&md5_ctx);
@@ -153,7 +153,7 @@ KERNEL_FQ void m24100_init (KERN_ATTR_TMPS_ESALT (mongodb_sha1_tmp_t, mongodb_sh
   tmps[gid].opad[3] = sha1_hmac_ctx.opad.h[3];
   tmps[gid].opad[4] = sha1_hmac_ctx.opad.h[4];
 
-  sha1_hmac_update_global (&sha1_hmac_ctx, esalt_bufs[DIGESTS_OFFSET].salt, 16);
+  sha1_hmac_update_global (&sha1_hmac_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].salt, 16);
 
   for (u32 i = 0, j = 1; i < 4; i += 5, j += 1)
   {
@@ -203,7 +203,7 @@ KERNEL_FQ void m24100_loop (KERN_ATTR_TMPS_ESALT (mongodb_sha1_tmp_t, mongodb_sh
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[5];
   u32x opad[5];
@@ -237,7 +237,7 @@ KERNEL_FQ void m24100_loop (KERN_ATTR_TMPS_ESALT (mongodb_sha1_tmp_t, mongodb_sh
     out[3] = packv (tmps, out, gid, i + 3);
     out[4] = packv (tmps, out, gid, i + 4);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -292,7 +292,7 @@ KERNEL_FQ void m24100_comp (KERN_ATTR_TMPS_ESALT (mongodb_sha1_tmp_t, mongodb_sh
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

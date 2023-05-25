@@ -21,7 +21,8 @@ static const char *HASH_NAME      = "Kerberos 5, etype 23, AS-REP";
 static const u64   KERN_TYPE      = 18200;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_NOT_ITERATED;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE;
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
 static const char *ST_HASH        = "$krb5asrep$23$user@domain.com:3e156ada591263b8aab0965f5aebd837$007497cb51b6c8116d6407a782ea0e1c5402b17db7afa6b05a6d30ed164a9933c754d720e279c6c573679bd27128fe77e5fea1f72334c1193c8ff0b370fadc6368bf2d49bbfdba4c5dccab95e8c8ebfdc75f438a0797dbfb2f8a1a5f4c423f9bfc1fea483342a11bd56a216f4d5158ccc4b224b52894fadfba3957dfe4b6b8f5f9f9fe422811a314768673e0c924340b8ccb84775ce9defaa3baa0910b676ad0036d13032b0dd94e3b13903cc738a7b6d00b0b3c210d1f972a6c7cae9bd3c959acf7565be528fc179118f28c679f6deeee1456f0781eb8154e18e49cb27b64bf74cd7112a0ebae2102ac";
@@ -47,10 +48,11 @@ typedef struct krb5asrep
   u32 checksum[4];
   u32 edata2[5120];
   u32 edata2_len;
+  u32 format;
 
 } krb5asrep_t;
 
-static const char *SIGNATURE_KRB5ASREP = "$krb5asrep$23$";
+static const char *SIGNATURE_KRB5ASREP = "$krb5asrep$";
 
 char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
@@ -64,6 +66,12 @@ char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAY
   }
   else if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
   {
+    #if defined (__APPLE__)
+
+    native_threads = 32;
+
+    #else
+
     if (device_param->device_local_mem_size < 49152)
     {
       native_threads = MIN (device_param->kernel_preferred_wgs_multiple, 32); // We can't just set 32, because Intel GPU need 8
@@ -72,6 +80,8 @@ char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAY
     {
       native_threads = device_param->kernel_preferred_wgs_multiple;
     }
+
+    #endif
   }
 
   hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u -D _unroll", native_threads);
@@ -86,25 +96,15 @@ u64 module_esalt_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED
   return esalt_size;
 }
 
-bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
-{
-  // amdgpu-pro-20.50-1234664-ubuntu-20.04 (legacy)
-  // test_1619967069/test_report.log:! unhandled return code 255, cmdline : ./hashcat --quiet --potfile-disable --runtime 400 --hwmon-disable -D 2 --backend-vector-width 4 -a 3 -m 18200  test_1619967069/18200_multihash_bruteforce.txt test_1619967069/18200_passwords.txt
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == false))
-  {
-    return true;
-  }
-
-  return false;
-}
-
 int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED void *digest_buf, MAYBE_UNUSED salt_t *salt, MAYBE_UNUSED void *esalt_buf, MAYBE_UNUSED void *hook_salt_buf, MAYBE_UNUSED hashinfo_t *hash_info, const char *line_buf, MAYBE_UNUSED const int line_len)
 {
   u32 *digest = (u32 *) digest_buf;
 
   krb5asrep_t *krb5asrep = (krb5asrep_t *) esalt_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.signatures_cnt    = 1;
   token.signatures_buf[0] = SIGNATURE_KRB5ASREP;
@@ -114,47 +114,128 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
                 | TOKEN_ATTR_VERIFY_SIGNATURE;
 
   /**
-   * $krb5asrep$23$user_principal_name:checksum$edata2
+   * hc
+   * format 1: $krb5asrep$23$user_principal_name:checksum$edata2
+   *
+   * jtr
+   * format 2: $krb5asrep$user_principal_name:checksum$edata2
    */
 
-  if (line_len < 16) return (PARSER_SALT_LENGTH);
+  if (line_len < (int) strlen (SIGNATURE_KRB5ASREP)) return (PARSER_SALT_LENGTH);
 
-  char *upn_info_start = (char *) line_buf + strlen (SIGNATURE_KRB5ASREP);
-  char *upn_info_stop  = strchr ((const char *) upn_info_start, ':');
+  memset (krb5asrep, 0, sizeof (krb5asrep_t));
 
-  if (upn_info_stop == NULL) return (PARSER_SEPARATOR_UNMATCHED);
+  size_t parse_off = 0;
 
-  upn_info_stop++; // we want the : char included
+  if (line_buf[token.len[0]] == '2' && line_buf[token.len[0] + 1] == '3' && line_buf[token.len[0] + 2] == '$')
+  {
+    // hashcat format
 
-  const int upn_info_len = upn_info_stop - upn_info_start;
+    krb5asrep->format = 1;
+
+    parse_off += 3;
+  }
+  else
+  {
+    // jtr format
+
+    krb5asrep->format = 2;
+  }
+
+  char *account_info_start = (char *) line_buf + strlen (SIGNATURE_KRB5ASREP) + parse_off;
+  char *account_info_stop  = strchr ((const char *) account_info_start, ':');
+
+  if (account_info_stop == NULL) return (PARSER_SEPARATOR_UNMATCHED);
+
+  const int account_info_len = account_info_stop - account_info_start;
 
   token.token_cnt  = 4;
 
-  token.len[1]     = upn_info_len;
-  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH;
+  if (krb5asrep->format == 1)
+  {
+    token.token_cnt++;
 
-  token.sep[2]     = '$';
-  token.len_min[2] = 32;
-  token.len_max[2] = 32;
-  token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
-                   | TOKEN_ATTR_VERIFY_HEX;
+    // etype
 
-  token.sep[3]     = '$';
-  token.len_min[3] = 64;
-  token.len_max[3] = 40960;
-  token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
-                   | TOKEN_ATTR_VERIFY_HEX;
+    token.sep[1]     = '$';
+    token.len[1]     = 2;
+    token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
+                     | TOKEN_ATTR_VERIFY_DIGIT;
+
+    // user_principal_name
+
+    token.sep[2]     = ':';
+    token.len[2]     = account_info_len;
+    token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH;
+
+    // checksum
+
+    token.sep[3]     = '$';
+    token.len[3]     = 32;
+    token.attr[3]    = TOKEN_ATTR_FIXED_LENGTH
+                     | TOKEN_ATTR_VERIFY_HEX;
+
+    // edata2
+
+    token.sep[4]     = '$';
+    token.len_min[4] = 64;
+    token.len_max[4] = 40960;
+    token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
+                     | TOKEN_ATTR_VERIFY_HEX;
+  }
+  else
+  {
+    // user_principal_name
+
+    token.sep[1]     = ':';
+    token.len[1]     = account_info_len;
+    token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH;
+
+    // checksum
+
+    token.sep[2]     = '$';
+    token.len[2]     = 32;
+    token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
+                     | TOKEN_ATTR_VERIFY_HEX;
+
+    // edata2
+
+    token.sep[3]     = '$';
+    token.len_min[3] = 64;
+    token.len_max[3] = 40960;
+    token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
+                     | TOKEN_ATTR_VERIFY_HEX;
+  }
 
   const int rc_tokenizer = input_tokenizer ((const u8 *) line_buf, line_len, &token);
 
   if (rc_tokenizer != PARSER_OK) return (rc_tokenizer);
 
-  const u8 *checksum_pos = token.buf[2];
+  const u8 *checksum_pos = NULL;
+  const u8 *data_pos = NULL;
 
-  const u8 *data_pos = token.buf[3];
-  const int data_len = token.len[3];
+  int data_len = 0;
 
-  memcpy (krb5asrep->account_info, token.buf[1], token.len[1]);
+  if (krb5asrep->format == 1)
+  {
+    checksum_pos = token.buf[3];
+
+    data_pos = token.buf[4];
+    data_len = token.len[4];
+
+    memcpy (krb5asrep->account_info, token.buf[2], token.len[2]);
+  }
+  else
+  {
+    checksum_pos = token.buf[2];
+
+    data_pos = token.buf[3];
+    data_len = token.len[3];
+
+    memcpy (krb5asrep->account_info, token.buf[1], token.len[1]);
+  }
+
+  if (checksum_pos == NULL || data_pos == NULL) return (PARSER_SALT_VALUE);
 
   krb5asrep->checksum[0] = hex_to_u32 (checksum_pos +  0);
   krb5asrep->checksum[1] = hex_to_u32 (checksum_pos +  8);
@@ -205,14 +286,30 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     sprintf (data + j, "%02x", ptr_edata2[i]);
   }
 
-  const int line_len = snprintf (line_buf, line_size, "%s%s%08x%08x%08x%08x$%s",
-    SIGNATURE_KRB5ASREP,
-    (char *) krb5asrep->account_info,
-    byte_swap_32 (krb5asrep->checksum[0]),
-    byte_swap_32 (krb5asrep->checksum[1]),
-    byte_swap_32 (krb5asrep->checksum[2]),
-    byte_swap_32 (krb5asrep->checksum[3]),
-    data);
+  int line_len = 0;
+
+  if (krb5asrep->format == 1)
+  {
+    line_len = snprintf (line_buf, line_size, "%s23$%s:%08x%08x%08x%08x$%s",
+      SIGNATURE_KRB5ASREP,
+      (char *) krb5asrep->account_info,
+      byte_swap_32 (krb5asrep->checksum[0]),
+      byte_swap_32 (krb5asrep->checksum[1]),
+      byte_swap_32 (krb5asrep->checksum[2]),
+      byte_swap_32 (krb5asrep->checksum[3]),
+      data);
+  }
+  else
+  {
+    line_len = snprintf (line_buf, line_size, "%s%s:%08x%08x%08x%08x$%s",
+      SIGNATURE_KRB5ASREP,
+      (char *) krb5asrep->account_info,
+      byte_swap_32 (krb5asrep->checksum[0]),
+      byte_swap_32 (krb5asrep->checksum[1]),
+      byte_swap_32 (krb5asrep->checksum[2]),
+      byte_swap_32 (krb5asrep->checksum[3]),
+      data);
+  }
 
   return line_len;
 }
@@ -226,6 +323,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -244,6 +342,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;
@@ -291,6 +390,6 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_st_hash                  = module_st_hash;
   module_ctx->module_st_pass                  = module_st_pass;
   module_ctx->module_tmp_size                 = MODULE_DEFAULT;
-  module_ctx->module_unstable_warning         = module_unstable_warning;
+  module_ctx->module_unstable_warning         = MODULE_DEFAULT;
   module_ctx->module_warmup_disable           = MODULE_DEFAULT;
 }

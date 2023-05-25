@@ -4,11 +4,11 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -23,8 +23,8 @@
 #define uint_to_hex_lower8(i) make_u32x (u16_bin_to_u32_hex ((i).s0), u16_bin_to_u32_hex ((i).s1), u16_bin_to_u32_hex ((i).s2), u16_bin_to_u32_hex ((i).s3), u16_bin_to_u32_hex ((i).s4), u16_bin_to_u32_hex ((i).s5), u16_bin_to_u32_hex ((i).s6), u16_bin_to_u32_hex ((i).s7), u16_bin_to_u32_hex ((i).s8), u16_bin_to_u32_hex ((i).s9), u16_bin_to_u32_hex ((i).sa), u16_bin_to_u32_hex ((i).sb), u16_bin_to_u32_hex ((i).sc), u16_bin_to_u32_hex ((i).sd), u16_bin_to_u32_hex ((i).se), u16_bin_to_u32_hex ((i).sf))
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct bcrypt_tmp
 {
@@ -334,17 +334,13 @@ CONSTANT_VK u32a c_pbox[18] =
 
 #define KEY32(lid,key) (((key) * FIXED_LOCAL_SIZE) + (lid))
 
-DECLSPEC u32 GET_KEY32 (LOCAL_AS u32 *S, const u64 key)
+DECLSPEC u32 GET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u64 lid)
 {
-  const u64 lid = get_local_id (0);
-
   return S[KEY32 (lid, key)];
 }
 
-DECLSPEC void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val)
+DECLSPEC void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val, const u64 lid)
 {
-  const u64 lid = get_local_id (0);
-
   S[KEY32 (lid, key)] = val;
 }
 
@@ -355,12 +351,12 @@ DECLSPEC void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val)
 // access pattern: linear access with S offset already set to right offset based on thread ID saving it from compuation
 //                 makes sense if there are not thread ID's (for instance on CPU)
 
-DECLSPEC inline u32 GET_KEY32 (LOCAL_AS u32 *S, const u64 key)
+DECLSPEC inline u32 GET_KEY32 (LOCAL_AS u32 *S, const u64 key, MAYBE_UNUSED const u64 lid)
 {
   return S[key];
 }
 
-DECLSPEC inline void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val)
+DECLSPEC inline void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val, MAYBE_UNUSED const u64 lid)
 {
   S[key] = val;
 }
@@ -376,10 +372,10 @@ DECLSPEC inline void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val)
   const u32 r2 = unpack_v8b_from_v32_S ((L)); \
   const u32 r3 = unpack_v8a_from_v32_S ((L)); \
                                               \
-  tmp  = GET_KEY32 (S0, r0);                  \
-  tmp += GET_KEY32 (S1, r1);                  \
-  tmp ^= GET_KEY32 (S2, r2);                  \
-  tmp += GET_KEY32 (S3, r3);                  \
+  tmp  = GET_KEY32 (S0, r0, lid);             \
+  tmp += GET_KEY32 (S1, r1, lid);             \
+  tmp ^= GET_KEY32 (S2, r2, lid);             \
+  tmp += GET_KEY32 (S3, r3, lid);             \
                                               \
   (R) ^= tmp ^ P[(N)];                        \
 }
@@ -418,10 +414,10 @@ DECLSPEC inline void SET_KEY32 (LOCAL_AS u32 *S, const u64 key, const u32 val)
 extern __shared__ u32 S[];
 #endif
 
-DECLSPEC void expand_key (u32 *E, u32 *W, const int len)
+DECLSPEC void expand_key (PRIVATE_AS u32 *E, PRIVATE_AS u32 *W, const int len)
 {
-  u8 *E_ptr = (u8 *) E;
-  u8 *W_ptr = (u8 *) W;
+  PRIVATE_AS u8 *E_ptr = (PRIVATE_AS u8 *) E;
+  PRIVATE_AS u8 *W_ptr = (PRIVATE_AS u8 *) W;
 
   for (int pos = 0; pos < 72; pos++) // pos++ is not a bug, we actually want that zero byte here
   {
@@ -456,7 +452,7 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha1_ctx_t ctx0;
 
@@ -535,10 +531,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
   u32 salt_buf[4];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
-  salt_buf[2] = salt_bufs[SALT_POS].salt_buf[2];
-  salt_buf[3] = salt_bufs[SALT_POS].salt_buf[3];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  salt_buf[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  salt_buf[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
 
   u32 P[18];
 
@@ -570,10 +566,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
   for (u32 i = 0; i < 256; i++)
   {
-    SET_KEY32 (S0, i, c_sbox0[i]);
-    SET_KEY32 (S1, i, c_sbox1[i]);
-    SET_KEY32 (S2, i, c_sbox2[i]);
-    SET_KEY32 (S3, i, c_sbox3[i]);
+    SET_KEY32 (S0, i, c_sbox0[i], lid);
+    SET_KEY32 (S1, i, c_sbox1[i], lid);
+    SET_KEY32 (S2, i, c_sbox2[i], lid);
+    SET_KEY32 (S3, i, c_sbox3[i], lid);
   }
 
   // expandstate
@@ -604,16 +600,16 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S0, i + 0, L0);
-    SET_KEY32 (S0, i + 1, R0);
+    SET_KEY32 (S0, i + 0, L0, lid);
+    SET_KEY32 (S0, i + 1, R0, lid);
 
     L0 ^= salt_buf[0];
     R0 ^= salt_buf[1];
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S0, i + 2, L0);
-    SET_KEY32 (S0, i + 3, R0);
+    SET_KEY32 (S0, i + 2, L0, lid);
+    SET_KEY32 (S0, i + 3, R0, lid);
   }
 
   for (u32 i = 0; i < 256; i += 4)
@@ -623,16 +619,16 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S1, i + 0, L0);
-    SET_KEY32 (S1, i + 1, R0);
+    SET_KEY32 (S1, i + 0, L0, lid);
+    SET_KEY32 (S1, i + 1, R0, lid);
 
     L0 ^= salt_buf[0];
     R0 ^= salt_buf[1];
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S1, i + 2, L0);
-    SET_KEY32 (S1, i + 3, R0);
+    SET_KEY32 (S1, i + 2, L0, lid);
+    SET_KEY32 (S1, i + 3, R0, lid);
   }
 
   for (u32 i = 0; i < 256; i += 4)
@@ -642,16 +638,16 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S2, i + 0, L0);
-    SET_KEY32 (S2, i + 1, R0);
+    SET_KEY32 (S2, i + 0, L0, lid);
+    SET_KEY32 (S2, i + 1, R0, lid);
 
     L0 ^= salt_buf[0];
     R0 ^= salt_buf[1];
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S2, i + 2, L0);
-    SET_KEY32 (S2, i + 3, R0);
+    SET_KEY32 (S2, i + 2, L0, lid);
+    SET_KEY32 (S2, i + 3, R0, lid);
   }
 
   for (u32 i = 0; i < 256; i += 4)
@@ -661,16 +657,16 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S3, i + 0, L0);
-    SET_KEY32 (S3, i + 1, R0);
+    SET_KEY32 (S3, i + 0, L0, lid);
+    SET_KEY32 (S3, i + 1, R0, lid);
 
     L0 ^= salt_buf[0];
     R0 ^= salt_buf[1];
 
     BF_ENCRYPT (L0, R0);
 
-    SET_KEY32 (S3, i + 2, L0);
-    SET_KEY32 (S3, i + 3, R0);
+    SET_KEY32 (S3, i + 2, L0, lid);
+    SET_KEY32 (S3, i + 3, R0, lid);
   }
 
   // store
@@ -682,10 +678,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_init (KERN_ATTR_TMPS 
 
   for (u32 i = 0; i < 256; i++)
   {
-    tmps[gid].S0[i] = GET_KEY32 (S0, i);
-    tmps[gid].S1[i] = GET_KEY32 (S1, i);
-    tmps[gid].S2[i] = GET_KEY32 (S2, i);
-    tmps[gid].S3[i] = GET_KEY32 (S3, i);
+    tmps[gid].S0[i] = GET_KEY32 (S0, i, lid);
+    tmps[gid].S1[i] = GET_KEY32 (S1, i, lid);
+    tmps[gid].S2[i] = GET_KEY32 (S2, i, lid);
+    tmps[gid].S3[i] = GET_KEY32 (S3, i, lid);
   }
 }
 
@@ -698,7 +694,7 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // load
 
@@ -739,10 +735,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
 
   for (u32 i = 0; i < 256; i++)
   {
-    SET_KEY32 (S0, i, tmps[gid].S0[i]);
-    SET_KEY32 (S1, i, tmps[gid].S1[i]);
-    SET_KEY32 (S2, i, tmps[gid].S2[i]);
-    SET_KEY32 (S3, i, tmps[gid].S3[i]);
+    SET_KEY32 (S0, i, tmps[gid].S0[i], lid);
+    SET_KEY32 (S1, i, tmps[gid].S1[i], lid);
+    SET_KEY32 (S2, i, tmps[gid].S2[i], lid);
+    SET_KEY32 (S3, i, tmps[gid].S3[i], lid);
   }
 
   /**
@@ -751,10 +747,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
 
   u32 salt_buf[4];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
-  salt_buf[2] = salt_bufs[SALT_POS].salt_buf[2];
-  salt_buf[3] = salt_bufs[SALT_POS].salt_buf[3];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  salt_buf[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  salt_buf[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
 
   /**
    * main loop
@@ -763,7 +759,7 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
   u32 L0;
   u32 R0;
 
-  for (u32 i = 0; i < loop_cnt; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     for (u32 i = 0; i < 18; i++)
     {
@@ -785,32 +781,32 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S0, i + 0, L0);
-      SET_KEY32 (S0, i + 1, R0);
+      SET_KEY32 (S0, i + 0, L0, lid);
+      SET_KEY32 (S0, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S1, i + 0, L0);
-      SET_KEY32 (S1, i + 1, R0);
+      SET_KEY32 (S1, i + 0, L0, lid);
+      SET_KEY32 (S1, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S2, i + 0, L0);
-      SET_KEY32 (S2, i + 1, R0);
+      SET_KEY32 (S2, i + 0, L0, lid);
+      SET_KEY32 (S2, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S3, i + 0, L0);
-      SET_KEY32 (S3, i + 1, R0);
+      SET_KEY32 (S3, i + 0, L0, lid);
+      SET_KEY32 (S3, i + 1, R0, lid);
     }
 
     P[ 0] ^= salt_buf[0];
@@ -847,32 +843,32 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S0, i + 0, L0);
-      SET_KEY32 (S0, i + 1, R0);
+      SET_KEY32 (S0, i + 0, L0, lid);
+      SET_KEY32 (S0, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S1, i + 0, L0);
-      SET_KEY32 (S1, i + 1, R0);
+      SET_KEY32 (S1, i + 0, L0, lid);
+      SET_KEY32 (S1, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S2, i + 0, L0);
-      SET_KEY32 (S2, i + 1, R0);
+      SET_KEY32 (S2, i + 0, L0, lid);
+      SET_KEY32 (S2, i + 1, R0, lid);
     }
 
     for (u32 i = 0; i < 256; i += 2)
     {
       BF_ENCRYPT (L0, R0);
 
-      SET_KEY32 (S3, i + 0, L0);
-      SET_KEY32 (S3, i + 1, R0);
+      SET_KEY32 (S3, i + 0, L0, lid);
+      SET_KEY32 (S3, i + 1, R0, lid);
     }
   }
 
@@ -885,10 +881,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_loop (KERN_ATTR_TMPS 
 
   for (u32 i = 0; i < 256; i++)
   {
-    tmps[gid].S0[i] = GET_KEY32 (S0, i);
-    tmps[gid].S1[i] = GET_KEY32 (S1, i);
-    tmps[gid].S2[i] = GET_KEY32 (S2, i);
-    tmps[gid].S3[i] = GET_KEY32 (S3, i);
+    tmps[gid].S0[i] = GET_KEY32 (S0, i, lid);
+    tmps[gid].S1[i] = GET_KEY32 (S1, i, lid);
+    tmps[gid].S2[i] = GET_KEY32 (S2, i, lid);
+    tmps[gid].S3[i] = GET_KEY32 (S3, i, lid);
   }
 }
 
@@ -901,7 +897,7 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_comp (KERN_ATTR_TMPS 
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // load
 
@@ -935,10 +931,10 @@ KERNEL_FQ void FIXED_THREAD_COUNT(FIXED_LOCAL_SIZE) m25800_comp (KERN_ATTR_TMPS 
 
   for (u32 i = 0; i < 256; i++)
   {
-    SET_KEY32 (S0, i, tmps[gid].S0[i]);
-    SET_KEY32 (S1, i, tmps[gid].S1[i]);
-    SET_KEY32 (S2, i, tmps[gid].S2[i]);
-    SET_KEY32 (S3, i, tmps[gid].S3[i]);
+    SET_KEY32 (S0, i, tmps[gid].S0[i], lid);
+    SET_KEY32 (S1, i, tmps[gid].S1[i], lid);
+    SET_KEY32 (S2, i, tmps[gid].S2[i], lid);
+    SET_KEY32 (S3, i, tmps[gid].S3[i], lid);
   }
 
   /**

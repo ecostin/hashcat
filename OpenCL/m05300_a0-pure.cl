@@ -6,14 +6,14 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
-#include "inc_scalar.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_scalar.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
 typedef struct ikepsk
@@ -35,7 +35,7 @@ KERNEL_FQ void m05300_mxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -47,7 +47,7 @@ KERNEL_FQ void m05300_mxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos++)
   {
     pw_t tmp = PASTE_PW;
 
@@ -57,7 +57,7 @@ KERNEL_FQ void m05300_mxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
 
     md5_hmac_init (&ctx0, tmp.i, tmp.pw_len);
 
-    md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET].nr_buf, esalt_bufs[DIGESTS_OFFSET].nr_len);
+    md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET_HOST].nr_buf, esalt_bufs[DIGESTS_OFFSET_HOST].nr_len);
 
     md5_hmac_final (&ctx0);
 
@@ -87,7 +87,7 @@ KERNEL_FQ void m05300_mxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
 
     md5_hmac_init_64 (&ctx, w0, w1, w2, w3);
 
-    md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET].msg_buf, esalt_bufs[DIGESTS_OFFSET].msg_len[5]);
+    md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET_HOST].msg_buf, esalt_bufs[DIGESTS_OFFSET_HOST].msg_len[5]);
 
     md5_hmac_final (&ctx);
 
@@ -109,7 +109,7 @@ KERNEL_FQ void m05300_sxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest
@@ -117,10 +117,10 @@ KERNEL_FQ void m05300_sxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -133,7 +133,7 @@ KERNEL_FQ void m05300_sxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos++)
   {
     pw_t tmp = PASTE_PW;
 
@@ -143,7 +143,7 @@ KERNEL_FQ void m05300_sxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
 
     md5_hmac_init (&ctx0, tmp.i, tmp.pw_len);
 
-    md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET].nr_buf, esalt_bufs[DIGESTS_OFFSET].nr_len);
+    md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET_HOST].nr_buf, esalt_bufs[DIGESTS_OFFSET_HOST].nr_len);
 
     md5_hmac_final (&ctx0);
 
@@ -173,7 +173,7 @@ KERNEL_FQ void m05300_sxx (KERN_ATTR_RULES_ESALT (ikepsk_t))
 
     md5_hmac_init_64 (&ctx, w0, w1, w2, w3);
 
-    md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET].msg_buf, esalt_bufs[DIGESTS_OFFSET].msg_len[5]);
+    md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET_HOST].msg_buf, esalt_bufs[DIGESTS_OFFSET_HOST].msg_len[5]);
 
     md5_hmac_final (&ctx);
 

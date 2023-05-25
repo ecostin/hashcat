@@ -6,12 +6,12 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -53,7 +53,7 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -82,14 +82,14 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  salt_buf0[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  salt_buf0[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  salt_buf0[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  salt_buf1[0] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  salt_buf1[1] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  salt_buf1[2] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  salt_buf1[3] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  salt_buf0[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  salt_buf0[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  salt_buf0[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  salt_buf0[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  salt_buf1[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  salt_buf1[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  salt_buf1[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  salt_buf1[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
   salt_buf2[0] = 0;
   salt_buf2[1] = 0;
   salt_buf2[2] = 0;
@@ -103,7 +103,7 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -141,7 +141,7 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -251,10 +251,10 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     w0[0] = salt_buf0[0];
     w0[1] = salt_buf0[1];
@@ -355,10 +355,10 @@ KERNEL_FQ void m02810_m04 (KERN_ATTR_BASIC ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    const u32x r_a = a + MD5M_A;
-    const u32x r_b = b + MD5M_B;
-    const u32x r_c = c + MD5M_C;
-    const u32x r_d = d + MD5M_D;
+    const u32x r_a = a + make_u32x (MD5M_A);
+    const u32x r_b = b + make_u32x (MD5M_B);
+    const u32x r_c = c + make_u32x (MD5M_C);
+    const u32x r_d = d + make_u32x (MD5M_D);
 
     const u32x r_00 = 0x80;
     const u32x r_14 = 64 * 8;
@@ -480,7 +480,7 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -509,14 +509,14 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  salt_buf0[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  salt_buf0[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  salt_buf0[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  salt_buf1[0] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  salt_buf1[1] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  salt_buf1[2] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  salt_buf1[3] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  salt_buf0[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  salt_buf0[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  salt_buf0[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  salt_buf0[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  salt_buf1[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  salt_buf1[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  salt_buf1[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  salt_buf1[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
   salt_buf2[0] = 0;
   salt_buf2[1] = 0;
   salt_buf2[2] = 0;
@@ -532,17 +532,17 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -580,7 +580,7 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -690,10 +690,10 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     w0[0] = salt_buf0[0];
     w0[1] = salt_buf0[1];
@@ -794,10 +794,10 @@ KERNEL_FQ void m02810_s04 (KERN_ATTR_BASIC ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    const u32x r_a = a + MD5M_A;
-    const u32x r_b = b + MD5M_B;
-    const u32x r_c = c + MD5M_C;
-    const u32x r_d = d + MD5M_D;
+    const u32x r_a = a + make_u32x (MD5M_A);
+    const u32x r_b = b + make_u32x (MD5M_B);
+    const u32x r_c = c + make_u32x (MD5M_C);
+    const u32x r_d = d + make_u32x (MD5M_D);
 
     const u32x r_00 = 0x80;
     const u32x r_14 = 64 * 8;

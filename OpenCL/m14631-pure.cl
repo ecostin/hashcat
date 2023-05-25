@@ -6,19 +6,21 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_hash_sha512.cl"
-#include "inc_hash_ripemd160.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
+#include M2S(INCLUDE_PATH/inc_hash_ripemd160.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
-#define LUKS_STRIPES 4000
+#define LUKS_STRIPES    (                                   4000)
+#define LUKS_CT_LEN     (                                    512)
+#define LUKS_AF_MAX_LEN (HC_LUKS_KEY_SIZE_512 / 8 * LUKS_STRIPES)
 
 typedef enum hc_luks_hash_type
 {
@@ -48,22 +50,25 @@ typedef enum hc_luks_cipher_type
 
 typedef enum hc_luks_cipher_mode
 {
-  HC_LUKS_CIPHER_MODE_CBC_ESSIV = 1,
-  HC_LUKS_CIPHER_MODE_CBC_PLAIN = 2,
-  HC_LUKS_CIPHER_MODE_XTS_PLAIN = 3,
+  HC_LUKS_CIPHER_MODE_CBC_ESSIV_SHA256 = 1,
+  HC_LUKS_CIPHER_MODE_CBC_PLAIN        = 2,
+  HC_LUKS_CIPHER_MODE_CBC_PLAIN64      = 3,
+  HC_LUKS_CIPHER_MODE_XTS_PLAIN        = 4,
+  HC_LUKS_CIPHER_MODE_XTS_PLAIN64      = 5,
 
 } hc_luks_cipher_mode_t;
 
 typedef struct luks
 {
-  int hash_type;    // hc_luks_hash_type_t
-  int key_size;     // hc_luks_key_size_t
-  int cipher_type;  // hc_luks_cipher_type_t
-  int cipher_mode;  // hc_luks_cipher_mode_t
+  int hash_type;   // hc_luks_hash_type_t
+  int key_size;    // hc_luks_key_size_t
+  int cipher_type; // hc_luks_cipher_type_t
+  int cipher_mode; // hc_luks_cipher_mode_t
 
-  u32 ct_buf[128];
+  u32 ct_buf[LUKS_CT_LEN / 4];
 
-  u32 af_src_buf[((HC_LUKS_KEY_SIZE_512 / 8) * LUKS_STRIPES) / 4];
+  u32 af_buf[LUKS_AF_MAX_LEN / 4];
+  u32 af_len;
 
 } luks_t;
 
@@ -84,18 +89,18 @@ typedef struct luks_tmp
 } luks_tmp_t;
 
 #ifdef KERNEL_STATIC
-#include "inc_luks_af.cl"
-#include "inc_luks_essiv.cl"
-#include "inc_luks_xts.cl"
-#include "inc_luks_aes.cl"
+#include M2S(INCLUDE_PATH/inc_luks_af.cl)
+#include M2S(INCLUDE_PATH/inc_luks_essiv.cl)
+#include M2S(INCLUDE_PATH/inc_luks_xts.cl)
+#include M2S(INCLUDE_PATH/inc_luks_aes.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 #define MAX_ENTROPY 7.0
 
-DECLSPEC void hmac_sha512_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *w4, u32x *w5, u32x *w6, u32x *w7, u64x *ipad, u64x *opad, u64x *digest)
+DECLSPEC void hmac_sha512_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *w4, PRIVATE_AS u32x *w5, PRIVATE_AS u32x *w6, PRIVATE_AS u32x *w7, PRIVATE_AS u64x *ipad, PRIVATE_AS u64x *opad, PRIVATE_AS u64x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -161,7 +166,7 @@ KERNEL_FQ void m14631_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha512_hmac_ctx_t sha512_hmac_ctx;
 
@@ -185,9 +190,9 @@ KERNEL_FQ void m14631_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
   tmps[gid].opad64[6] = sha512_hmac_ctx.opad.h[6];
   tmps[gid].opad64[7] = sha512_hmac_ctx.opad.h[7];
 
-  sha512_hmac_update_global_swap (&sha512_hmac_ctx, salt_bufs[DIGESTS_OFFSET].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha512_hmac_update_global_swap (&sha512_hmac_ctx, salt_bufs[DIGESTS_OFFSET_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
-  const u32 key_size = esalt_bufs[DIGESTS_OFFSET].key_size;
+  const u32 key_size = esalt_bufs[DIGESTS_OFFSET_HOST].key_size;
 
   for (u32 i = 0, j = 1; i < ((key_size / 8) / 4); i += 16, j += 1)
   {
@@ -263,7 +268,7 @@ KERNEL_FQ void m14631_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u64x ipad[8];
   u64x opad[8];
@@ -286,7 +291,7 @@ KERNEL_FQ void m14631_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
   opad[6] = pack64v (tmps, opad64, gid, 6);
   opad[7] = pack64v (tmps, opad64, gid, 7);
 
-  u32 key_size = esalt_bufs[DIGESTS_OFFSET].key_size;
+  u32 key_size = esalt_bufs[DIGESTS_OFFSET_HOST].key_size;
 
   for (u32 i = 0; i < ((key_size / 8) / 4); i += 16)
   {
@@ -311,7 +316,7 @@ KERNEL_FQ void m14631_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
     out[6] = pack64v (tmps, out64, gid, i + 6);
     out[7] = pack64v (tmps, out64, gid, i + 7);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -444,7 +449,7 @@ KERNEL_FQ void m14631_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // decrypt AF with first pbkdf2 result
   // merge AF to masterkey
@@ -452,7 +457,7 @@ KERNEL_FQ void m14631_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   u32 pt_buf[128];
 
-  luks_af_sha512_then_aes_decrypt (&esalt_bufs[DIGESTS_OFFSET], &tmps[gid], pt_buf, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4);
+  luks_af_sha512_then_aes_decrypt (&esalt_bufs[DIGESTS_OFFSET_HOST], &tmps[gid], pt_buf, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4);
 
   // check entropy
 
@@ -460,9 +465,9 @@ KERNEL_FQ void m14631_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   if (entropy < MAX_ENTROPY)
   {
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
   }
 }

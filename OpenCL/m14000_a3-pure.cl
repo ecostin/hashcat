@@ -6,14 +6,14 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single_bs.cl"
-#define COMPARE_M "inc_comp_multi_bs.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single_bs.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi_bs.cl)
 
 #ifdef IS_NV
 #define KXX_DECL
@@ -55,7 +55,7 @@
 
 #define LUT(a,b,c,d,e) u32 a; asm ("lop3.b32 %0, %1, %2, %3, "#e";" : "=r"(a): "r"(b), "r"(c), "r"(d));
 
-DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(xAA55AA5500550055, a1, a4, a6, 0xC1)
   LUT(xA55AA55AF0F5F0F5, a3, a6, xAA55AA5500550055, 0x9E)
@@ -89,7 +89,7 @@ DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(xEEEEEEEE99999999, a1, a2, a6, 0x97)
   LUT(xFFFFEEEE66666666, a5, a6, xEEEEEEEE99999999, 0x67)
@@ -122,7 +122,7 @@ DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(xA50FA50FA50FA50F, a1, a3, a4, 0xC9)
   LUT(xF0F00F0FF0F0F0F0, a3, a5, a6, 0x4B)
@@ -156,7 +156,7 @@ DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(x55F055F055F055F0, a1, a3, a4, 0x72)
   LUT(xA500F5F0A500F5F0, a3, a5, x55F055F055F055F0, 0xAD)
@@ -183,7 +183,7 @@ DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(xA0A0A0A0FFFFFFFF, a1, a3, a6, 0xAB)
   LUT(xFFFF00005555FFFF, a1, a5, a6, 0xB9)
@@ -217,7 +217,7 @@ DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(x5050F5F55050F5F5, a1, a3, a5, 0xB2)
   LUT(x6363C6C66363C6C6, a1, a2, x5050F5F55050F5F5, 0x66)
@@ -250,7 +250,7 @@ DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(x88AA88AA88AA88AA, a1, a2, a4, 0x0B)
   LUT(xAAAAFF00AAAAFF00, a1, a4, a5, 0x27)
@@ -283,7 +283,7 @@ DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
   *out4 ^= x4;
 }
 
-DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
   LUT(xEEEE3333EEEE3333, a1, a2, a5, 0x9D)
   LUT(xBBBBBBBBBBBBBBBB, a1, a1, a2, 0x83)
@@ -341,7 +341,7 @@ DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
  * The effort has been sponsored by Rapid7: http://www.rapid7.com
  */
 
-DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x55005500, x5A0F5A0F, x3333FFFF, x66666666, x22226666, x2D2D6969,
         x25202160;
@@ -416,7 +416,7 @@ DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x33CC33CC;
     u32 x55550000, x00AA00FF, x33BB33FF;
@@ -487,7 +487,7 @@ DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x44444444, x0F0FF0F0, x4F4FF4F4, x00FFFF00, x00AAAA00, x4FE55EF4;
     u32 x3C3CC3C3, x3C3C0000, x7373F4F4, x0C840A00;
@@ -558,7 +558,7 @@ DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out3 ^= x21;
 }
 
-DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x5A5A5A5A, x0F0FF0F0;
     u32 x33FF33FF, x33FFCC00, x0C0030F0, x0C0CC0C0, x0CF3C03F, x5EFBDA7F,
@@ -612,7 +612,7 @@ DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x77777777, x77770000, x22225555, x11116666, x1F1F6F6F;
     u32 x70700000, x43433333, x00430033, x55557777, x55167744, x5A19784B;
@@ -685,7 +685,7 @@ DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out2 ^= x11;
 }
 
-DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x33CC33CC;
     u32 x3333FFFF, x11115555, x22DD6699, x22DD9966, x00220099;
@@ -758,7 +758,7 @@ DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out1 ^= x01;
 }
 
-DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x0FF00FF0, x3CC33CC3, x00003CC3, x0F000F00, x5A555A55, x00001841;
     u32 x00000F00, x33333C33, x7B777E77, x0FF0F00F, x74878E78;
@@ -829,7 +829,7 @@ DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out2 ^= x11;
 }
 
-DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x0C0C0C0C, x0000F0F0, x00FFF00F, x00555005, x00515001;
     u32 x33000330, x77555775, x30303030, x3030CFCF, x30104745, x30555745;
@@ -922,7 +922,7 @@ DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
  * The effort has been sponsored by Rapid7: http://www.rapid7.com
  */
 
-DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x55005500, x5A0F5A0F, x3333FFFF, x66666666, x22226666, x2D2D6969,
         x25202160;
@@ -997,7 +997,7 @@ DECLSPEC void s1 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x33CC33CC;
     u32 x55550000, x00AA00FF, x33BB33FF;
@@ -1068,7 +1068,7 @@ DECLSPEC void s2 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x44444444, x0F0FF0F0, x4F4FF4F4, x00FFFF00, x00AAAA00, x4FE55EF4;
     u32 x3C3CC3C3, x3C3C0000, x7373F4F4, x0C840A00;
@@ -1139,7 +1139,7 @@ DECLSPEC void s3 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out3 ^= x21;
 }
 
-DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x5A5A5A5A, x0F0FF0F0;
     u32 x33FF33FF, x33FFCC00, x0C0030F0, x0C0CC0C0, x0CF3C03F, x5EFBDA7F,
@@ -1193,7 +1193,7 @@ DECLSPEC void s4 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out4 ^= x31;
 }
 
-DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x77777777, x77770000, x22225555, x11116666, x1F1F6F6F;
     u32 x70700000, x43433333, x00430033, x55557777, x55167744, x5A19784B;
@@ -1266,7 +1266,7 @@ DECLSPEC void s5 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out2 ^= x11;
 }
 
-DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x33CC33CC;
     u32 x3333FFFF, x11115555, x22DD6699, x22DD9966, x00220099;
@@ -1339,7 +1339,7 @@ DECLSPEC void s6 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out1 ^= x01;
 }
 
-DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x0FF00FF0, x3CC33CC3, x00003CC3, x0F000F00, x5A555A55, x00001841;
     u32 x00000F00, x33333C33, x7B777E77, x0FF0F00F, x74878E78;
@@ -1410,7 +1410,7 @@ DECLSPEC void s7 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
     *out2 ^= x11;
 }
 
-DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, u32 *out1, u32 *out2, u32 *out3, u32 *out4)
+DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const u32 a5, const u32 a6, PRIVATE_AS u32 *out1, PRIVATE_AS u32 *out2, PRIVATE_AS u32 *out3, PRIVATE_AS u32 *out4)
 {
     u32 x0C0C0C0C, x0000F0F0, x00FFF00F, x00555005, x00515001;
     u32 x33000330, x77555775, x30303030, x3030CFCF, x30104745, x30555745;
@@ -1529,7 +1529,7 @@ DECLSPEC void s8 (const u32 a1, const u32 a2, const u32 a3, const u32 a4, const 
 #define KEYSET07 { k00 = K31; k01 = K35; k02 = K52; k03 = K43; k04 = K08; k05 = K37; k06 = K51; k07 = K15; k08 = K49; k09 = K30; k10 = K07; k11 = K02; k12 = K50; k13 = K21; k14 = K45; k15 = K44; k16 = K29; k17 = K16; k18 = K42; k19 = K23; k20 = K22; k21 = K14; k22 = K38; k23 = K01; k24 = K10; k25 = K47; k26 = K53; k27 = K11; k28 = K27; k29 = K26; k30 = K05; k31 = K17; k32 = K54; k33 = K41; k34 = K39; k35 = K20; k36 = K48; k37 = K13; k38 = K24; k39 = K19; k40 = K32; k41 = K40; k42 = K34; k43 = K03; k44 = K06; k45 = K18; k46 = K12; k47 = K46; }
 #define KEYSET17 { k00 = K15; k01 = K51; k02 = K36; k03 = K02; k04 = K49; k05 = K21; k06 = K35; k07 = K31; k08 = K08; k09 = K14; k10 = K23; k11 = K43; k12 = K09; k13 = K37; k14 = K29; k15 = K28; k16 = K45; k17 = K00; k18 = K01; k19 = K07; k20 = K38; k21 = K30; k22 = K22; k23 = K42; k24 = K26; k25 = K04; k26 = K41; k27 = K54; k28 = K39; k29 = K10; k30 = K48; k31 = K33; k32 = K11; k33 = K53; k34 = K27; k35 = K32; k36 = K05; k37 = K25; k38 = K40; k39 = K03; k40 = K20; k41 = K24; k42 = K46; k43 = K19; k44 = K18; k45 = K06; k46 = K55; k47 = K34; }
 
-DECLSPEC void DES (const u32 K00, const u32 K01, const u32 K02, const u32 K03, const u32 K04, const u32 K05, const u32 K06, const u32 K07, const u32 K08, const u32 K09, const u32 K10, const u32 K11, const u32 K12, const u32 K13, const u32 K14, const u32 K15, const u32 K16, const u32 K17, const u32 K18, const u32 K19, const u32 K20, const u32 K21, const u32 K22, const u32 K23, const u32 K24, const u32 K25, const u32 K26, const u32 K27, const u32 K28, const u32 K29, const u32 K30, const u32 K31, const u32 K32, const u32 K33, const u32 K34, const u32 K35, const u32 K36, const u32 K37, const u32 K38, const u32 K39, const u32 K40, const u32 K41, const u32 K42, const u32 K43, const u32 K44, const u32 K45, const u32 K46, const u32 K47, const u32 K48, const u32 K49, const u32 K50, const u32 K51, const u32 K52, const u32 K53, const u32 K54, const u32 K55, u32 *D00, u32 *D01, u32 *D02, u32 *D03, u32 *D04, u32 *D05, u32 *D06, u32 *D07, u32 *D08, u32 *D09, u32 *D10, u32 *D11, u32 *D12, u32 *D13, u32 *D14, u32 *D15, u32 *D16, u32 *D17, u32 *D18, u32 *D19, u32 *D20, u32 *D21, u32 *D22, u32 *D23, u32 *D24, u32 *D25, u32 *D26, u32 *D27, u32 *D28, u32 *D29, u32 *D30, u32 *D31, u32 *D32, u32 *D33, u32 *D34, u32 *D35, u32 *D36, u32 *D37, u32 *D38, u32 *D39, u32 *D40, u32 *D41, u32 *D42, u32 *D43, u32 *D44, u32 *D45, u32 *D46, u32 *D47, u32 *D48, u32 *D49, u32 *D50, u32 *D51, u32 *D52, u32 *D53, u32 *D54, u32 *D55, u32 *D56, u32 *D57, u32 *D58, u32 *D59, u32 *D60, u32 *D61, u32 *D62, u32 *D63)
+DECLSPEC void DES (const u32 K00, const u32 K01, const u32 K02, const u32 K03, const u32 K04, const u32 K05, const u32 K06, const u32 K07, const u32 K08, const u32 K09, const u32 K10, const u32 K11, const u32 K12, const u32 K13, const u32 K14, const u32 K15, const u32 K16, const u32 K17, const u32 K18, const u32 K19, const u32 K20, const u32 K21, const u32 K22, const u32 K23, const u32 K24, const u32 K25, const u32 K26, const u32 K27, const u32 K28, const u32 K29, const u32 K30, const u32 K31, const u32 K32, const u32 K33, const u32 K34, const u32 K35, const u32 K36, const u32 K37, const u32 K38, const u32 K39, const u32 K40, const u32 K41, const u32 K42, const u32 K43, const u32 K44, const u32 K45, const u32 K46, const u32 K47, const u32 K48, const u32 K49, const u32 K50, const u32 K51, const u32 K52, const u32 K53, const u32 K54, const u32 K55, PRIVATE_AS u32 *D00, PRIVATE_AS u32 *D01, PRIVATE_AS u32 *D02, PRIVATE_AS u32 *D03, PRIVATE_AS u32 *D04, PRIVATE_AS u32 *D05, PRIVATE_AS u32 *D06, PRIVATE_AS u32 *D07, PRIVATE_AS u32 *D08, PRIVATE_AS u32 *D09, PRIVATE_AS u32 *D10, PRIVATE_AS u32 *D11, PRIVATE_AS u32 *D12, PRIVATE_AS u32 *D13, PRIVATE_AS u32 *D14, PRIVATE_AS u32 *D15, PRIVATE_AS u32 *D16, PRIVATE_AS u32 *D17, PRIVATE_AS u32 *D18, PRIVATE_AS u32 *D19, PRIVATE_AS u32 *D20, PRIVATE_AS u32 *D21, PRIVATE_AS u32 *D22, PRIVATE_AS u32 *D23, PRIVATE_AS u32 *D24, PRIVATE_AS u32 *D25, PRIVATE_AS u32 *D26, PRIVATE_AS u32 *D27, PRIVATE_AS u32 *D28, PRIVATE_AS u32 *D29, PRIVATE_AS u32 *D30, PRIVATE_AS u32 *D31, PRIVATE_AS u32 *D32, PRIVATE_AS u32 *D33, PRIVATE_AS u32 *D34, PRIVATE_AS u32 *D35, PRIVATE_AS u32 *D36, PRIVATE_AS u32 *D37, PRIVATE_AS u32 *D38, PRIVATE_AS u32 *D39, PRIVATE_AS u32 *D40, PRIVATE_AS u32 *D41, PRIVATE_AS u32 *D42, PRIVATE_AS u32 *D43, PRIVATE_AS u32 *D44, PRIVATE_AS u32 *D45, PRIVATE_AS u32 *D46, PRIVATE_AS u32 *D47, PRIVATE_AS u32 *D48, PRIVATE_AS u32 *D49, PRIVATE_AS u32 *D50, PRIVATE_AS u32 *D51, PRIVATE_AS u32 *D52, PRIVATE_AS u32 *D53, PRIVATE_AS u32 *D54, PRIVATE_AS u32 *D55, PRIVATE_AS u32 *D56, PRIVATE_AS u32 *D57, PRIVATE_AS u32 *D58, PRIVATE_AS u32 *D59, PRIVATE_AS u32 *D60, PRIVATE_AS u32 *D61, PRIVATE_AS u32 *D62, PRIVATE_AS u32 *D63)
 {
   KXX_DECL u32 k00, k01, k02, k03, k04, k05;
   KXX_DECL u32 k06, k07, k08, k09, k10, k11;
@@ -1635,7 +1635,7 @@ DECLSPEC void DES (const u32 K00, const u32 K01, const u32 K02, const u32 K03, c
   }
 }
 
-DECLSPEC void transpose32c (u32 *data)
+DECLSPEC void transpose32c (PRIVATE_AS u32 *data)
 {
   #define swap(x,y,j,m)               \
      t  = ((x) ^ ((y) >> (j))) & (m); \
@@ -1730,9 +1730,11 @@ DECLSPEC void transpose32c (u32 *data)
 // transpose bitslice mod : attention race conditions, need different buffers for *in and *out
 //
 
-KERNEL_FQ void m14000_tm (GLOBAL_AS u32 *mod, GLOBAL_AS bs_word_t *words_buf_b)
+KERNEL_FQ void m14000_tm (KERN_ATTR_TM)
 {
   const u64 gid = get_global_id (0);
+
+  // if (gid >= GID_CNT) return;
 
   const u32 block = gid / 32;
   const u32 slice = gid % 32;
@@ -1763,12 +1765,14 @@ KERNEL_FQ void m14000_mxx (KERN_ATTR_BITSLICE ())
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
+  if (gid >= GID_CNT) return;
+
   /**
    * salt
    */
 
-  const u32 salt0 = salt_bufs[SALT_POS].salt_buf_pc[0];
-  const u32 salt1 = salt_bufs[SALT_POS].salt_buf_pc[1];
+  const u32 salt0 = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  const u32 salt1 = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
 
   // salt1 first, because this is a 64 bit value actually
 
@@ -1906,7 +1910,7 @@ KERNEL_FQ void m14000_mxx (KERN_ATTR_BITSLICE ())
    * inner loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += 32)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += 32)
   {
     u32 k00 = K00;
     u32 k01 = K01;
@@ -2120,11 +2124,11 @@ KERNEL_FQ void m14000_mxx (KERN_ATTR_BITSLICE ())
     out[62] = D62;
     out[63] = D63;
 
-    if (digests_cnt < 16)
+    if (DIGESTS_CNT < 16)
     {
-      for (u32 d = 0; d < digests_cnt; d++)
+      for (u32 d = 0; d < DIGESTS_CNT; d++)
       {
-        const u32 final_hash_pos = DIGESTS_OFFSET + d;
+        const u32 final_hash_pos = DIGESTS_OFFSET_HOST + d;
 
         if (hashes_shown[final_hash_pos]) continue;
 
@@ -2171,8 +2175,8 @@ KERNEL_FQ void m14000_mxx (KERN_ATTR_BITSLICE ())
       #endif
       for (int i = 0; i < 32; i++)
       {
-        out0[i] = out[ 0 + i];
-        out1[i] = out[32 + i];
+        out0[i] = out[ 0 + 31 - i];
+        out1[i] = out[32 + 31 - i];
       }
 
       transpose32c (out0);
@@ -2183,8 +2187,8 @@ KERNEL_FQ void m14000_mxx (KERN_ATTR_BITSLICE ())
       #endif
       for (int slice = 0; slice < 32; slice++)
       {
-        const u32 r0 = out0[slice];
-        const u32 r1 = out1[slice];
+        const u32 r0 = out0[31 - slice];
+        const u32 r1 = out1[31 - slice];
         const u32 r2 = 0;
         const u32 r3 = 0;
 
@@ -2205,12 +2209,14 @@ KERNEL_FQ void m14000_sxx (KERN_ATTR_BITSLICE ())
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
+  if (gid >= GID_CNT) return;
+
   /**
    * salt
    */
 
-  const u32 salt0 = salt_bufs[SALT_POS].salt_buf_pc[0];
-  const u32 salt1 = salt_bufs[SALT_POS].salt_buf_pc[1];
+  const u32 salt0 = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  const u32 salt1 = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
 
   // salt1 first, because this is a 64 bit value actually
 
@@ -2419,7 +2425,7 @@ KERNEL_FQ void m14000_sxx (KERN_ATTR_BITSLICE ())
    * inner loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += 32)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += 32)
   {
     u32 k00 = K00;
     u32 k01 = K01;

@@ -30,6 +30,8 @@ int _dowildcard = -1;
 
 static void main_log_clear_line (MAYBE_UNUSED const size_t prev_len, MAYBE_UNUSED FILE *fp)
 {
+  if (!is_stdout_terminal ()) return;
+
   #if defined (_WIN)
 
   fputc ('\r', fp);
@@ -68,8 +70,6 @@ static void main_log (hashcat_ctx_t *hashcat_ctx, FILE *fp, const int loglevel)
     event_ctx->prev_len = msg_len;
   }
 
-  // color stuff pre
-
   #if defined (_WIN)
   HANDLE hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
 
@@ -78,52 +78,60 @@ static void main_log (hashcat_ctx_t *hashcat_ctx, FILE *fp, const int loglevel)
   GetConsoleScreenBufferInfo (hConsole, &con_info);
 
   const int orig = con_info.wAttributes;
+  #endif
 
-  switch (loglevel)
+  // color stuff pre
+  if (is_stdout_terminal ())
   {
-    case LOGLEVEL_INFO:
-      break;
-    case LOGLEVEL_WARNING: SetConsoleTextAttribute (hConsole, 6);
-      break;
-    case LOGLEVEL_ERROR:   SetConsoleTextAttribute (hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-      break;
-    case LOGLEVEL_ADVICE:  SetConsoleTextAttribute (hConsole, 6);
-      break;
-  }
+  #if defined (_WIN)
+    switch (loglevel)
+    {
+      case LOGLEVEL_INFO:
+        break;
+      case LOGLEVEL_WARNING: SetConsoleTextAttribute (hConsole, 6);
+        break;
+      case LOGLEVEL_ERROR:   SetConsoleTextAttribute (hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+        break;
+      case LOGLEVEL_ADVICE:  SetConsoleTextAttribute (hConsole, 6);
+        break;
+    }
 
   #else
-  switch (loglevel)
-  {
-    case LOGLEVEL_INFO:                                   break;
-    case LOGLEVEL_WARNING: fwrite ("\033[33m", 5, 1, fp); break;
-    case LOGLEVEL_ERROR:   fwrite ("\033[31m", 5, 1, fp); break;
-    case LOGLEVEL_ADVICE:  fwrite ("\033[33m", 5, 1, fp); break;
-  }
+    switch (loglevel)
+    {
+      case LOGLEVEL_INFO:                                   break;
+      case LOGLEVEL_WARNING: fwrite ("\033[33m", 5, 1, fp); break;
+      case LOGLEVEL_ERROR:   fwrite ("\033[31m", 5, 1, fp); break;
+      case LOGLEVEL_ADVICE:  fwrite ("\033[33m", 5, 1, fp); break;
+    }
   #endif
+  }
 
   // finally, print
 
   fwrite (msg_buf, msg_len, 1, fp);
 
   // color stuff post
-
+  if (is_stdout_terminal ())
+  {
   #if defined (_WIN)
-  switch (loglevel)
-  {
-    case LOGLEVEL_INFO:                                              break;
-    case LOGLEVEL_WARNING: SetConsoleTextAttribute (hConsole, orig); break;
-    case LOGLEVEL_ERROR:   SetConsoleTextAttribute (hConsole, orig); break;
-    case LOGLEVEL_ADVICE:  SetConsoleTextAttribute (hConsole, orig); break;
-  }
+    switch (loglevel)
+    {
+      case LOGLEVEL_INFO:                                              break;
+      case LOGLEVEL_WARNING: SetConsoleTextAttribute (hConsole, orig); break;
+      case LOGLEVEL_ERROR:   SetConsoleTextAttribute (hConsole, orig); break;
+      case LOGLEVEL_ADVICE:  SetConsoleTextAttribute (hConsole, orig); break;
+    }
   #else
-  switch (loglevel)
-  {
-    case LOGLEVEL_INFO:                                  break;
-    case LOGLEVEL_WARNING: fwrite ("\033[0m", 4, 1, fp); break;
-    case LOGLEVEL_ERROR:   fwrite ("\033[0m", 4, 1, fp); break;
-    case LOGLEVEL_ADVICE:  fwrite ("\033[0m", 4, 1, fp); break;
-  }
+    switch (loglevel)
+    {
+      case LOGLEVEL_INFO:                                  break;
+      case LOGLEVEL_WARNING: fwrite ("\033[0m", 4, 1, fp); break;
+      case LOGLEVEL_ERROR:   fwrite ("\033[0m", 4, 1, fp); break;
+      case LOGLEVEL_ADVICE:  fwrite ("\033[0m", 4, 1, fp); break;
+    }
   #endif
+  }
 
   // eventual newline
 
@@ -188,12 +196,12 @@ static void main_outerloop_starting (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MA
 
   status_ctx->shutdown_outer = false;
 
-  if (user_options->hash_info      == true) return;
-  if (user_options->keyspace       == true) return;
-  if (user_options->stdout_flag    == true) return;
-  if (user_options->backend_info   == true) return;
-  if (user_options->speed_only     == true) return;
-  if (user_options->identify       == true) return;
+  if (user_options->hash_info    == true) return;
+  if (user_options->keyspace     == true) return;
+  if (user_options->stdout_flag  == true) return;
+  if (user_options->speed_only   == true) return;
+  if (user_options->identify     == true) return;
+  if (user_options->backend_info  > 0)    return;
 
   if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
   {
@@ -265,10 +273,10 @@ static void main_cracker_finished (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYB
   const user_options_t       *user_options       = hashcat_ctx->user_options;
   const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
 
-  if (user_options->hash_info       == true) return;
-  if (user_options->keyspace        == true) return;
-  if (user_options->backend_info    == true) return;
-  if (user_options->stdout_flag     == true) return;
+  if (user_options->hash_info    == true) return;
+  if (user_options->keyspace     == true) return;
+  if (user_options->stdout_flag  == true) return;
+  if (user_options->backend_info  > 0)    return;
 
   // if we had a prompt, clear it
 
@@ -314,6 +322,10 @@ static void main_cracker_finished (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYB
     status_display (hashcat_ctx);
   }
   else if (user_options->status == true)
+  {
+    status_display (hashcat_ctx);
+  }
+  else if (user_options->status_json == true)
   {
     status_display (hashcat_ctx);
   }
@@ -384,6 +396,24 @@ static void main_potfile_remove_parse_post (MAYBE_UNUSED hashcat_ctx_t *hashcat_
   event_log_info_nn (hashcat_ctx, "Compared hashes with potfile entries");
 }
 
+static void main_rulesfiles_parse_pre (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Loading rules. Please be patient...");
+}
+
+static void main_rulesfiles_parse_post (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Loading rules finished");
+}
+
 static void main_potfile_hash_show (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
 {
   outfile_ctx_t *outfile_ctx = hashcat_ctx->outfile_ctx;
@@ -406,24 +436,30 @@ static void main_potfile_hash_left (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAY
 static void main_potfile_num_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
 {
   const user_options_t *user_options = hashcat_ctx->user_options;
-  const hashes_t       *hashes       = hashcat_ctx->hashes;
+  hashes_t             *hashes       = hashcat_ctx->hashes;
 
   if (user_options->quiet == true) return;
 
-  const int potfile_remove_cracks = hashes->digests_done;
-
-  if (potfile_remove_cracks > 0)
+  if (hashes->digests_done_zero == 1)
   {
-    if (potfile_remove_cracks == 1)
-    {
-      event_log_info (hashcat_ctx, "INFO: Removed 1 hash found as potfile entry or as empty hash.");
-      event_log_info (hashcat_ctx, NULL);
-    }
-    else
-    {
-      event_log_info (hashcat_ctx, "INFO: Removed %d hashes found as potfile entries or as empty hashes.", potfile_remove_cracks);
-      event_log_info (hashcat_ctx, NULL);
-    }
+    event_log_info (hashcat_ctx, "INFO: Removed hash found as empty hash.");
+    event_log_info (hashcat_ctx, NULL);
+  }
+  else if (hashes->digests_done_zero > 1)
+  {
+    event_log_info (hashcat_ctx, "INFO: Removed %d hashes found as empty hashes.", hashes->digests_done_zero);
+    event_log_info (hashcat_ctx, NULL);
+  }
+
+  if (hashes->digests_done_pot == 1)
+  {
+    event_log_info (hashcat_ctx, "INFO: Removed hash found as potfile entry.");
+    event_log_info (hashcat_ctx, NULL);
+  }
+  else if (hashes->digests_done_pot > 1)
+  {
+    event_log_info (hashcat_ctx, "INFO: Removed %d hashes found as potfile entries.", hashes->digests_done_pot);
+    event_log_info (hashcat_ctx, NULL);
   }
 }
 
@@ -433,7 +469,7 @@ static void main_potfile_all_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, M
 
   if (user_options->quiet == true) return;
 
-  event_log_info (hashcat_ctx, "INFO: All hashes found in potfile! Use --show to display them.");
+  event_log_info (hashcat_ctx, "INFO: All hashes found as potfile and/or empty entries! Use --show to display them.");
   event_log_info (hashcat_ctx, NULL);
 }
 
@@ -524,6 +560,22 @@ static void main_outerloop_mainscreen (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, 
     event_log_advice (hashcat_ctx, "This tells hashcat to continue attacking all target hashes until exhaustion.");
     event_log_advice (hashcat_ctx, "hashcat will NOT check for or remove targets present in the potfile, and");
     event_log_advice (hashcat_ctx, "will add ALL plains/collisions found, even duplicates, to the potfile.");
+    event_log_advice (hashcat_ctx, NULL);
+  }
+
+  if (hashconfig->potfile_disable == true && user_options->attack_mode != ATTACK_MODE_ASSOCIATION)
+  {
+    event_log_advice (hashcat_ctx, "ATTENTION! Potfile storage is disabled for this hash mode.");
+    event_log_advice (hashcat_ctx, "Passwords cracked during this session will NOT be stored to the potfile.");
+    event_log_advice (hashcat_ctx, "Consider using -o to save cracked passwords.");
+    event_log_advice (hashcat_ctx, NULL);
+  }
+
+  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+  {
+    event_log_advice (hashcat_ctx, "ATTENTION! Potfile read/write is disabled for this attack mode.");
+    event_log_advice (hashcat_ctx, "Passwords cracked during this session will NOT be stored to the potfile.");
+    event_log_advice (hashcat_ctx, "Consider using -o to save cracked passwords.");
     event_log_advice (hashcat_ctx, NULL);
   }
   /**
@@ -750,10 +802,16 @@ static void main_monitor_performance_hint (MAYBE_UNUSED hashcat_ctx_t *hashcat_c
 
   if (user_options->slow_candidates == false)
   {
-    event_log_advice (hashcat_ctx, "* Append -S to the commandline.");
-    event_log_advice (hashcat_ctx, "  This has a drastic speed impact but can be better for specific attacks.");
-    event_log_advice (hashcat_ctx, "  Typical scenarios are a small wordlist but a large ruleset.");
-    event_log_advice (hashcat_ctx, NULL);
+    if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
+    {
+      if ((user_options->attack_mode != ATTACK_MODE_HYBRID1) && (user_options->attack_mode != ATTACK_MODE_HYBRID2) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
+      {
+        event_log_advice (hashcat_ctx, "* Append -S to the commandline.");
+        event_log_advice (hashcat_ctx, "  This has a drastic speed impact but can be better for specific attacks.");
+        event_log_advice (hashcat_ctx, "  Typical scenarios are a small wordlist but a large ruleset.");
+        event_log_advice (hashcat_ctx, NULL);
+      }
+    }
   }
 
   event_log_advice (hashcat_ctx, "* Update your backend API runtime / driver the right way:");
@@ -793,9 +851,8 @@ static void main_monitor_temp_abort (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MA
   const user_options_t       *user_options       = hashcat_ctx->user_options;
   const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
 
-  if (user_options->quiet == true) return;
 
-  if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
+  if (((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK)) && user_options->quiet == false)
   {
     clear_prompt (hashcat_ctx);
   }
@@ -1149,6 +1206,8 @@ static void event (const u32 id, hashcat_ctx_t *hashcat_ctx, const void *buf, co
     case EVENT_POTFILE_NUM_CRACKED:       main_potfile_num_cracked       (hashcat_ctx, buf, len); break;
     case EVENT_POTFILE_REMOVE_PARSE_POST: main_potfile_remove_parse_post (hashcat_ctx, buf, len); break;
     case EVENT_POTFILE_REMOVE_PARSE_PRE:  main_potfile_remove_parse_pre  (hashcat_ctx, buf, len); break;
+    case EVENT_RULESFILES_PARSE_POST:     main_rulesfiles_parse_post     (hashcat_ctx, buf, len); break;
+    case EVENT_RULESFILES_PARSE_PRE:      main_rulesfiles_parse_pre      (hashcat_ctx, buf, len); break;
     case EVENT_SET_KERNEL_POWER_FINAL:    main_set_kernel_power_final    (hashcat_ctx, buf, len); break;
     case EVENT_WORDLIST_CACHE_GENERATE:   main_wordlist_cache_generate   (hashcat_ctx, buf, len); break;
     case EVENT_WORDLIST_CACHE_HIT:        main_wordlist_cache_hit        (hashcat_ctx, buf, len); break;
@@ -1257,7 +1316,7 @@ int main (int argc, char **argv)
 
   if (hashcat_session_init (hashcat_ctx, install_folder, shared_folder, argc, argv, COMPTIME) == 0)
   {
-    if (user_options->usage == true)
+    if (user_options->usage > 0)
     {
       usage_big_print (hashcat_ctx);
 
@@ -1269,7 +1328,7 @@ int main (int argc, char **argv)
 
       rc_final = 0;
     }
-    else if (user_options->backend_info == true)
+    else if (user_options->backend_info > 0)
     {
       // if this is just backend_info, no need to execute some real cracking session
 

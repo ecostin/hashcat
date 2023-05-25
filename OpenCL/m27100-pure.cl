@@ -6,19 +6,19 @@
 // #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
-#include "inc_scalar.cl"
-#include "inc_hash_md4.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_scalar.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md4.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 #ifdef KERNEL_STATIC
 DECLSPEC u8 hex_convert (const u8 c)
@@ -26,7 +26,7 @@ DECLSPEC u8 hex_convert (const u8 c)
   return (c & 15) + (c >> 6) * 9;
 }
 
-DECLSPEC u8 hex_to_u8 (const u8 *hex)
+DECLSPEC u8 hex_to_u8 (PRIVATE_AS const u8 *hex)
 {
   u8 v = 0;
 
@@ -65,7 +65,7 @@ KERNEL_FQ void m27100_init (KERN_ATTR_TMPS_ESALT (netntlm_tmp_t, netntlm_t))
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -82,11 +82,10 @@ KERNEL_FQ void m27100_init (KERN_ATTR_TMPS_ESALT (netntlm_tmp_t, netntlm_t))
   in[ 6] = pws[gid].i[ 6];
   in[ 7] = pws[gid].i[ 7];
 
-  u8 *in_ptr = (u8 *) in;
-
   u32 out[4];
 
-  u8 *out_ptr = (u8 *) out;
+  PRIVATE_AS u8 *in_ptr  = (PRIVATE_AS u8 *) in;
+  PRIVATE_AS u8 *out_ptr = (PRIVATE_AS u8 *) out;
 
   for (int i = 0, j = 0; i < 16; i += 1, j += 2)
   {
@@ -115,7 +114,7 @@ KERNEL_FQ void m27100_comp (KERN_ATTR_TMPS_ESALT (netntlm_tmp_t, netntlm_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 
@@ -145,7 +144,7 @@ KERNEL_FQ void m27100_comp (KERN_ATTR_TMPS_ESALT (netntlm_tmp_t, netntlm_t))
 
   md5_hmac_init_64 (&ctx0, w0, w1, w2, w3);
 
-  md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET].userdomain_buf, esalt_bufs[DIGESTS_OFFSET].user_len + esalt_bufs[DIGESTS_OFFSET].domain_len);
+  md5_hmac_update_global (&ctx0, esalt_bufs[DIGESTS_OFFSET_HOST].userdomain_buf, esalt_bufs[DIGESTS_OFFSET_HOST].user_len + esalt_bufs[DIGESTS_OFFSET_HOST].domain_len);
 
   md5_hmac_final (&ctx0);
 
@@ -170,7 +169,7 @@ KERNEL_FQ void m27100_comp (KERN_ATTR_TMPS_ESALT (netntlm_tmp_t, netntlm_t))
 
   md5_hmac_init_64 (&ctx, w0, w1, w2, w3);
 
-  md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET].chall_buf, esalt_bufs[DIGESTS_OFFSET].srvchall_len + esalt_bufs[DIGESTS_OFFSET].clichall_len);
+  md5_hmac_update_global (&ctx, esalt_bufs[DIGESTS_OFFSET_HOST].chall_buf, esalt_bufs[DIGESTS_OFFSET_HOST].srvchall_len + esalt_bufs[DIGESTS_OFFSET_HOST].clichall_len);
 
   md5_hmac_final (&ctx);
 

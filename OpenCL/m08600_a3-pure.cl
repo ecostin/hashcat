@@ -6,11 +6,11 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 // we just double this buffer so we can safe the & 0xff ;)
@@ -96,7 +96,7 @@ CONSTANT_VK u32a lotus_magic_table[512] =
 #define BOX1(S,i) make_u32x ((S)[(i).s0], (S)[(i).s1], (S)[(i).s2], (S)[(i).s3], (S)[(i).s4], (S)[(i).s5], (S)[(i).s6], (S)[(i).s7], (S)[(i).s8], (S)[(i).s9], (S)[(i).sa], (S)[(i).sb], (S)[(i).sc], (S)[(i).sd], (S)[(i).se], (S)[(i).sf])
 #endif
 
-DECLSPEC void lotus_mix (u32x *in, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void lotus_mix (PRIVATE_AS u32x *in, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32x p = 0;
 
@@ -119,7 +119,7 @@ DECLSPEC void lotus_mix (u32x *in, LOCAL_AS u32 *s_lotus_magic_table)
   }
 }
 
-DECLSPEC void lotus_transform_password (const u32x *in, u32x *out, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void lotus_transform_password (PRIVATE_AS const u32x *in, PRIVATE_AS u32x *out, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32x t = out[3] >> 24;
 
@@ -137,7 +137,7 @@ DECLSPEC void lotus_transform_password (const u32x *in, u32x *out, LOCAL_AS u32 
   }
 }
 
-DECLSPEC void pad (u32 *w, const u32 len)
+DECLSPEC void pad (PRIVATE_AS u32 *w, const u32 len)
 {
   const u32 val = 16 - len;
 
@@ -216,7 +216,7 @@ DECLSPEC void pad (u32 *w, const u32 len)
   }
 }
 
-DECLSPEC void mdtransform_norecalc (u32x *state, const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform_norecalc (PRIVATE_AS u32x *state, PRIVATE_AS const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32x x[12];
 
@@ -241,14 +241,14 @@ DECLSPEC void mdtransform_norecalc (u32x *state, const u32x *block, LOCAL_AS u32
   state[3] = x[3];
 }
 
-DECLSPEC void mdtransform (u32x *state, u32x *checksum, const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform (PRIVATE_AS u32x *state, PRIVATE_AS u32x *checksum, PRIVATE_AS const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
 {
   mdtransform_norecalc (state, block, s_lotus_magic_table);
 
   lotus_transform_password (block, checksum, s_lotus_magic_table);
 }
 
-DECLSPEC void domino_big_md (const u32x *saved_key, const u32 size, u32x *state, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void domino_big_md (PRIVATE_AS const u32x *saved_key, const u32 size, PRIVATE_AS u32x *state, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32x checksum[4];
 
@@ -262,14 +262,11 @@ DECLSPEC void domino_big_md (const u32x *saved_key, const u32 size, u32x *state,
   mdtransform_norecalc (state, checksum, s_lotus_magic_table);
 }
 
-DECLSPEC void m08600m (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
+DECLSPEC void m08600m (LOCAL_AS u32 *s_lotus_magic_table, PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR ())
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * base
@@ -283,7 +280,7 @@ DECLSPEC void m08600m (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_l
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -309,14 +306,11 @@ DECLSPEC void m08600m (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_l
   }
 }
 
-DECLSPEC void m08600s (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
+DECLSPEC void m08600s (LOCAL_AS u32 *s_lotus_magic_table, PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR ())
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * base
@@ -330,10 +324,10 @@ DECLSPEC void m08600s (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_l
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -342,7 +336,7 @@ DECLSPEC void m08600s (LOCAL_AS u32 *s_lotus_magic_table, u32 *w, const u32 pw_l
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -374,8 +368,8 @@ KERNEL_FQ void m08600_mxx (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -391,7 +385,7 @@ KERNEL_FQ void m08600_mxx (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -422,7 +416,7 @@ KERNEL_FQ void m08600_mxx (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m08600m (s_lotus_magic_table, w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m08600m (s_lotus_magic_table, w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m08600_sxx (KERN_ATTR_VECTOR ())
@@ -431,8 +425,8 @@ KERNEL_FQ void m08600_sxx (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -448,7 +442,7 @@ KERNEL_FQ void m08600_sxx (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -479,5 +473,5 @@ KERNEL_FQ void m08600_sxx (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m08600s (s_lotus_magic_table, w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m08600s (s_lotus_magic_table, w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }

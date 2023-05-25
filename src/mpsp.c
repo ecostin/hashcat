@@ -324,7 +324,7 @@ static int mp_expand (hashcat_ctx_t *hashcat_ctx, const char *in_buf, size_t in_
     }
     else
     {
-      if (hashconfig->opts_type & OPTS_TYPE_PT_HEX)
+      if (hashconfig->opts_type & OPTS_TYPE_MT_HEX)
       {
         in_pos++;
 
@@ -437,7 +437,7 @@ static int mp_gen_css (hashcat_ctx_t *hashcat_ctx, char *mask_buf, size_t mask_l
     }
     else
     {
-      if (hashconfig->opts_type & OPTS_TYPE_PT_HEX)
+      if (hashconfig->opts_type & OPTS_TYPE_MT_HEX)
       {
         mask_pos++;
 
@@ -519,7 +519,7 @@ static int mp_get_truncated_mask (hashcat_ctx_t *hashcat_ctx, const char *mask_b
     }
     else
     {
-      if (hashconfig->opts_type & OPTS_TYPE_PT_HEX)
+      if (hashconfig->opts_type & OPTS_TYPE_MT_HEX)
       {
         mask_pos++;
 
@@ -1168,7 +1168,7 @@ u32 mp_get_length (const char *mask, const u32 opts_type)
         ignore_next = true;
       }
 
-      if (opts_type & OPTS_TYPE_PT_HEX)
+      if (opts_type & OPTS_TYPE_MT_HEX)
       {
         ignore_next = true;
       }
@@ -1218,7 +1218,6 @@ int mask_ctx_update_loop (hashcat_ctx_t *hashcat_ctx)
   status_ctx_t         *status_ctx         = hashcat_ctx->status_ctx;
   user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
   user_options_t       *user_options       = hashcat_ctx->user_options;
-
 
   if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)
   {
@@ -1395,23 +1394,24 @@ int mask_ctx_update_loop (hashcat_ctx_t *hashcat_ctx)
 
 int mask_ctx_init (hashcat_ctx_t *hashcat_ctx)
 {
-  const hashconfig_t         *hashconfig          = hashcat_ctx->hashconfig;
-  const user_options_extra_t *user_options_extra  = hashcat_ctx->user_options_extra;
-  const user_options_t       *user_options        = hashcat_ctx->user_options;
-  mask_ctx_t                 *mask_ctx            = hashcat_ctx->mask_ctx;
+  const hashconfig_t         *hashconfig         = hashcat_ctx->hashconfig;
+  const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
+  const user_options_t       *user_options       = hashcat_ctx->user_options;
+  mask_ctx_t                 *mask_ctx           = hashcat_ctx->mask_ctx;
 
   mask_ctx->enabled = false;
 
-  if (user_options->hash_info      == true) return 0;
-  if (user_options->left           == true) return 0;
-  if (user_options->backend_info   == true) return 0;
-  if (user_options->show           == true) return 0;
-  if (user_options->usage          == true) return 0;
-  if (user_options->version        == true) return 0;
+  if (user_options->usage         > 0)    return 0;
+  if (user_options->backend_info  > 0)    return 0;
 
-  if (user_options->attack_mode == ATTACK_MODE_STRAIGHT) return 0;
-  if (user_options->attack_mode == ATTACK_MODE_COMBI)    return 0;
-  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)  return 0;
+  if (user_options->hash_info    == true) return 0;
+  if (user_options->left         == true) return 0;
+  if (user_options->show         == true) return 0;
+  if (user_options->version      == true) return 0;
+
+  if (user_options->attack_mode  == ATTACK_MODE_ASSOCIATION) return 0;
+  if (user_options->attack_mode  == ATTACK_MODE_STRAIGHT)    return 0;
+  if (user_options->attack_mode  == ATTACK_MODE_COMBI)       return 0;
 
   mask_ctx->enabled = true;
 
@@ -1443,6 +1443,14 @@ int mask_ctx_init (hashcat_ctx_t *hashcat_ctx)
   if (user_options->custom_charset_2) { if (mp_setup_usr (hashcat_ctx, mask_ctx->mp_sys, mask_ctx->mp_usr, user_options->custom_charset_2, 1) == -1) return -1; }
   if (user_options->custom_charset_3) { if (mp_setup_usr (hashcat_ctx, mask_ctx->mp_sys, mask_ctx->mp_usr, user_options->custom_charset_3, 2) == -1) return -1; }
   if (user_options->custom_charset_4) { if (mp_setup_usr (hashcat_ctx, mask_ctx->mp_sys, mask_ctx->mp_usr, user_options->custom_charset_4, 3) == -1) return -1; }
+
+  if (user_options->benchmark == true)
+  {
+    if (hashconfig->benchmark_charset != NULL)
+    {
+      if (mp_setup_usr (hashcat_ctx, mask_ctx->mp_sys, mask_ctx->mp_usr, hashconfig->benchmark_charset, 0) == -1) return -1;
+    }
+  }
 
   if (user_options->attack_mode == ATTACK_MODE_BF)
   {

@@ -13,7 +13,7 @@
 #if defined (__APPLE__)
 #include <IOKit/IOKitLib.h>
 
-UInt32 hm_IOKIT_strtoul (char *str, int size, int base)
+UInt32 hm_IOKIT_strtoul (const char *str, int size, int base)
 {
   int i;
 
@@ -27,7 +27,7 @@ UInt32 hm_IOKIT_strtoul (char *str, int size, int base)
     }
     else
     {
-      total += (unsigned char)(str[i] << (size - 1 - i) * 8);
+      total += (unsigned char) (str[i] << (size - 1 - i) * 8);
     }
   }
   return total;
@@ -37,7 +37,7 @@ void hm_IOKIT_ultostr (char *str, UInt32 val)
 {
   str[0] = '\0';
 
-  sprintf (str, "%c%c%c%c", (unsigned int)(val >> 24), (unsigned int)(val >> 16), (unsigned int)(val >> 8), (unsigned int)(val));
+  snprintf (str, 5, "%c%c%c%c", (unsigned int) (val >> 24), (unsigned int) (val >> 16), (unsigned int) (val >> 8), (unsigned int) (val));
 }
 
 kern_return_t hm_IOKIT_SMCOpen (void *hashcat_ctx, io_connect_t *conn)
@@ -68,7 +68,7 @@ kern_return_t hm_IOKIT_SMCOpen (void *hashcat_ctx, io_connect_t *conn)
     return 1;
   }
 
-  result = IOServiceOpen (device, mach_task_self(), 0, conn);
+  result = IOServiceOpen (device, mach_task_self (), 0, conn);
 
   IOObjectRelease (device);
 
@@ -124,7 +124,7 @@ kern_return_t hm_IOKIT_SMCReadKey (UInt32Char_t key, SMCVal_t *val, io_connect_t
 
   if (hm_IOKIT_SMCCall (KERNEL_INDEX_SMC, &inData, &outData, conn) != kIOReturnSuccess) return 1;
 
-  memcpy(val->bytes, outData.bytes, sizeof(outData.bytes));
+  memcpy (val->bytes, outData.bytes, sizeof (outData.bytes));
 
   return kIOReturnSuccess;
 }
@@ -145,9 +145,9 @@ int hm_IOKIT_SMCGetSensorGraphicHot (void *hashcat_ctx)
 
     if (val.dataSize > 0)
     {
-      if (strcmp(val.dataType, DATATYPE_UINT8) == 0)
+      if (strcmp (val.dataType, DATATYPE_UINT8) == 0)
       {
-        alarm = hm_IOKIT_strtoul ((char *)val.bytes, val.dataSize, 10);
+        alarm = hm_IOKIT_strtoul ((char *) val.bytes, val.dataSize, 10);
       }
     }
 
@@ -171,7 +171,7 @@ int hm_IOKIT_SMCGetTemperature (void *hashcat_ctx, char *key, double *temp)
   {
     if (val.dataSize > 0)
     {
-      if (strcmp(val.dataType, DATATYPE_SP78) == 0)
+      if (strcmp (val.dataType, DATATYPE_SP78) == 0)
       {
         // convert sp78 value to temperature
         int intValue = val.bytes[0] * 256 + (unsigned char)val.bytes[1];
@@ -200,17 +200,17 @@ bool hm_IOKIT_SMCGetFanRPM (char *key, io_connect_t conn, float *ret)
   {
     if (val.dataSize > 0)
     {
-      if (strcmp(val.dataType, DATATYPE_FLT) == 0)
+      if (strcmp (val.dataType, DATATYPE_FLT) == 0)
       {
         *ret = *(float *) val.bytes;
 
         return true;
       }
 
-      if (strcmp(val.dataType, DATATYPE_FPE2) == 0)
+      if (strcmp (val.dataType, DATATYPE_FPE2) == 0)
       {
         // convert fpe2 value to RPM
-        *ret = ntohs (*(UInt16*)val.bytes) / 4.0;
+        *ret = ntohs (*(UInt16*) val.bytes) / 4.0;
 
         return true;
       }
@@ -221,6 +221,66 @@ bool hm_IOKIT_SMCGetFanRPM (char *key, io_connect_t conn, float *ret)
   *ret = -1.f;
 
   return false;
+}
+
+int hm_IOKIT_get_utilization_current (void *hashcat_ctx, int *utilization)
+{
+  bool rc = false;
+
+  io_iterator_t iterator;
+
+  CFMutableDictionaryRef matching = IOServiceMatching ("IOAccelerator");
+
+  if (IOServiceGetMatchingServices (kIOMasterPortDefault, matching, &iterator) != kIOReturnSuccess)
+  {
+    event_log_error (hashcat_ctx, "IOServiceGetMatchingServices(): failure");
+
+    return rc;
+  }
+
+  io_registry_entry_t regEntry;
+
+  while ((regEntry = IOIteratorNext (iterator)))
+  {
+    // Put this services object into a dictionary object.
+    CFMutableDictionaryRef serviceDictionary;
+
+    if (IORegistryEntryCreateCFProperties (regEntry, &serviceDictionary, kCFAllocatorDefault, kNilOptions) != kIOReturnSuccess)
+    {
+      // Service dictionary creation failed.
+      IOObjectRelease (regEntry);
+
+      continue;
+    }
+
+    CFMutableDictionaryRef perf_properties = (CFMutableDictionaryRef) CFDictionaryGetValue (serviceDictionary, CFSTR ("PerformanceStatistics"));
+
+    if (perf_properties)
+    {
+      static ssize_t gpuCoreUtil = 0;
+
+      const void *gpuCoreUtilization = CFDictionaryGetValue (perf_properties, CFSTR ("Device Utilization %"));
+
+      if (gpuCoreUtilization != NULL)
+      {
+        CFNumberGetValue (gpuCoreUtilization, kCFNumberSInt64Type, &gpuCoreUtil);
+
+        *utilization = gpuCoreUtil;
+
+        rc = true;
+      }
+    }
+
+    CFRelease (serviceDictionary);
+
+    IOObjectRelease (regEntry);
+
+    if (rc == true) break;
+  }
+
+  IOObjectRelease (iterator);
+
+  return rc;
 }
 
 int hm_IOKIT_get_fan_speed_current (void *hashcat_ctx, char *fan_speed_buf)
@@ -241,6 +301,9 @@ int hm_IOKIT_get_fan_speed_current (void *hashcat_ctx, char *fan_speed_buf)
 
     if (totalFans <= 0) return -1;
 
+    // limit totalFans to 10
+    if (totalFans > 10) totalFans = 10;
+
     char tmp_buf[16];
 
     for (int i = 0; i < totalFans; i++)
@@ -250,12 +313,12 @@ int hm_IOKIT_get_fan_speed_current (void *hashcat_ctx, char *fan_speed_buf)
       float maximum_speed = 0.0f;
 
       memset (&key, 0, sizeof (UInt32Char_t));
-      sprintf (key, "F%dAc", i);
+      snprintf (key, 5, "F%dAc", i);
       hm_IOKIT_SMCGetFanRPM (key, iokit->conn, &actual_speed);
       if (actual_speed < 0.f) continue;
 
       memset (&key, 0, sizeof (UInt32Char_t));
-      sprintf (key, "F%dMx", i);
+      snprintf (key, 5, "F%dMx", i);
       hm_IOKIT_SMCGetFanRPM (key, iokit->conn, &maximum_speed);
       if (maximum_speed < 0.f) continue;
 

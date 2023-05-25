@@ -6,12 +6,12 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md4.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md4.cl)
 #endif
 
 typedef struct netntlm
@@ -354,7 +354,7 @@ CONSTANT_VK u32a c_skb[8][64] =
 #define BOX(i,n,S) make_u32x ((S)[(n)][(i).s0], (S)[(n)][(i).s1], (S)[(n)][(i).s2], (S)[(n)][(i).s3], (S)[(n)][(i).s4], (S)[(n)][(i).s5], (S)[(n)][(i).s6], (S)[(n)][(i).s7], (S)[(n)][(i).s8], (S)[(n)][(i).s9], (S)[(n)][(i).sa], (S)[(n)][(i).sb], (S)[(n)][(i).sc], (S)[(n)][(i).sd], (S)[(n)][(i).se], (S)[(n)][(i).sf])
 #endif
 
-DECLSPEC void _des_crypt_encrypt (u32x *iv, u32x *data, u32x *Kc, u32x *Kd, SHM_TYPE u32 (*s_SPtrans)[64])
+DECLSPEC void _des_crypt_encrypt (PRIVATE_AS u32x *iv, PRIVATE_AS u32x *data, PRIVATE_AS u32x *Kc, PRIVATE_AS u32x *Kd, SHM_TYPE u32 (*s_SPtrans)[64])
 {
   u32x r = data[0];
   u32x l = data[1];
@@ -396,7 +396,7 @@ DECLSPEC void _des_crypt_encrypt (u32x *iv, u32x *data, u32x *Kc, u32x *Kd, SHM_
   iv[1] = r;
 }
 
-DECLSPEC void _des_crypt_keysetup (u32x c, u32x d, u32x *Kc, u32x *Kd, SHM_TYPE u32 (*s_skb)[64])
+DECLSPEC void _des_crypt_keysetup (u32x c, u32x d, PRIVATE_AS u32x *Kc, PRIVATE_AS u32x *Kd, SHM_TYPE u32 (*s_skb)[64])
 {
   u32x tt;
 
@@ -465,7 +465,7 @@ DECLSPEC void _des_crypt_keysetup (u32x c, u32x d, u32x *Kc, u32x *Kd, SHM_TYPE 
   }
 }
 
-DECLSPEC void transform_netntlmv1_key (const u32x w0, const u32x w1, u32x *out)
+DECLSPEC void transform_netntlmv1_key (const u32x w0, const u32x w1, PRIVATE_AS u32x *out)
 {
   u32x t[8];
 
@@ -549,7 +549,7 @@ KERNEL_FQ void m05500_m04 (KERN_ATTR_BASIC ())
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -573,15 +573,15 @@ KERNEL_FQ void m05500_m04 (KERN_ATTR_BASIC ())
    * salt
    */
 
-  const u32 s0 = salt_bufs[SALT_POS].salt_buf[0];
-  const u32 s1 = salt_bufs[SALT_POS].salt_buf[1];
-  const u32 s2 = salt_bufs[SALT_POS].salt_buf[2];
+  const u32 s0 = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  const u32 s1 = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  const u32 s2 = salt_bufs[SALT_POS_HOST].salt_buf[2];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -619,7 +619,7 @@ KERNEL_FQ void m05500_m04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -715,15 +715,15 @@ KERNEL_FQ void m05500_m04 (KERN_ATTR_BASIC ())
     MD4_STEP (MD4_H , a, b, c, d, w0_t[3], MD4C02, MD4S20);
     MD4_STEP (MD4_H , d, a, b, c, w2_t[3], MD4C02, MD4S21);
 
-    if (MATCHES_NONE_VS (((d + MD4M_D) >> 16), s2)) continue;
+    if (MATCHES_NONE_VS (((d + make_u32x (MD4M_D)) >> 16), s2)) continue;
 
     MD4_STEP (MD4_H , c, d, a, b, w1_t[3], MD4C02, MD4S22);
     MD4_STEP (MD4_H , b, c, d, a, w3_t[3], MD4C02, MD4S23);
 
-    a += MD4M_A;
-    b += MD4M_B;
-    c += MD4M_C;
-    d += MD4M_D;
+    a += make_u32x (MD4M_A);
+    b += make_u32x (MD4M_B);
+    c += make_u32x (MD4M_C);
+    d += make_u32x (MD4M_D);
 
     /**
      * DES1
@@ -824,7 +824,7 @@ KERNEL_FQ void m05500_s04 (KERN_ATTR_BASIC ())
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -848,9 +848,9 @@ KERNEL_FQ void m05500_s04 (KERN_ATTR_BASIC ())
    * salt
    */
 
-  const u32 s0 = salt_bufs[SALT_POS].salt_buf[0];
-  const u32 s1 = salt_bufs[SALT_POS].salt_buf[1];
-  const u32 s2 = salt_bufs[SALT_POS].salt_buf[2];
+  const u32 s0 = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  const u32 s1 = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  const u32 s2 = salt_bufs[SALT_POS_HOST].salt_buf[2];
 
   /**
    * digest
@@ -858,17 +858,17 @@ KERNEL_FQ void m05500_s04 (KERN_ATTR_BASIC ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -906,7 +906,7 @@ KERNEL_FQ void m05500_s04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -1002,15 +1002,15 @@ KERNEL_FQ void m05500_s04 (KERN_ATTR_BASIC ())
     MD4_STEP (MD4_H , a, b, c, d, w0_t[3], MD4C02, MD4S20);
     MD4_STEP (MD4_H , d, a, b, c, w2_t[3], MD4C02, MD4S21);
 
-    if (MATCHES_NONE_VS (((d + MD4M_D) >> 16), s2)) continue;
+    if (MATCHES_NONE_VS (((d + make_u32x (MD4M_D)) >> 16), s2)) continue;
 
     MD4_STEP (MD4_H , c, d, a, b, w1_t[3], MD4C02, MD4S22);
     MD4_STEP (MD4_H , b, c, d, a, w3_t[3], MD4C02, MD4S23);
 
-    a += MD4M_A;
-    b += MD4M_B;
-    c += MD4M_C;
-    d += MD4M_D;
+    a += make_u32x (MD4M_A);
+    b += make_u32x (MD4M_B);
+    c += make_u32x (MD4M_C);
+    d += make_u32x (MD4M_D);
 
     /**
      * DES1

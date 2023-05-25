@@ -7,13 +7,13 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 // we just double this buffer so we can safe the & 0xff ;)
@@ -99,7 +99,7 @@ CONSTANT_VK u32a lotus_magic_table[512] =
 #define BOX1(S,i) make_u32x ((S)[(i).s0], (S)[(i).s1], (S)[(i).s2], (S)[(i).s3], (S)[(i).s4], (S)[(i).s5], (S)[(i).s6], (S)[(i).s7], (S)[(i).s8], (S)[(i).s9], (S)[(i).sa], (S)[(i).sb], (S)[(i).sc], (S)[(i).sd], (S)[(i).se], (S)[(i).sf])
 #endif
 
-DECLSPEC void lotus_mix (u32 *in, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void lotus_mix (PRIVATE_AS u32 *in, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32 p = 0;
 
@@ -122,7 +122,7 @@ DECLSPEC void lotus_mix (u32 *in, LOCAL_AS u32 *s_lotus_magic_table)
   }
 }
 
-DECLSPEC void lotus_transform_password (const u32 *in, u32x *out, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void lotus_transform_password (PRIVATE_AS const u32 *in, PRIVATE_AS u32x *out, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32 t = out[3] >> 24;
 
@@ -140,7 +140,7 @@ DECLSPEC void lotus_transform_password (const u32 *in, u32x *out, LOCAL_AS u32 *
   }
 }
 
-DECLSPEC void pad (u32 *w, const u32 len)
+DECLSPEC void pad (PRIVATE_AS u32 *w, const u32 len)
 {
   const u32 val = 16 - len;
 
@@ -219,7 +219,7 @@ DECLSPEC void pad (u32 *w, const u32 len)
   }
 }
 
-DECLSPEC void mdtransform_norecalc (u32 *state, const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform_norecalc (PRIVATE_AS u32 *state, PRIVATE_AS const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32 x[12];
 
@@ -244,14 +244,14 @@ DECLSPEC void mdtransform_norecalc (u32 *state, const u32x *block, LOCAL_AS u32 
   state[3] = x[3];
 }
 
-DECLSPEC void mdtransform (u32 *state, u32x *checksum, const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform (PRIVATE_AS u32 *state, PRIVATE_AS u32x *checksum, PRIVATE_AS const u32x *block, LOCAL_AS u32 *s_lotus_magic_table)
 {
   mdtransform_norecalc (state, block, s_lotus_magic_table);
 
   lotus_transform_password (block, checksum, s_lotus_magic_table);
 }
 
-DECLSPEC void domino_big_md (const u32 *saved_key, const u32 size, u32x *state, LOCAL_AS u32 *s_lotus_magic_table)
+DECLSPEC void domino_big_md (PRIVATE_AS const u32 *saved_key, const u32 size, PRIVATE_AS u32x *state, LOCAL_AS u32 *s_lotus_magic_table)
 {
   u32 checksum[4];
 
@@ -288,7 +288,7 @@ KERNEL_FQ void m08600_mxx (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -300,7 +300,7 @@ KERNEL_FQ void m08600_mxx (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw_t tmp = PASTE_PW;
 
@@ -352,7 +352,7 @@ KERNEL_FQ void m08600_sxx (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -366,17 +366,17 @@ KERNEL_FQ void m08600_sxx (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw_t tmp = PASTE_PW;
 

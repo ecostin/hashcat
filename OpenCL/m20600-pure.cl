@@ -6,18 +6,18 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct omt_sha256_tmp
 {
@@ -33,7 +33,7 @@ KERNEL_FQ void m20600_init (KERN_ATTR_TMPS (omt_sha256_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * init
@@ -43,7 +43,7 @@ KERNEL_FQ void m20600_init (KERN_ATTR_TMPS (omt_sha256_tmp_t))
 
   sha256_init (&sha256_ctx);
 
-  sha256_update_global_swap (&sha256_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha256_update_global_swap (&sha256_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   sha256_update_global_swap (&sha256_ctx, pws[gid].i, pws[gid].pw_len);
 
@@ -67,7 +67,7 @@ KERNEL_FQ void m20600_loop (KERN_ATTR_TMPS (omt_sha256_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   /**
    * init
@@ -102,7 +102,7 @@ KERNEL_FQ void m20600_loop (KERN_ATTR_TMPS (omt_sha256_tmp_t))
   w3[2] = 0;
   w3[3] = 32 * 8;
 
-  for (u32 i = 0; i < loop_cnt; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     w0[0] = digest[0];
     w0[1] = digest[1];
@@ -144,7 +144,7 @@ KERNEL_FQ void m20600_comp (KERN_ATTR_TMPS (omt_sha256_tmp_t))
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest

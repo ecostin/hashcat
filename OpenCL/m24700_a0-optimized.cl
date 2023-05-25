@@ -6,14 +6,14 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
 KERNEL_FQ void m24700_m04 (KERN_ATTR_RULES ())
@@ -24,7 +24,7 @@ KERNEL_FQ void m24700_m04 (KERN_ATTR_RULES ())
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -48,7 +48,7 @@ KERNEL_FQ void m24700_m04 (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -137,10 +137,10 @@ KERNEL_FQ void m24700_m04 (KERN_ATTR_RULES ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     w0[0] = a;
     w0[1] = b & 0xff; w0[1] |= 0x8000;
@@ -256,7 +256,7 @@ KERNEL_FQ void m24700_s04 (KERN_ATTR_RULES ())
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -282,8 +282,8 @@ KERNEL_FQ void m24700_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
     0,
     0
   };
@@ -292,7 +292,7 @@ KERNEL_FQ void m24700_s04 (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -381,10 +381,10 @@ KERNEL_FQ void m24700_s04 (KERN_ATTR_RULES ())
     MD5_STEP (MD5_I , c, d, a, b, w0[2], MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w2[1], MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     w0[0] = a;
     w0[1] = b & 0xff; w0[1] |= 0x8000;

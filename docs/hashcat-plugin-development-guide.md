@@ -225,7 +225,7 @@ There is no need to implement any black magic into the module. A module covers e
 * Hook functions
 * JiT compiler options
 
-Namely, these configurations take place in a variety of optional functions that you provide in every module. There is a few mandatory functions which need to be implemented:
+Namely, these configurations take place in a variety of optional functions that you provide in every module. There are a few mandatory functions which need to be implemented:
 
 * module_init()
 * module_hash_decode()
@@ -433,6 +433,10 @@ The final hash should go to line_buf[] array and the length of the data in this 
 
 Note: the general rule is that the kernel code should not do any unnecessary repetition of data manipulation (e.g byte swaps etc) because it should run as fast as possible. Instead, the encoder and decoder are host functions that are normally only executed very rarely - and therefore it is not a problem if they need to change the data a little bit to pre-compute, or adapt the data to make it look nice in the output.
 
+### module_hash_decode_postprocess() ###
+
+This module can be used when you have certain configuration items of a hash that you want to override with a command line parameter. A good example is the --hccapx-message-pair, where the user can add additional filter criteria so that Hashcat doesn't load a specific set of hashes from the hash list.
+
 ### module_opts_type() ###
 
 This configuration item is a bitmask field and is very similar to the module_opti_type() function. The main difference is that here you configure general options of the workflow and not optimization specific settings. As always, the list of flags can be found here: `include/types.h`. The following list contains the flags currently supported:
@@ -452,7 +456,7 @@ This configuration item is a bitmask field and is very similar to the module_opt
 * OPTS_TYPE_PT_ALWAYS_ASCII: This option prevents hashcat to automatically convert a password into the $HEX[...] encoding type. This automatic conversion is typically performed if the password itself contains the same character as the hash line separator character.
 * OPTS_TYPE_PT_ALWAYS_HEXIFY: This option forces all the cracked passwords to be written always in hex. In this case neither "$HEX[", nor "]", is added.
 * OPTS_TYPE_PT_LM: Special handling for LM passwords: all lower, 7 max, ...
-* OPTS_TYPE_PT_HEX: Assume that all input data like wordlist and masks are always given in hex
+* OPTS_TYPE_PT_HEX: Assume that wordlist is given in hex.
 * OPTS_TYPE_ST_UTF16LE: Same as OPTS_TYPE_PT_UTF16LE but applied on the salt buffer.
 * OPTS_TYPE_ST_UTF16BE: Same as OPTS_TYPE_PT_UTF16BE but applied on the salt buffer.
 * OPTS_TYPE_ST_UPPER: Same as OPTS_TYPE_PT_UPPER but applied on the salt buffer.
@@ -464,6 +468,7 @@ This configuration item is a bitmask field and is very similar to the module_opt
 * OPTS_TYPE_ST_ADDBITS15: Same as OPTS_TYPE_PT_ADDBITS15 but applied on the salt buffer.
 * OPTS_TYPE_ST_HEX: Same as OPTS_TYPE_PT_HEX but applied on the salt buffer.
 * OPTS_TYPE_ST_BASE64: Same as OPTS_TYPE_ST_HEX but using base64 encoding.
+* OPTS_TYPE_MT_HEX: Assume that mask is always given in hex.
 * OPTS_TYPE_HASH_COPY: This copies the original input hash line as it is into a buffer so that it can be used later. This is required if the original input hash line ships with the same data which is not copied into salt_t or esalt buffer because it is overhead data which is not used in any way. The hash line is copied to the buffer hash_info->orighash and can be used from the encoder function by simply returning hash_info->orighash. Please do not abuse this functionality, for two reasons: First, by being able to reconstruct the original hash line from only the hashcat data we verify that the correct amount of data has been stored in the hashcat memory structures (IOW, it is a good verification process). Second, the host memory requirement for saving this data increases drastically.
 * OPTS_TYPE_HASH_SPLIT: This needs to be used if the hash actually contains multiple hashes in the same hash line. A good example is the LM hash which is typically stored as a 128 bit hash, but actually is built on two 64 bit hashes.
 * OPTS_TYPE_LOOP_PREPARE: TBD
@@ -478,7 +483,7 @@ This configuration item is a bitmask field and is very similar to the module_opt
 * OPTS_TYPE_AUX3: See OPTS_TYPE_AUX1, but for a different branch.
 * OPTS_TYPE_AUX4: See OPTS_TYPE_AUX1, but for a different branch.
 * OPTS_TYPE_BINARY_HASHFILE: Use this in case your hash file contains binary data. As you can imagine, a bit of special handling is required. For normal hash files with only text data, hashcat reads the file line by line and for each line the decoder function is called. For binary data you can decide yourself if you want to use hashcat to load the binary data and present it in the line_buf[] buffer or if you want to iterate through the binary data yourself. If you select the first variant (default) this has the disadvantage that you can only load a single hash. If you want to load multiple hashes from binary data, then you need to understand that it is unknown to hashcat how to iterate through different "hashes" because it cannot know the binary structure. However, hashcat needs to know the number of hashes that are included in the binary file in order to allocate the required memory structure. In the first step, hashcat calls the module function module_hash_binary_count() in which you need to return the number of hashes which will be read from this particular binary data. In a second step, the module function module_hash_binary_parse() is called in which you have to implement the logic to iterate through the different hashes yourself. In theory there is no need to provide module_hash_decode() because it is not called by hashcat, however in the spirit of good programming we recommend to stick to this function for binary hashes as well. Use the module_hash_binary_parse() to load the binary data and prepare the chunks and then call module_hash_decode() and provide the hash. Then regularly parse the data in module_hash_decode() and copy its data to hashcat structures. For easy single hash loading of binary data you can take a look at `src/modules/module_05200.c` and for a multi hash example take a look at `src/modules/module_02500.c`. Note that for the WPA example there is also a lot of other functions involved to deal with binary data, such as writing the binary data in case a hash was cracked.
-* OPTS_TYPE_BINARY_HASHFILE_OPTIONAL: TBD
+* OPTS_TYPE_BINARY_HASHFILE_OPTIONAL: This option can be used in combination with OPTS_TYPE_BINARY_HASHFILE but is there for backward compatibility. See -m 22000 as an example. This mode can have hashfiles either in binary or in plaintext. In this situation you need the binary decoder in order to decode the binary data and then re encode it  so that you can load it in the plaintext decoder. This also enables you to have hashes on the command line, even if the mode has the OPTS_TYPE_BINARY_HASHFILE option set.
 * OPTS_TYPE_PT_ADD02: Same as OPTS_TYPE_PT_ADD01 but use 0x02 byte instead.
 * OPTS_TYPE_KEYBOARD_MAPPING: there are a few algorithms which support the remapping of characters from inside the kernel. The configuration of the mapping can be loaded from the hashcat host binary on startup, thus it is required to set this option to let the hashcat host binary know that your kernel will support this functionality. Please read `docs/keyboard-layout-mapping.md` for a detailed explanation.
 * OPTS_TYPE_DEEP_COMP_KERNEL: This option is used for algorithms that use a salt which is related but unlinked from the esalt. Use this in case you want the hashcat host binary to iterate through the different esalts in the _comp kernel for you. This is a very complex scenario which requires a detailed explanation. Please refer to the section "Data Structures: salt_t vs esalt" at the end of this documentation. A good example is `src/modules/module_22000.c`.
@@ -523,6 +528,18 @@ It is unclear to hashcat if this buffer will be handled in a thread-safe fashion
 The module developer does not have to care about managing the multiple instances but has to provide the size of the buffer to be allocated. For this, they have to use the module_hook_extra_param_size() function. The buffer in *hook_extra_param is zeroed and ready to be written when module_hook_extra_param_init() is called. On startup, hashcat will call module_hook_extra_param_init() that many times as there are hook threads each time providing the module function with a new buffer. The same logic applies to module_hook_extra_param_term() on shutdown. Hashcat will also free the memory on shutdown.
 
 A good example for this is: `src/modules/module_11600.c` and `src/modules/module_23800.c`
+
+### module_benchmark_mask() ###
+
+This is a mask that is hash mode specific and is normally used whenever the mask that should be used in benchmarks is of a very specific length and/or pattern. This could be a dynamic string, but in general try to use a variable called `BENCHMARK_MASK`.
+
+### module_benchmark_charset() ###
+
+This is a custom charset setting (like `--custom-charset1`) that always needs to be synchronized with the default benchmark mask (see `module_benchmark_mask ()`, or the default one if not set). This setting does only affect `--benchmark` and you can use this charset within your mask with `?1`. Try to use a variable called `BENCHMARK_CHARSET` for this string whenever possible.
+
+### module_benchmark_salt() ###
+
+This is a salt that is hash mode specific and allows you to set a `salt_t` structure dynamically. This could sometimes be needed if custom iteration counts or salt lengths are needed for a specific hash mode.
 
 ## Kernel ##
 
@@ -793,7 +810,7 @@ One very unique feature is that the tokenizer allows you to have both dynamic le
 The first step after declaring the tokenizer context buffer is to create its configuration. There is just one mandatory parameter and a maximum of 128 optional configuration items (columns). The mandatory configuration item needs to be set to the number of columns/fields which the hash line includes. Note that this is a fixed value. For more complex hash lines with a dynamic column count you need to create multiple tokenizer instances (e.g. use a second configuration, if the first one failed), but in most of the times this is not required.
 
 ```
-token_t token;
+hc_token_t token;
 
 token.token_cnt = 1;
 ```

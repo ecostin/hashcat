@@ -6,15 +6,15 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #else
 #include "inc_vendor.h"
 #include "inc_types.h"
@@ -27,8 +27,8 @@
 #include "inc_cipher_aes.h"
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct wpa_eapol
 {
@@ -62,7 +62,7 @@ typedef struct wpa_pbkdf2_tmp
 
 } wpa_pbkdf2_tmp_t;
 
-DECLSPEC void make_kn (u32 *k)
+DECLSPEC void make_kn (PRIVATE_AS u32 *k)
 {
   u32 kl[4];
   u32 kr[4];
@@ -92,7 +92,7 @@ DECLSPEC void make_kn (u32 *k)
   k[3] ^= c * 0x87000000;
 }
 
-DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha1_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -136,7 +136,7 @@ KERNEL_FQ void m02500_init (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha1_hmac_ctx_t sha1_hmac_ctx0;
 
@@ -154,7 +154,7 @@ KERNEL_FQ void m02500_init (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   tmps[gid].opad[3] = sha1_hmac_ctx0.opad.h[3];
   tmps[gid].opad[4] = sha1_hmac_ctx0.opad.h[4];
 
-  sha1_hmac_update_global_swap (&sha1_hmac_ctx0, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha1_hmac_update_global_swap (&sha1_hmac_ctx0, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   u32 w0[4];
   u32 w1[4];
@@ -240,7 +240,7 @@ KERNEL_FQ void m02500_loop (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[5];
   u32x opad[5];
@@ -274,7 +274,7 @@ KERNEL_FQ void m02500_loop (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   out[3] = packv (tmps, out, gid, 3);
   out[4] = packv (tmps, out, gid, 4);
 
-  for (u32 j = 0; j < loop_cnt; j++)
+  for (u32 j = 0; j < LOOP_CNT; j++)
   {
     u32x w0[4];
     u32x w1[4];
@@ -333,7 +333,7 @@ KERNEL_FQ void m02500_loop (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   out[3] = packv (tmps, out, gid, 8);
   out[4] = packv (tmps, out, gid, 9);
 
-  for (u32 j = 0; j < loop_cnt; j++)
+  for (u32 j = 0; j < LOOP_CNT; j++)
   {
     u32x w0[4];
     u32x w1[4];
@@ -388,7 +388,7 @@ KERNEL_FQ void m02500_aux1 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 out0[4];
   u32 out1[4];
@@ -402,11 +402,14 @@ KERNEL_FQ void m02500_aux1 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   out1[2] = tmps[gid].out[6];
   out1[3] = tmps[gid].out[7];
 
-  const u32 digest_pos = loop_pos;
+  const u32 digest_pos = LOOP_POS;
 
-  const u32 digest_cur = DIGESTS_OFFSET + digest_pos;
+  const u32 digest_cur = DIGESTS_OFFSET_HOST + digest_pos;
 
   GLOBAL_AS const wpa_eapol_t *wpa_eapol = &esalt_bufs[digest_cur];
+
+  // this can occur on -a 9 because we are ignoring module_deep_comp_kernel()
+  if (wpa_eapol->keyver != 1) return;
 
   u32 pke[32];
 
@@ -562,7 +565,7 @@ KERNEL_FQ void m02500_aux1 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
       {
         if (hc_atomic_inc (&hashes_shown[digest_cur]) == 0)
         {
-          mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, digest_pos, digest_cur, gid, 0, 0, 0);
+          mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, digest_pos, digest_cur, gid, 0, 0, 0);
         }
       }
     }
@@ -573,7 +576,7 @@ KERNEL_FQ void m02500_aux2 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 out0[4];
   u32 out1[4];
@@ -587,11 +590,14 @@ KERNEL_FQ void m02500_aux2 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   out1[2] = tmps[gid].out[6];
   out1[3] = tmps[gid].out[7];
 
-  const u32 digest_pos = loop_pos;
+  const u32 digest_pos = LOOP_POS;
 
-  const u32 digest_cur = DIGESTS_OFFSET + digest_pos;
+  const u32 digest_cur = DIGESTS_OFFSET_HOST + digest_pos;
 
   GLOBAL_AS const wpa_eapol_t *wpa_eapol = &esalt_bufs[digest_cur];
+
+  // this can occur on -a 9 because we are ignoring module_deep_comp_kernel()
+  if (wpa_eapol->keyver != 2) return;
 
   u32 pke[32];
 
@@ -742,7 +748,7 @@ KERNEL_FQ void m02500_aux2 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
       {
         if (hc_atomic_inc (&hashes_shown[digest_cur]) == 0)
         {
-          mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, digest_pos, digest_cur, gid, 0, 0, 0);
+          mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, digest_pos, digest_cur, gid, 0, 0, 0);
         }
       }
     }
@@ -789,7 +795,7 @@ KERNEL_FQ void m02500_aux3 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 out0[4];
   u32 out1[4];
@@ -803,11 +809,14 @@ KERNEL_FQ void m02500_aux3 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
   out1[2] = tmps[gid].out[6];
   out1[3] = tmps[gid].out[7];
 
-  const u32 digest_pos = loop_pos;
+  const u32 digest_pos = LOOP_POS;
 
-  const u32 digest_cur = DIGESTS_OFFSET + digest_pos;
+  const u32 digest_cur = DIGESTS_OFFSET_HOST + digest_pos;
 
   GLOBAL_AS const wpa_eapol_t *wpa_eapol = &esalt_bufs[digest_cur];
+
+  // this can occur on -a 9 because we are ignoring module_deep_comp_kernel()
+  if (wpa_eapol->keyver != 3) return;
 
   u32 pke[32];
 
@@ -1028,7 +1037,7 @@ KERNEL_FQ void m02500_aux3 (KERN_ATTR_TMPS_ESALT (wpa_pbkdf2_tmp_t, wpa_eapol_t)
       {
         if (hc_atomic_inc (&hashes_shown[digest_cur]) == 0)
         {
-          mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, digest_pos, digest_cur, gid, 0, 0, 0);
+          mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, digest_pos, digest_cur, gid, 0, 0, 0);
         }
       }
     }

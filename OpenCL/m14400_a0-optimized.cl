@@ -4,14 +4,14 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -26,7 +26,7 @@
 #define uint_to_hex_lower8_le(i) make_u32x (l_bin2asc[(i).s0], l_bin2asc[(i).s1], l_bin2asc[(i).s2], l_bin2asc[(i).s3], l_bin2asc[(i).s4], l_bin2asc[(i).s5], l_bin2asc[(i).s6], l_bin2asc[(i).s7], l_bin2asc[(i).s8], l_bin2asc[(i).s9], l_bin2asc[(i).sa], l_bin2asc[(i).sb], l_bin2asc[(i).sc], l_bin2asc[(i).sd], l_bin2asc[(i).se], l_bin2asc[(i).sf])
 #endif
 
-DECLSPEC void append_4 (const u32 offset, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 src_r0)
+DECLSPEC void append_4 (const u32 offset, PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 src_r0)
 {
   u32 tmp[2];
 
@@ -98,7 +98,7 @@ DECLSPEC void append_4 (const u32 offset, u32 *w0, u32 *w1, u32 *w2, u32 *w3, co
   }
 }
 
-DECLSPEC void shift_2 (u32 *w0, u32 *w1, u32 *w2, u32 *w3)
+DECLSPEC void shift_2 (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3)
 {
   w3[3] = w3[2] >> 16 | w3[3] << 16;
   w3[2] = w3[1] >> 16 | w3[2] << 16;
@@ -145,7 +145,7 @@ KERNEL_FQ void m14400_m04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -176,11 +176,11 @@ KERNEL_FQ void m14400_m04 (KERN_ATTR_RULES ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf0[1] = salt_bufs[SALT_POS].salt_buf[1];
-  salt_buf0[2] = salt_bufs[SALT_POS].salt_buf[2];
-  salt_buf0[3] = salt_bufs[SALT_POS].salt_buf[3];
-  salt_buf1[0] = salt_bufs[SALT_POS].salt_buf[4];
+  salt_buf0[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf0[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  salt_buf0[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  salt_buf0[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
+  salt_buf1[0] = salt_bufs[SALT_POS_HOST].salt_buf[4];
   salt_buf1[1] = 0;
   salt_buf1[2] = 0;
   salt_buf1[3] = 0;
@@ -215,7 +215,7 @@ KERNEL_FQ void m14400_m04 (KERN_ATTR_RULES ())
   salt_buf3[2] = hc_swap32_S (salt_buf3[2]);
   salt_buf3[3] = hc_swap32_S (salt_buf3[3]);
 
-  const u32 salt_len_orig = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len_orig = salt_bufs[SALT_POS_HOST].salt_len;
 
   const u32 salt_len_new = 2 + salt_len_orig + 2;
 
@@ -223,7 +223,7 @@ KERNEL_FQ void m14400_m04 (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -416,7 +416,7 @@ KERNEL_FQ void m14400_s04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -447,11 +447,11 @@ KERNEL_FQ void m14400_s04 (KERN_ATTR_RULES ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf0[1] = salt_bufs[SALT_POS].salt_buf[1];
-  salt_buf0[2] = salt_bufs[SALT_POS].salt_buf[2];
-  salt_buf0[3] = salt_bufs[SALT_POS].salt_buf[3];
-  salt_buf1[0] = salt_bufs[SALT_POS].salt_buf[4];
+  salt_buf0[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf0[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  salt_buf0[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  salt_buf0[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
+  salt_buf1[0] = salt_bufs[SALT_POS_HOST].salt_buf[4];
   salt_buf1[1] = 0;
   salt_buf1[2] = 0;
   salt_buf1[3] = 0;
@@ -486,7 +486,7 @@ KERNEL_FQ void m14400_s04 (KERN_ATTR_RULES ())
   salt_buf3[2] = hc_swap32_S (salt_buf3[2]);
   salt_buf3[3] = hc_swap32_S (salt_buf3[3]);
 
-  const u32 salt_len_orig = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len_orig = salt_bufs[SALT_POS_HOST].salt_len;
 
   const u32 salt_len_new = 2 + salt_len_orig + 2;
 
@@ -496,17 +496,17 @@ KERNEL_FQ void m14400_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };

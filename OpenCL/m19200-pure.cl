@@ -6,16 +6,16 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha512.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct qnx_sha512_tmp
 {
@@ -25,7 +25,7 @@ typedef struct qnx_sha512_tmp
 
 } qnx_sha512_tmp_t;
 
-DECLSPEC u32 sha512_update_128_qnxbug (sha512_ctx_t *ctx, u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *w4, u32 *w5, u32 *w6, u32 *w7, const int len, u32 sav)
+DECLSPEC u32 sha512_update_128_qnxbug (PRIVATE_AS sha512_ctx_t *ctx, PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, PRIVATE_AS u32 *w4, PRIVATE_AS u32 *w5, PRIVATE_AS u32 *w6, PRIVATE_AS u32 *w7, const int len, u32 sav)
 {
   const int pos = ctx->len & 127;
 
@@ -155,7 +155,7 @@ DECLSPEC u32 sha512_update_128_qnxbug (sha512_ctx_t *ctx, u32 *w0, u32 *w1, u32 
   return sav;
 }
 
-DECLSPEC u32 sha512_update_global_swap_qnxbug (sha512_ctx_t *ctx, GLOBAL_AS const u32 *w, const int len, u32 sav)
+DECLSPEC u32 sha512_update_global_swap_qnxbug (PRIVATE_AS sha512_ctx_t *ctx, GLOBAL_AS const u32 *w, const int len, u32 sav)
 {
   u32 w0[4];
   u32 w1[4];
@@ -311,7 +311,7 @@ DECLSPEC u32 sha512_update_global_swap_qnxbug (sha512_ctx_t *ctx, GLOBAL_AS cons
   return sav;
 }
 
-DECLSPEC void sha512_final_qnxbug (sha512_ctx_t *ctx, u32 sav)
+DECLSPEC void sha512_final_qnxbug (PRIVATE_AS sha512_ctx_t *ctx, u32 sav)
 {
   const int pos = ctx->len & 127;
 
@@ -372,7 +372,7 @@ KERNEL_FQ void m19200_init (KERN_ATTR_TMPS (qnx_sha512_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * init
@@ -382,7 +382,7 @@ KERNEL_FQ void m19200_init (KERN_ATTR_TMPS (qnx_sha512_tmp_t))
 
   sha512_init (&sha512_ctx);
 
-  sha512_update_global_swap (&sha512_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha512_update_global_swap (&sha512_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   sha512_update_global_swap (&sha512_ctx, pws[gid].i, pws[gid].pw_len);
 
@@ -398,12 +398,12 @@ KERNEL_FQ void m19200_loop (KERN_ATTR_TMPS (qnx_sha512_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha512_ctx_t sha512_ctx = tmps[gid].sha512_ctx;
   u32 sav = tmps[gid].sav;
 
-  for (u32 i = 0; i < loop_cnt; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     sav = sha512_update_global_swap_qnxbug (&sha512_ctx, pws[gid].i, pws[gid].pw_len, sav);
   }
@@ -421,7 +421,7 @@ KERNEL_FQ void m19200_comp (KERN_ATTR_TMPS (qnx_sha512_tmp_t))
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha512_ctx_t sha512_ctx = tmps[gid].sha512_ctx;
 

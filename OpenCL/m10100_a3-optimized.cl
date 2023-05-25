@@ -6,18 +6,71 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
+
+DECLSPEC u64 siphash_rot32_S (const u64 a)
+{
+  vconv64_t in;
+
+  in.v64 = a;
+
+  vconv64_t out;
+
+  out.v32.a = in.v32.b;
+  out.v32.b = in.v32.a;
+
+  return out.v64;
+}
+
+DECLSPEC u64x siphash_rot32 (const u64x a)
+{
+  u64x r;
+
+  #if VECT_SIZE == 1
+  r = siphash_rot32_S (a);
+  #endif
+
+  #if VECT_SIZE >= 2
+  r.s0 = siphash_rot32_S (a.s0);
+  r.s1 = siphash_rot32_S (a.s1);
+  #endif
+
+  #if VECT_SIZE >= 4
+  r.s2 = siphash_rot32_S (a.s2);
+  r.s3 = siphash_rot32_S (a.s3);
+  #endif
+
+  #if VECT_SIZE >= 8
+  r.s4 = siphash_rot32_S (a.s4);
+  r.s5 = siphash_rot32_S (a.s5);
+  r.s6 = siphash_rot32_S (a.s6);
+  r.s7 = siphash_rot32_S (a.s7);
+  #endif
+
+  #if VECT_SIZE >= 16
+  r.s8 = siphash_rot32_S (a.s8);
+  r.s9 = siphash_rot32_S (a.s9);
+  r.sa = siphash_rot32_S (a.sa);
+  r.sb = siphash_rot32_S (a.sb);
+  r.sc = siphash_rot32_S (a.sc);
+  r.sd = siphash_rot32_S (a.sd);
+  r.se = siphash_rot32_S (a.se);
+  r.sf = siphash_rot32_S (a.sf);
+  #endif
+
+  return r;
+}
 
 #define SIPROUND(v0,v1,v2,v3)   \
   (v0) += (v1);                 \
   (v1)  = hc_rotl64 ((v1), 13); \
   (v1) ^= (v0);                 \
-  (v0)  = hc_rotl64 ((v0), 32); \
+  (v0)  = siphash_rot32 ((v0)); \
   (v2) += (v3);                 \
   (v3)  = hc_rotl64 ((v3), 16); \
   (v3) ^= (v2);                 \
@@ -27,16 +80,13 @@
   (v2) += (v1);                 \
   (v1)  = hc_rotl64 ((v1), 17); \
   (v1) ^= (v2);                 \
-  (v2)  = hc_rotl64 ((v2), 32)
+  (v2)  = siphash_rot32 ((v2))
 
-DECLSPEC void m10100m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
+DECLSPEC void m10100m (PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR ())
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * salt
@@ -47,10 +97,10 @@ DECLSPEC void m10100m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
   u64 v2p = SIPHASHM_2;
   u64 v3p = SIPHASHM_3;
 
-  v0p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[1], salt_bufs[SALT_POS].salt_buf[0]);
-  v1p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[3], salt_bufs[SALT_POS].salt_buf[2]);
-  v2p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[1], salt_bufs[SALT_POS].salt_buf[0]);
-  v3p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[3], salt_bufs[SALT_POS].salt_buf[2]);
+  v0p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[1], salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  v1p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[3], salt_bufs[SALT_POS_HOST].salt_buf[2]);
+  v2p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[1], salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  v3p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[3], salt_bufs[SALT_POS_HOST].salt_buf[2]);
 
   switch (pw_len / 8)
   {
@@ -66,7 +116,7 @@ DECLSPEC void m10100m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -123,14 +173,11 @@ DECLSPEC void m10100m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
   }
 }
 
-DECLSPEC void m10100s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
+DECLSPEC void m10100s (PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR ())
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * salt
@@ -141,10 +188,10 @@ DECLSPEC void m10100s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
   u64 v2p = SIPHASHM_2;
   u64 v3p = SIPHASHM_3;
 
-  v0p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[1], salt_bufs[SALT_POS].salt_buf[0]);
-  v1p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[3], salt_bufs[SALT_POS].salt_buf[2]);
-  v2p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[1], salt_bufs[SALT_POS].salt_buf[0]);
-  v3p ^= hl32_to_64_S (salt_bufs[SALT_POS].salt_buf[3], salt_bufs[SALT_POS].salt_buf[2]);
+  v0p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[1], salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  v1p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[3], salt_bufs[SALT_POS_HOST].salt_buf[2]);
+  v2p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[1], salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  v3p ^= hl32_to_64_S (salt_bufs[SALT_POS_HOST].salt_buf[3], salt_bufs[SALT_POS_HOST].salt_buf[2]);
 
   switch (pw_len / 8)
   {
@@ -160,8 +207,8 @@ DECLSPEC void m10100s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
     0,
     0
   };
@@ -172,7 +219,7 @@ DECLSPEC void m10100s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR ())
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -235,9 +282,11 @@ KERNEL_FQ void m10100_m04 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -264,7 +313,7 @@ KERNEL_FQ void m10100_m04 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m10100_m08 (KERN_ATTR_VECTOR ())
@@ -273,9 +322,11 @@ KERNEL_FQ void m10100_m08 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -302,7 +353,7 @@ KERNEL_FQ void m10100_m08 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m10100_m16 (KERN_ATTR_VECTOR ())
@@ -311,9 +362,11 @@ KERNEL_FQ void m10100_m16 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -340,7 +393,7 @@ KERNEL_FQ void m10100_m16 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m10100_s04 (KERN_ATTR_VECTOR ())
@@ -349,9 +402,11 @@ KERNEL_FQ void m10100_s04 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -378,7 +433,7 @@ KERNEL_FQ void m10100_s04 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m10100_s08 (KERN_ATTR_VECTOR ())
@@ -387,9 +442,11 @@ KERNEL_FQ void m10100_s08 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -416,7 +473,7 @@ KERNEL_FQ void m10100_s08 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m10100_s16 (KERN_ATTR_VECTOR ())
@@ -425,9 +482,11 @@ KERNEL_FQ void m10100_s16 (KERN_ATTR_VECTOR ())
    * base
    */
 
+  const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w[16];
 
@@ -454,5 +513,5 @@ KERNEL_FQ void m10100_s16 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m10100s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }

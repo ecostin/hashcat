@@ -6,12 +6,12 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -52,7 +52,7 @@ KERNEL_FQ void m04510_m04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max)
+  if (gid >= GID_CNT)
     return;
 
   /**
@@ -82,30 +82,30 @@ KERNEL_FQ void m04510_m04 (KERN_ATTR_BASIC ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -143,7 +143,7 @@ KERNEL_FQ void m04510_m04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -367,11 +367,11 @@ KERNEL_FQ void m04510_m04 (KERN_ATTR_BASIC ())
     SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
     // Update sha1 state
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     /**
     * 2nd SHA1
@@ -1070,6 +1070,11 @@ KERNEL_FQ void m04510_m04 (KERN_ATTR_BASIC ())
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u);
     SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
+    b += digest[1] - make_u32x (SHA1M_B);
+    c += digest[2] - make_u32x (SHA1M_C);
+    d += digest[3] - make_u32x (SHA1M_D);
+    e += digest[4] - make_u32x (SHA1M_E);
+
     COMPARE_M_SIMD (d, e, c, b);
   }
 }
@@ -1108,7 +1113,7 @@ KERNEL_FQ void m04510_s04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max)
+  if (gid >= GID_CNT)
     return;
 
   /**
@@ -1138,47 +1143,41 @@ KERNEL_FQ void m04510_s04 (KERN_ATTR_BASIC ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * digest
    */
 
   const u32 search[4] = {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
-
-  /**
-   * reverse
-   */
-
-  const u32 e_rev = hc_rotl32_S (search[1], 2u);
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -1216,7 +1215,7 @@ KERNEL_FQ void m04510_s04 (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -1439,11 +1438,11 @@ KERNEL_FQ void m04510_s04 (KERN_ATTR_BASIC ())
     SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
     // Update sha1 state
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     /**
     * 2nd SHA1
@@ -2136,18 +2135,23 @@ KERNEL_FQ void m04510_s04 (KERN_ATTR_BASIC ())
     SHA1_STEP (SHA1_F1, b, c, d, e, a, wa_t);
     wb_t = hc_rotl32 ((w8_t ^ w3_t ^ wd_t ^ wb_t), 1u);
     SHA1_STEP (SHA1_F1, a, b, c, d, e, wb_t);
-
-    if (MATCHES_NONE_VS (e, e_rev))
-      continue;
-
     wc_t = hc_rotl32 ((w9_t ^ w4_t ^ we_t ^ wc_t), 1u);
     SHA1_STEP (SHA1_F1, e, a, b, c, d, wc_t);
     wd_t = hc_rotl32 ((wa_t ^ w5_t ^ wf_t ^ wd_t), 1u);
     SHA1_STEP (SHA1_F1, d, e, a, b, c, wd_t);
+
+    if (MATCHES_NONE_VS ((e + digest[4] - make_u32x (SHA1M_E)), search[1]))
+      continue;
+
     we_t = hc_rotl32 ((wb_t ^ w6_t ^ w0_t ^ we_t), 1u);
     SHA1_STEP (SHA1_F1, c, d, e, a, b, we_t);
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u);
     SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
+
+    b += digest[1] - make_u32x (SHA1M_B);
+    c += digest[2] - make_u32x (SHA1M_C);
+    d += digest[3] - make_u32x (SHA1M_D);
+    e += digest[4] - make_u32x (SHA1M_E);
 
     COMPARE_S_SIMD (d, e, c, b);
   }

@@ -32,7 +32,6 @@ static u64 get_highest_words_done (const hashcat_ctx_t *hashcat_ctx)
     hc_device_param_t *device_param = &backend_ctx->devices_param[backend_devices_idx];
 
     if (device_param->skipped == true) continue;
-
     if (device_param->skipped_warning == true) continue;
 
     const u64 words_done = device_param->words_done;
@@ -54,7 +53,6 @@ static u64 get_lowest_words_done (const hashcat_ctx_t *hashcat_ctx)
     hc_device_param_t *device_param = &backend_ctx->devices_param[backend_devices_idx];
 
     if (device_param->skipped == true) continue;
-
     if (device_param->skipped_warning == true) continue;
 
     const u64 words_done = device_param->words_done;
@@ -154,6 +152,9 @@ static int calc_stdin (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_par
   straight_ctx_t       *straight_ctx       = hashcat_ctx->straight_ctx;
   status_ctx_t         *status_ctx         = hashcat_ctx->status_ctx;
 
+  const u32 attack_mode = user_options->attack_mode;
+  const u32 attack_kern = user_options_extra->attack_kern;
+
   char *buf = (char *) hcmalloc (HCBUFSIZ_LARGE);
 
   bool iconv_enabled = false;
@@ -245,13 +246,22 @@ static int calc_stdin (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_par
 
       char rule_buf_out[RP_PASSWORD_SIZE];
 
-      if (run_rule_engine ((int) user_options_extra->rule_len_l, user_options->rule_buf_l))
+      int   rule_jk_len = (int)    user_options_extra->rule_len_l;
+      char *rule_jk_buf = (char *) user_options->rule_buf_l;
+
+      if (attack_mode == ATTACK_MODE_HYBRID2)
+      {
+        rule_jk_len = (int)    user_options_extra->rule_len_r;
+        rule_jk_buf = (char *) user_options->rule_buf_r;
+      }
+
+      if (run_rule_engine (rule_jk_len, rule_jk_buf))
       {
         if (line_len >= RP_PASSWORD_SIZE) continue;
 
         memset (rule_buf_out, 0, sizeof (rule_buf_out));
 
-        const int rule_len_out = _old_apply_rule (user_options->rule_buf_l, (int) user_options_extra->rule_len_l, line_buf, (int) line_len, rule_buf_out);
+        const int rule_len_out = _old_apply_rule (rule_jk_buf, rule_jk_len, line_buf, (int) line_len, rule_buf_out);
 
         if (rule_len_out < 0) continue;
 
@@ -262,8 +272,6 @@ static int calc_stdin (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_par
       if (line_len > PW_MAX) continue;
 
       // hmm that's always the case, or?
-
-      const u32 attack_kern = user_options_extra->attack_kern;
 
       if (attack_kern == ATTACK_KERN_STRAIGHT)
       {
@@ -353,7 +361,6 @@ HC_API_CALL void *thread_calc_stdin (void *p)
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
   if (device_param->skipped) return NULL;
-
   if (device_param->skipped_warning == true) return NULL;
 
   if (device_param->is_cuda == true)
@@ -1418,13 +1425,22 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
 
             // post-process rule engine
 
-            if (run_rule_engine ((int) user_options_extra->rule_len_l, user_options->rule_buf_l))
+            int   rule_jk_len = (int)    user_options_extra->rule_len_l;
+            char *rule_jk_buf = (char *) user_options->rule_buf_l;
+
+            if (attack_mode == ATTACK_MODE_HYBRID2)
+            {
+              rule_jk_len = (int)    user_options_extra->rule_len_r;
+              rule_jk_buf = (char *) user_options->rule_buf_r;
+            }
+
+            if (run_rule_engine (rule_jk_len, rule_jk_buf))
             {
               if (line_len >= RP_PASSWORD_SIZE) continue;
 
               memset (rule_buf_out, 0, sizeof (rule_buf_out));
 
-              const int rule_len_out = _old_apply_rule (user_options->rule_buf_l, (int) user_options_extra->rule_len_l, line_buf, (int) line_len, rule_buf_out);
+              const int rule_len_out = _old_apply_rule (rule_jk_buf, rule_jk_len, line_buf, (int) line_len, rule_buf_out);
 
               if (rule_len_out < 0) continue;
 
@@ -1432,21 +1448,47 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
               line_len = (u32) rule_len_out;
             }
 
-            if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+            /*
+
+            if (attack_mode == ATTACK_MODE_ASSOCIATION)
             {
               // we can't reject password base on length in -a 9 because it will bring the schedule out of sync
               // therefore we render it defective so the other candidates survive
 
+              line_len = MAX (line_len, hashconfig->pw_min);
               line_len = MIN (line_len, hashconfig->pw_max);
             }
 
+            This strategy turns out not to work very well. If there's a candidate shorter than pw_min, this leads to situation the \n is copied, too.
+
+            To reproduce:
+
+            $ cat hash
+            WPA*01*4d4fe7aac3a2cecab195321ceb99a7d0*fc690c158264*f4747f87f9f4*686173686361742d6573736964***
+            $ cat word
+            hashcat
+            $ ./hashcat -m 22000 -a 9 hash word
+            ...
+            Candidates.#1....: $HEX[686173686361740a21] -> $HEX[686173686361740a21]
+            ...
+            */
+
+            // This is a test fix for the above situation
+
             if (attack_kern == ATTACK_KERN_STRAIGHT)
             {
-              if ((line_len < hashconfig->pw_min) || (line_len > hashconfig->pw_max))
+              if (attack_mode == ATTACK_MODE_ASSOCIATION)
               {
-                words_extra++;
+                // do nothing, test fix for above scenario
+              }
+              else
+              {
+                if ((line_len < hashconfig->pw_min) || (line_len > hashconfig->pw_max))
+                {
+                  words_extra++;
 
-                continue;
+                  continue;
+                }
               }
             }
             else if (attack_kern == ATTACK_KERN_COMBI)
@@ -1604,7 +1646,6 @@ HC_API_CALL void *thread_calc (void *p)
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
   if (device_param->skipped) return NULL;
-
   if (device_param->skipped_warning == true) return NULL;
 
   if (device_param->is_cuda == true)

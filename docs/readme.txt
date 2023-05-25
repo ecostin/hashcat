@@ -7,11 +7,11 @@
            |_____|     /___________/     |_____|  /_____/        /_______|
                  :                             :                         :
 
-hashcat v6.2.5
+hashcat v6.2.6
 ==============
 
-AMD GPUs on Linux require "AMD ROCm" (4.5 or later)
-AMD GPUs on Windows require "AMD Radeon Adrenalin 2020 Edition" (21.2.1 or later)
+AMD GPUs on Linux require "AMDGPU" (21.50 or later) and "ROCm" (5.0 or later)
+AMD GPUs on Windows require "AMD Adrenalin Edition" (Adrenalin 22.5.1 exactly)
 Intel CPUs require "OpenCL Runtime for Intel Core and Intel Xeon Processors" (16.1.1 or later)
 NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or later)
 
@@ -58,10 +58,11 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - SHA3-512
 - RIPEMD-160
 - BLAKE2b-512
+- BLAKE2s-256
+- SM3
 - GOST R 34.11-2012 (Streebog) 256-bit, big-endian
 - GOST R 34.11-2012 (Streebog) 512-bit, big-endian
 - GOST R 34.11-94
-- GPG (AES-128/AES-256 (SHA-1($pass)))
 - Half MD5
 - Keccak-224
 - Keccak-256
@@ -74,6 +75,8 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - sha256(utf16le($pass))
 - sha384(utf16le($pass))
 - sha512(utf16le($pass))
+- BLAKE2b-512($pass.$salt)
+- BLAKE2b-512($salt.$pass)
 - md5($pass.$salt)
 - md5($salt.$pass)
 - md5($salt.$pass.$salt)
@@ -82,10 +85,14 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - md5($salt.md5($salt.$pass))
 - md5($salt.sha1($salt.$pass))
 - md5($salt.utf16le($pass))
+- md5($salt1.strtoupper(md5($salt2.$pass)))
 - md5(md5($pass))
 - md5(md5($pass).md5($salt))
 - md5(md5(md5($pass)))
+- md5(md5(md5($pass)).$salt)
+- md5(md5(md5($pass).$salt1).$salt2)
 - md5(sha1($pass))
+- md5(sha1($pass).$salt)
 - md5(sha1($pass).md5($pass).sha1($pass))
 - md5(sha1($salt).md5($pass))
 - md5(strtoupper(md5($pass)))
@@ -110,6 +117,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - sha256($salt.$pass)
 - sha256($salt.$pass.$salt)
 - sha256($salt.sha256($pass))
+- sha256($salt.sha256_bin($pass))
 - sha256($salt.utf16le($pass))
 - sha256(md5($pass))
 - sha256(sha256($pass).$salt)
@@ -125,6 +133,8 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - sha512(utf16le($pass).$salt)
 - HMAC-MD5 (key = $pass)
 - HMAC-MD5 (key = $salt)
+- HMAC-RIPEMD160 (key = $pass)
+- HMAC-RIPEMD160 (key = $salt)
 - HMAC-SHA1 (key = $pass)
 - HMAC-SHA1 (key = $salt)
 - HMAC-SHA256 (key = $pass)
@@ -135,6 +145,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - HMAC-Streebog-256 (key = $salt), big-endian
 - HMAC-Streebog-512 (key = $pass), big-endian
 - HMAC-Streebog-512 (key = $salt), big-endian
+- Amazon AWS4-HMAC-SHA256
 - CRC32
 - CRC32C
 - CRC64Jones
@@ -156,6 +167,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - scrypt
 - phpass
 - TACACS+
+- DANE RFC7929/RFC8162 SHA2-256
 - SIP digest authentication (MD5)
 - IKE-PSK MD5
 - IKE-PSK SHA1
@@ -172,13 +184,20 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - WPA-PMK-PMKID+EAPOL
 - WPA-PMKID-PBKDF2
 - WPA-PMKID-PMK
+- IPMI2 RAKP HMAC-MD5
 - IPMI2 RAKP HMAC-SHA1
 - CRAM-MD5
+- MS SNTP
 - JWT (JSON Web Token)
+- Radmin3
 - Kerberos 5, etype 17, TGS-REP
 - Kerberos 5, etype 17, Pre-Auth
+- Kerberos 5, etype 17, DB
+- Kerberos 5, etype 17, AS-REP
 - Kerberos 5, etype 18, TGS-REP
 - Kerberos 5, etype 18, Pre-Auth
+- Kerberos 5, etype 18, DB
+- Kerberos 5, etype 18, AS-REP
 - Kerberos 5, etype 23, AS-REQ Pre-Auth
 - Kerberos 5, etype 23, TGS-REP
 - Kerberos 5, etype 23, AS-REP
@@ -186,6 +205,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - NetNTLMv1 / NetNTLMv1+ESS (NT)
 - NetNTLMv2
 - NetNTLMv2 (NT)
+- Flask Session Cookie ($salt.$salt.$pass)
 - iSCSI CHAP authentication, MD5(CHAP)
 - RACF
 - AIX {smd5}
@@ -196,8 +216,10 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - QNX /etc/shadow (MD5)
 - QNX /etc/shadow (SHA256)
 - QNX /etc/shadow (SHA512)
-- DPAPI masterkey file v1
-- DPAPI masterkey file v2
+- DPAPI masterkey file v1 (context 1 and 2)
+- DPAPI masterkey file v1 (context 3)
+- DPAPI masterkey file v2 (context 1 and 2)
+- DPAPI masterkey file v2 (context 3)
 - GRUB 2
 - MS-AzureSync PBKDF2-HMAC-SHA256
 - BSDi Crypt, Extended DES
@@ -228,6 +250,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - bcrypt $2*$, Blowfish (Unix)
 - md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
 - descrypt, DES (Unix), Traditional DES
+- sha1($salt.sha1(utf16le($username).':'.utf16le($pass)))
 - sha256crypt $5$, SHA256 (Unix)
 - sha512crypt $6$, SHA512 (Unix)
 - SQLCipher
@@ -238,6 +261,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - MongoDB ServerKey SCRAM-SHA-256
 - PostgreSQL
 - PostgreSQL CRAM (MD5)
+- PostgreSQL SCRAM-SHA-256
 - Oracle H: Type (Oracle 7+)
 - Oracle S: Type (Oracle 11+)
 - Oracle T: Type (Oracle 12+)
@@ -266,8 +290,18 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - SAP CODVN F/G (PASSCODE)
 - SAP CODVN F/G (PASSCODE) from RFC_READ_TABLE
 - SAP CODVN H (PWDSALTEDHASH) iSSHA-1
+- Adobe AEM (SSPR, SHA-256 with Salt)
+- Adobe AEM (SSPR, SHA-512 with Salt)
 - PeopleSoft
 - PeopleSoft PS_TOKEN
+- NetIQ SSPR (MD5)
+- NetIQ SSPR (PBKDF2WithHmacSHA1)
+- NetIQ SSPR (PBKDF2WithHmacSHA256)
+- NetIQ SSPR (PBKDF2WithHmacSHA512)
+- NetIQ SSPR (SHA-1 with Salt)
+- NetIQ SSPR (SHA-256 with Salt)
+- NetIQ SSPR (SHA-512 with Salt)
+- NetIQ SSPR (SHA1)
 - SolarWinds Orion
 - SolarWinds Orion v2
 - SolarWinds Serv-U
@@ -280,7 +314,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - AuthMe sha256
 - AES Crypt (SHA256)
 - VMware VMX (PBKDF2-HMAC-SHA1 + AES-256-CBC)
-- LUKS
+- LUKS v1
 - VeraCrypt
 - BestCrypt v3 Volume Encryption
 - FileVault 2
@@ -316,10 +350,12 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - Apple iWork
 - 1Password, agilekeychain
 - 1Password, cloudkeychain
+- 1Password, mobilekeychain (1Password 8)
 - Password Safe v2
 - Password Safe v3
 - LastPass + LastPass sniffed
 - KeePass 1 (AES/Twofish) and KeePass 2 (AES)
+- KeePass 1 (AES/Twofish) and KeePass 2 (AES) - keyfile only mode
 - Bitwarden
 - Ansible Vault
 - Mozilla key3.db
@@ -327,19 +363,15 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - Apple Keychain
 - 7-Zip
 - RAR3-hp
-- RAR3-p (Compressed)
-- RAR3-p (Uncompressed)
+- RAR3-p
 - RAR5
-- PKZIP (Compressed Multi-File)
-- PKZIP (Compressed)
-- PKZIP (Mixed Multi-File)
-- PKZIP (Mixed Multi-File Checksum-Only)
-- PKZIP (Uncompressed)
+- PKZIP
 - PKZIP Master Key
 - PKZIP Master Key (6 byte optimization)
 - SecureZIP AES-128
 - SecureZIP AES-192
 - SecureZIP AES-256
+- Veeam VBK
 - WinZip
 - Android Backup
 - Stuffit5
@@ -366,6 +398,9 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - vBulletin >= v3.8.5
 - bcrypt(md5($pass)) / bcryptmd5
 - bcrypt(sha1($pass)) / bcryptsha1
+- bcrypt(sha256($pass)) / bcryptsha256
+- bcrypt(sha512($pass)) / bcryptsha512
+- md5(md5($salt).md5(md5($pass)))
 - osCommerce, xt:Commerce
 - TOTP (HMAC-SHA1)
 - Web2py pbkdf2-sha512
@@ -374,24 +409,41 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - Atlassian (PBKDF2-HMAC-SHA1)
 - Ruby on Rails Restful-Authentication
 - Ruby on Rails Restful Auth (one round, no sitekey)
+- Python Werkzeug MD5 (HMAC-MD5 (key = $salt))
+- Python Werkzeug SHA256 (HMAC-SHA256 (key = $salt))
 - Python passlib pbkdf2-sha512
 - Python passlib pbkdf2-sha256
 - Python passlib pbkdf2-sha1
 - PKCS#8 Private Keys (PBKDF2-HMAC-SHA1 + 3DES/AES)
 - PKCS#8 Private Keys (PBKDF2-HMAC-SHA256 + 3DES/AES)
 - JKS Java Key Store Private Keys (SHA1)
+- GPG (AES-128/AES-256 (SHA-1($pass)))
+- GPG (AES-128/AES-256 (SHA-512($pass)))
+- GPG (AES-128/AES-256 (SHA-256($pass)))
 - RSA/DSA/EC/OpenSSH Private Keys ($0$)
 - RSA/DSA/EC/OpenSSH Private Keys ($6$)
 - RSA/DSA/EC/OpenSSH Private Keys ($1, $3$)
 - RSA/DSA/EC/OpenSSH Private Keys ($4$)
 - RSA/DSA/EC/OpenSSH Private Keys ($5$)
 - XMPP SCRAM PBKDF2-SHA1
+- Teamspeak 3 (channel hash)
 - Telegram Desktop < v2.1.14 (PBKDF2-HMAC-SHA1)
 - Telegram Desktop >= v2.1.14 (PBKDF2-HMAC-SHA512)
 - Telegram Mobile App Passcode (SHA256)
 - Skype
-- MetaMask Wallet
+- Anope IRC Services (enc_sha256)
+- Terra Station Wallet (AES256-CBC(PBKDF2($pass)))
+- MetaMask Mobile Wallet
+- MetaMask Wallet (needs all data, checks AES-GCM tag)
+- MetaMask Wallet (short hash, plaintext check)
+- Bisq .wallet (scrypt)
 - BitShares v0.x - sha512(sha512_bin(pass))
+- Bitcoin WIF private key (P2PKH)
+- Bitcoin WIF private key (P2WPKH, Bech32)
+- Bitcoin WIF private key (P2SH(P2WPKH))
+- Bitcoin raw private key (P2PKH)
+- Bitcoin raw private key (P2WPKH, Bech32)
+- Bitcoin raw private key (P2SH(P2WPKH))
 - Bitcoin/Litecoin wallet.dat
 - Electrum Wallet (Salt-Type 1-3)
 - Electrum Wallet (Salt-Type 4)
@@ -406,6 +458,12 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - MultiBit Classic .key (MD5)
 - MultiBit Classic .wallet (scrypt)
 - MultiBit HD (scrypt)
+- Exodus Desktop Wallet (scrypt)
+- ENCsecurity Datavault (PBKDF2/no keychain)
+- ENCsecurity Datavault (PBKDF2/keychain)
+- ENCsecurity Datavault (MD5/no keychain)
+- ENCsecurity Datavault (MD5/keychain)
+- SecureCRT MasterPassphrase v2
 
 ##
 ## Attack-Modes

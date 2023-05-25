@@ -29,14 +29,16 @@ static const char *HASH_NAME      = "WPA-EAPOL-PMK";
 static const u64   KERN_TYPE      = 2501;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_AUX1
                                   | OPTS_TYPE_AUX2
                                   | OPTS_TYPE_AUX3
                                   | OPTS_TYPE_BINARY_HASHFILE
                                   | OPTS_TYPE_DEEP_COMP_KERNEL
                                   | OPTS_TYPE_POTFILE_NOPASS
-                                  | OPTS_TYPE_COPY_TMPS;
+                                  | OPTS_TYPE_COPY_TMPS
+                                  | OPTS_TYPE_AUTODETECT_DISABLE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "7f620a599c445155935a35634638fa67b4aafecb92e0bd8625388757a63c2dda";
 static const char *ST_HASH        = "4843505804000000000235380000000000000000000000000000000000000000000000000000000000000151aecc428f182acefbd1a9e62d369a079265784da83ba4cf88375c44c830e6e5aa5d6faf352aa496a9ee129fb8292f7435df5420b823a1cd402aed449cced04f552c5b5acfebf06ae96a09c96d9a01c443a17aa62258c4f651a68aa67b0001030077fe010900200000000000000001a4cf88375c44c830e6e5aa5d6faf352aa496a9ee129fb8292f7435df5420b8230000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018dd160050f20101000050f20201000050f20201000050f20200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -518,6 +520,24 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
     return false;
   }
 
+  kernel_param_t kernel_param;
+
+  kernel_param.bitmap_mask         = 0;
+  kernel_param.bitmap_shift1       = 0;
+  kernel_param.bitmap_shift2       = 0;
+  kernel_param.salt_pos_host       = 0;
+  kernel_param.loop_pos            = 0;
+  kernel_param.loop_cnt            = 0;
+  kernel_param.il_cnt              = 0;
+  kernel_param.digests_cnt         = 1;
+  kernel_param.digests_offset_host = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.pws_pos             = 0;
+  kernel_param.gid_max             = 1;
+
   m02501_aux
   (
     NULL,               // pws
@@ -544,19 +564,7 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
     NULL,               // d_extra1_buf
     NULL,               // d_extra2_buf
     NULL,               // d_extra3_buf
-    0,                  // bitmap_mask
-    0,                  // bitmap_shift1
-    0,                  // bitmap_shift2
-    0,                  // salt_pos
-    0,                  // loop_pos
-    0,                  // loop_cnt
-    0,                  // il_cnt
-    1,                  // digests_cnt
-    0,                  // digests_offset
-    0,                  // combs_mode
-    0,                  // salt_repeat
-    0,                  // pws_pos
-    1                   // gid_max
+    &kernel_param       // kernel_param
   );
 
   const bool r = (d_return_buf == 0) ? false : true;
@@ -902,6 +910,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = module_benchmark_mask;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = module_deep_comp_kernel;
@@ -920,6 +929,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = module_hash_binary_count;
   module_ctx->module_hash_binary_parse        = module_hash_binary_parse;
   module_ctx->module_hash_binary_save         = module_hash_binary_save;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = module_hash_decode_potfile;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

@@ -6,12 +6,12 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -40,14 +40,11 @@
   h = 0;                                        \
 }
 
-DECLSPEC void m20710m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u32 *l_bin2asc)
+DECLSPEC void m20710m (PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR (), LOCAL_AS u32 *l_bin2asc)
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * salt
@@ -58,24 +55,24 @@ DECLSPEC void m20710m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * loop
@@ -83,7 +80,7 @@ DECLSPEC void m20710m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -187,14 +184,14 @@ DECLSPEC void m20710m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
     wf_t = SHA256_EXPAND (wd_t, w8_t, w0_t, wf_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, b, c, d, e, f, g, h, a, wf_t, SHA256C3f);
 
-    a += SHA256M_A;
-    b += SHA256M_B;
-    c += SHA256M_C;
-    d += SHA256M_D;
-    e += SHA256M_E;
-    f += SHA256M_F;
-    g += SHA256M_G;
-    h += SHA256M_H;
+    a += make_u32x (SHA256M_A);
+    b += make_u32x (SHA256M_B);
+    c += make_u32x (SHA256M_C);
+    d += make_u32x (SHA256M_D);
+    e += make_u32x (SHA256M_E);
+    f += make_u32x (SHA256M_F);
+    g += make_u32x (SHA256M_G);
+    h += make_u32x (SHA256M_H);
 
     // final sha256
 
@@ -566,25 +563,22 @@ DECLSPEC void m20710m (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
 
 //    a += digest[0] - SHA256M_A;
 //    b += digest[1] - SHA256M_B;
-    c += digest[2] - SHA256M_C;
-    d += digest[3] - SHA256M_D;
+    c += digest[2] - make_u32x (SHA256M_C);
+    d += digest[3] - make_u32x (SHA256M_D);
 //    e += digest[4] - SHA256M_E;
 //    f += digest[5] - SHA256M_F;
-    g += digest[6] - SHA256M_G;
-    h += digest[7] - SHA256M_H;
+    g += digest[6] - make_u32x (SHA256M_G);
+    h += digest[7] - make_u32x (SHA256M_H);
 
     COMPARE_M_SIMD (d, h, c, g);
   }
 }
 
-DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u32 *l_bin2asc)
+DECLSPEC void m20710s (PRIVATE_AS u32 *w, const u32 pw_len, KERN_ATTR_FUNC_VECTOR (), LOCAL_AS u32 *l_bin2asc)
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * digest
@@ -592,10 +586,10 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -607,24 +601,24 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * loop
@@ -632,7 +626,7 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
 
   u32 w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -736,14 +730,14 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
     wf_t = SHA256_EXPAND (wd_t, w8_t, w0_t, wf_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, b, c, d, e, f, g, h, a, wf_t, SHA256C3f);
 
-    a += SHA256M_A;
-    b += SHA256M_B;
-    c += SHA256M_C;
-    d += SHA256M_D;
-    e += SHA256M_E;
-    f += SHA256M_F;
-    g += SHA256M_G;
-    h += SHA256M_H;
+    a += make_u32x (SHA256M_A);
+    b += make_u32x (SHA256M_B);
+    c += make_u32x (SHA256M_C);
+    d += make_u32x (SHA256M_D);
+    e += make_u32x (SHA256M_E);
+    f += make_u32x (SHA256M_F);
+    g += make_u32x (SHA256M_G);
+    h += make_u32x (SHA256M_H);
 
     // final sha256
 
@@ -1110,7 +1104,7 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
     wb_t = SHA256_EXPAND (w9_t, w4_t, wc_t, wb_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, f, g, h, a, b, c, d, e, wb_t, SHA256C3b);
     wc_t = SHA256_EXPAND (wa_t, w5_t, wd_t, wc_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, e, f, g, h, a, b, c, d, wc_t, SHA256C3c);
 
-    if (MATCHES_NONE_VS (h+digest[7]-SHA256M_H, search[1])) continue;
+    if (MATCHES_NONE_VS ((h + digest[7] - make_u32x (SHA256M_H)), search[1])) continue;
 
     wd_t = SHA256_EXPAND (wb_t, w6_t, we_t, wd_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, d, e, f, g, h, a, b, c, wd_t, SHA256C3d);
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
@@ -1118,12 +1112,12 @@ DECLSPEC void m20710s (u32 *w, const u32 pw_len, KERN_ATTR_VECTOR (), LOCAL_AS u
 
 //    a += digest[0] - SHA256M_A;
 //    b += digest[1] - SHA256M_B;
-    c += digest[2] - SHA256M_C;
-    d += digest[3] - SHA256M_D;
+    c += digest[2] - make_u32x (SHA256M_C);
+    d += digest[3] - make_u32x (SHA256M_D);
 //    e += digest[4] - SHA256M_E;
 //    f += digest[5] - SHA256M_F;
-    g += digest[6] - SHA256M_G;
-    h += digest[7] - SHA256M_H;
+    g += digest[6] - make_u32x (SHA256M_G);
+    h += digest[7] - make_u32x (SHA256M_H);
 
     COMPARE_S_SIMD (d, h, c, g);
   }
@@ -1135,8 +1129,8 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1156,7 +1150,7 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1187,7 +1181,7 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20710_m08 (KERN_ATTR_VECTOR ())
@@ -1196,8 +1190,8 @@ KERNEL_FQ void m20710_m08 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1217,7 +1211,7 @@ KERNEL_FQ void m20710_m08 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1248,7 +1242,7 @@ KERNEL_FQ void m20710_m08 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20710_m16 (KERN_ATTR_VECTOR ())
@@ -1257,8 +1251,8 @@ KERNEL_FQ void m20710_m16 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1278,7 +1272,7 @@ KERNEL_FQ void m20710_m16 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1309,7 +1303,7 @@ KERNEL_FQ void m20710_m16 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710m (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20710_s04 (KERN_ATTR_VECTOR ())
@@ -1318,8 +1312,8 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1339,7 +1333,7 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1370,7 +1364,7 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20710_s08 (KERN_ATTR_VECTOR ())
@@ -1379,8 +1373,8 @@ KERNEL_FQ void m20710_s08 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1400,7 +1394,7 @@ KERNEL_FQ void m20710_s08 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1431,7 +1425,7 @@ KERNEL_FQ void m20710_s08 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20710_s16 (KERN_ATTR_VECTOR ())
@@ -1440,8 +1434,8 @@ KERNEL_FQ void m20710_s16 (KERN_ATTR_VECTOR ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1461,7 +1455,7 @@ KERNEL_FQ void m20710_s16 (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1492,5 +1486,5 @@ KERNEL_FQ void m20710_s16 (KERN_ATTR_VECTOR ())
    * main
    */
 
-  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20710s (w, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }

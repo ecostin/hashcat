@@ -6,12 +6,12 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
 typedef struct gpg
@@ -47,12 +47,27 @@ DECLSPEC u32 hc_bytealign_le_S (const u32 a, const u32 b, const int c)
 {
   const int c_mod_4 = c & 3;
 
-  const u32 r = hc_byte_perm_S (b, a, (0x76543210 >> (c_mod_4 * 4)) & 0xffff);
+  #if ((defined IS_AMD || defined IS_HIP) && HAS_VPERM == 0) || defined IS_GENERIC
+  const u32 r = l32_from_64_S ((v64_from_v32ab_S (b, a) >> (c_mod_4 * 8)));
+  #endif
+
+  #if ((defined IS_AMD || defined IS_HIP) && HAS_VPERM == 1) || defined IS_NV
+
+  #if defined IS_NV
+  const int selector = (0x76543210 >> (c_mod_4 * 4)) & 0xffff;
+  #endif
+
+  #if (defined IS_AMD || defined IS_HIP)
+  const int selector = l32_from_64_S (0x0706050403020100UL >> (c_mod_4 * 8));
+  #endif
+
+  const u32 r = hc_byte_perm (b, a, selector);
+  #endif
 
   return r;
 }
 
-DECLSPEC void memcat_le_S (u32 *block, const u32 offset, const u32 *append, u32 len)
+DECLSPEC void memcat_le_S (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, u32 len)
 {
   const u32 start_index = (offset - 1) >> 2;
   const u32 count = ((offset + len + 3) >> 2) - start_index;
@@ -67,12 +82,13 @@ DECLSPEC void memcat_le_S (u32 *block, const u32 offset, const u32 *append, u32 
   }
 }
 
-DECLSPEC void memzero_le_S (u32 *block, const u32 start_offset, const u32 end_offset)
+DECLSPEC void memzero_le_S (PRIVATE_AS u32 *block, const u32 start_offset, const u32 end_offset)
 {
   const u32 start_idx = start_offset / 4;
 
   // zero out bytes in the first u32 starting from 'start_offset'
-  block[start_idx] &= 0xffffffff >> ((4 - (start_offset & 3)) * 8);
+  // math is a bit complex to avoid shifting by 32 bits, which is not possible on some architectures
+  block[start_idx] &= ~(0xffffffff << ((start_offset & 3) * 8));
 
   const u32 end_idx = (end_offset + 3) / 4;
 
@@ -83,12 +99,13 @@ DECLSPEC void memzero_le_S (u32 *block, const u32 start_offset, const u32 end_of
   }
 }
 
-DECLSPEC void memzero_be_S (u32 *block, const u32 start_offset, const u32 end_offset)
+DECLSPEC void memzero_be_S (PRIVATE_AS u32 *block, const u32 start_offset, const u32 end_offset)
 {
   const u32 start_idx = start_offset / 4;
 
   // zero out bytes in the first u32 starting from 'start_offset'
-  block[start_idx] &= 0xffffffff << ((4 - (start_offset & 3)) * 8);
+  // math is a bit complex to avoid shifting by 32 bits, which is not possible on some architectures
+  block[start_idx] &= ~(0xffffffff >> ((start_offset & 3) * 8));
 
   const u32 end_idx = (end_offset + 3) / 4;
 
@@ -99,7 +116,7 @@ DECLSPEC void memzero_be_S (u32 *block, const u32 start_offset, const u32 end_of
   }
 }
 
-DECLSPEC void aes128_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_len, const u32 *iv, const u32 *key, u32 *decrypted_data,
+DECLSPEC void aes128_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_len, PRIVATE_AS const u32 *iv, PRIVATE_AS const u32 *key, PRIVATE_AS u32 *decrypted_data,
                                   SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
 {
   u32 ks[44];
@@ -131,7 +148,7 @@ DECLSPEC void aes128_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_
   }
 }
 
-DECLSPEC void aes256_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_len, const u32 *iv, const u32 *key, u32 *decrypted_data,
+DECLSPEC void aes256_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_len, PRIVATE_AS const u32 *iv, PRIVATE_AS const u32 *key, PRIVATE_AS u32 *decrypted_data,
                                   SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
 {
   u32 ks[60];
@@ -163,7 +180,7 @@ DECLSPEC void aes256_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_
   }
 }
 
-DECLSPEC int check_decoded_data (u32 *decoded_data, const u32 decoded_data_size)
+DECLSPEC int check_decoded_data (PRIVATE_AS u32 *decoded_data, const u32 decoded_data_size)
 {
   // Check the SHA-1 of the decrypted data which is stored at the end of the decrypted data
   const u32 sha1_byte_off = (decoded_data_size - 20);
@@ -198,16 +215,16 @@ KERNEL_FQ void m17010_init (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u32 pw_len = pws[gid].pw_len;
-  const u32 salted_pw_len = (salt_bufs[SALT_POS].salt_len + pw_len);
+  const u32 salted_pw_len = (salt_bufs[SALT_POS_HOST].salt_len + pw_len);
 
   u32 salted_pw_block[80];
 
   // concatenate salt and password -- the salt is always 8 bytes
-  salted_pw_block[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salted_pw_block[1] = salt_bufs[SALT_POS].salt_buf[1];
+  salted_pw_block[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salted_pw_block[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
   for (u32 idx = 0; idx < 64; idx++) salted_pw_block[idx + 2] = pws[gid].i[idx];
 
@@ -247,7 +264,7 @@ KERNEL_FQ void m17010_loop_prepare (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   tmps[gid].w0[0] = 0;
   tmps[gid].w0[1] = 0;
@@ -266,14 +283,14 @@ KERNEL_FQ void m17010_loop_prepare (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   tmps[gid].w3[2] = 0;
   tmps[gid].w3[3] = 0;
 
-  tmps[gid].len = salt_repeat;
+  tmps[gid].len = SALT_REPEAT;
 }
 
 KERNEL_FQ void m17010_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // get the prepared buffer from the gpg_tmp_t struct into a local buffer
   u32 salted_pw_block[80];
@@ -291,7 +308,7 @@ KERNEL_FQ void m17010_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   sha1_ctx_t ctx;
 
-  const u32 sha_offset = salt_repeat * 5;
+  const u32 sha_offset = SALT_REPEAT * 5;
 
   for (int i = 0; i < 5; i++) ctx.h[i] = tmps[gid].h[sha_offset + i];
 
@@ -303,17 +320,17 @@ KERNEL_FQ void m17010_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   ctx.len = tmps[gid].len;
 
   // sha-1 of salt and password, up to 'salt_iter' bytes
-  const u32 salt_iter = salt_bufs[SALT_POS].salt_iter;
+  const u32 salt_iter = salt_bufs[SALT_POS_HOST].salt_iter;
 
-  const u32 salted_pw_block_pos = loop_pos % salted_pw_block_len;
-  const u32 rounds = (loop_cnt + salted_pw_block_pos) / salted_pw_block_len;
+  const u32 salted_pw_block_pos = LOOP_POS % salted_pw_block_len;
+  const u32 rounds = (LOOP_CNT + salted_pw_block_pos) / salted_pw_block_len;
 
   for (u32 i = 0; i < rounds; i++)
   {
     sha1_update (&ctx, salted_pw_block, salted_pw_block_len);
   }
 
-  if ((loop_pos + loop_cnt) == salt_iter)
+  if ((LOOP_POS + LOOP_CNT) == salt_iter)
   {
     const u32 remaining_bytes = salt_iter % salted_pw_block_len;
 
@@ -389,7 +406,7 @@ KERNEL_FQ void m17010_aux1 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // retrieve and use the SHA-1 as the key for AES
 
@@ -399,19 +416,19 @@ KERNEL_FQ void m17010_aux1 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   u32 iv[4] = {0};
 
-  for (int idx = 0; idx < 4; idx++) iv[idx] = esalt_bufs[DIGESTS_OFFSET].iv[idx];
+  for (int idx = 0; idx < 4; idx++) iv[idx] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[idx];
 
   u32 decoded_data[384];
 
-  const u32 enc_data_size = esalt_bufs[DIGESTS_OFFSET].encrypted_data_size;
+  const u32 enc_data_size = esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data_size;
 
-  aes128_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET].encrypted_data, enc_data_size, iv, aes_key, decoded_data, s_te0, s_te1, s_te2, s_te3, s_te4);
+  aes128_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data, enc_data_size, iv, aes_key, decoded_data, s_te0, s_te1, s_te2, s_te3, s_te4);
 
   if (check_decoded_data (decoded_data, enc_data_size))
   {
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
   }
 }
@@ -459,7 +476,7 @@ KERNEL_FQ void m17010_aux2 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // retrieve and use the SHA-1 as the key for AES
 
@@ -469,19 +486,19 @@ KERNEL_FQ void m17010_aux2 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   u32 iv[4] = {0};
 
-  for (int idx = 0; idx < 4; idx++) iv[idx] = esalt_bufs[DIGESTS_OFFSET].iv[idx];
+  for (int idx = 0; idx < 4; idx++) iv[idx] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[idx];
 
   u32 decoded_data[384];
 
-  const u32 enc_data_size = esalt_bufs[DIGESTS_OFFSET].encrypted_data_size;
+  const u32 enc_data_size = esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data_size;
 
-  aes256_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET].encrypted_data, enc_data_size, iv, aes_key, decoded_data, s_te0, s_te1, s_te2, s_te3, s_te4);
+  aes256_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data, enc_data_size, iv, aes_key, decoded_data, s_te0, s_te1, s_te2, s_te3, s_te4);
 
   if (check_decoded_data (decoded_data, enc_data_size))
   {
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
   }
 }

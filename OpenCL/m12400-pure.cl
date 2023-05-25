@@ -4,14 +4,14 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct bsdicrypt_tmp
 {
@@ -358,7 +358,7 @@ CONSTANT_VK u32a c_skb[8][64] =
 
 #define BOX(i,n,S) (S)[(n)][(i)]
 
-DECLSPEC void _des_crypt_keysetup (u32 c, u32 d, u32 *Kc, u32 *Kd, LOCAL_AS u32 (*s_skb)[64])
+DECLSPEC void _des_crypt_keysetup (u32 c, u32 d, PRIVATE_AS u32 *Kc, PRIVATE_AS u32 *Kd, LOCAL_AS u32 (*s_skb)[64])
 {
   u32 tt;
 
@@ -427,7 +427,7 @@ DECLSPEC void _des_crypt_keysetup (u32 c, u32 d, u32 *Kc, u32 *Kd, LOCAL_AS u32 
   }
 }
 
-DECLSPEC void _des_crypt_encrypt (u32 *iv, u32 mask, u32 rounds, u32 *Kc, u32 *Kd, LOCAL_AS u32 (*s_SPtrans)[64])
+DECLSPEC void _des_crypt_encrypt (PRIVATE_AS u32 *iv, u32 mask, u32 rounds, PRIVATE_AS u32 *Kc, PRIVATE_AS u32 *Kd, LOCAL_AS u32 (*s_SPtrans)[64])
 {
   const u32 E0 = ((mask >>  0) & 0x003f)
                | ((mask >>  4) & 0x3f00);
@@ -537,7 +537,7 @@ KERNEL_FQ void m12400_init (KERN_ATTR_TMPS (bsdicrypt_tmp_t))
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * word
@@ -673,7 +673,7 @@ KERNEL_FQ void m12400_loop (KERN_ATTR_TMPS (bsdicrypt_tmp_t))
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * main
@@ -722,9 +722,9 @@ KERNEL_FQ void m12400_loop (KERN_ATTR_TMPS (bsdicrypt_tmp_t))
   iv[0] = tmps[gid].iv[0];
   iv[1] = tmps[gid].iv[1];
 
-  const u32 mask = salt_bufs[SALT_POS].salt_buf[0];
+  const u32 mask = salt_bufs[SALT_POS_HOST].salt_buf[0];
 
-  _des_crypt_encrypt (iv, mask, loop_cnt, Kc, Kd, s_SPtrans);
+  _des_crypt_encrypt (iv, mask, LOOP_CNT, Kc, Kd, s_SPtrans);
 
   tmps[gid].iv[0] = iv[0];
   tmps[gid].iv[1] = iv[1];
@@ -738,7 +738,7 @@ KERNEL_FQ void m12400_comp (KERN_ATTR_TMPS (bsdicrypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

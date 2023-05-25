@@ -15,9 +15,9 @@ static double try_run (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_par
   hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
   user_options_t *user_options = hashcat_ctx->user_options;
 
-  device_param->kernel_params_buf32[28] = 0;
-  device_param->kernel_params_buf32[29] = kernel_loops; // not a bug, both need to be set
-  device_param->kernel_params_buf32[30] = kernel_loops; // because there's two variables for inner iters for slow and fast hashes
+  device_param->kernel_param.loop_pos = 0;
+  device_param->kernel_param.loop_cnt = kernel_loops; // not a bug, both need to be set
+  device_param->kernel_param.il_cnt   = kernel_loops; // because there's two variables for inner iters for slow and fast hashes
 
   const u32 hardware_power = ((hashconfig->opts_type & OPTS_TYPE_MP_MULTI_DISABLE) ? 1 : device_param->device_processors) * kernel_threads;
 
@@ -104,10 +104,10 @@ static u32 previous_power_of_two (const u32 x)
 
 static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
 {
-  const hashconfig_t    *hashconfig   = hashcat_ctx->hashconfig;
-  const backend_ctx_t   *backend_ctx  = hashcat_ctx->backend_ctx;
-  const straight_ctx_t  *straight_ctx = hashcat_ctx->straight_ctx;
-  const user_options_t  *user_options = hashcat_ctx->user_options;
+  const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
+  const backend_ctx_t  *backend_ctx  = hashcat_ctx->backend_ctx;
+  const straight_ctx_t *straight_ctx = hashcat_ctx->straight_ctx;
+  const user_options_t *user_options = hashcat_ctx->user_options;
 
   const double target_msec = backend_ctx->target_msec;
 
@@ -119,6 +119,20 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
 
   const u32 kernel_threads_min = device_param->kernel_threads_min;
   const u32 kernel_threads_max = device_param->kernel_threads_max;
+
+  // stores the minimum values
+  // they could be used if the autotune fails and user specify --force
+
+  if (user_options->force == true)
+  {
+    device_param->kernel_accel   = kernel_accel_min;
+    device_param->kernel_loops   = kernel_loops_min;
+    device_param->kernel_threads = kernel_threads_min;
+    device_param->hardware_power = ((hashconfig->opts_type & OPTS_TYPE_MP_MULTI_DISABLE) ? 1 : device_param->device_processors) * kernel_threads_min;
+    device_param->kernel_power   = device_param->hardware_power * kernel_accel_min;
+  }
+
+  // start engine
 
   u32 kernel_accel = kernel_accel_min;
   u32 kernel_loops = kernel_loops_min;
@@ -212,6 +226,8 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
       }
     }
 
+    device_param->at_rc = -2;
+
     if (device_param->is_cuda == true)
     {
       if (run_cuda_kernel_atinit (hashcat_ctx, device_param, device_param->cuda_d_pws_buf, kernel_power_max) == -1) return -1;
@@ -221,6 +237,13 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
     {
       if (run_hip_kernel_atinit (hashcat_ctx, device_param, device_param->hip_d_pws_buf, kernel_power_max) == -1) return -1;
     }
+
+    #if defined (__APPLE__)
+    if (device_param->is_metal == true)
+    {
+      if (run_metal_kernel_atinit (hashcat_ctx, device_param, device_param->metal_d_pws_buf, kernel_power_max) == -1) return -1;
+    }
+    #endif
 
     if (device_param->is_opencl == true)
     {
@@ -236,6 +259,8 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
       {
         if (straight_ctx->kernel_rules_cnt > 1)
         {
+          device_param->at_rc = -3;
+
           if (device_param->is_cuda == true)
           {
             if (hc_cuMemcpyDtoDAsync (hashcat_ctx, device_param->cuda_d_rules_c, device_param->cuda_d_rules, MIN (kernel_loops_max, KERNEL_RULES) * sizeof (kernel_rule_t), device_param->cuda_stream) == -1) return -1;
@@ -245,6 +270,13 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
           {
             if (hc_hipMemcpyDtoDAsync (hashcat_ctx, device_param->hip_d_rules_c, device_param->hip_d_rules, MIN (kernel_loops_max, KERNEL_RULES) * sizeof (kernel_rule_t), device_param->hip_stream) == -1) return -1;
           }
+
+          #if defined (__APPLE__)
+          if (device_param->is_metal == true)
+          {
+            if (hc_mtlMemcpyDtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_rules_c, 0, device_param->metal_d_rules, 0, MIN (kernel_loops_max, KERNEL_RULES) * sizeof (kernel_rule_t)) == -1) return -1;
+          }
+          #endif
 
           if (device_param->is_opencl == true)
           {
@@ -289,6 +321,8 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
       if (exec_msec > 2000)
       {
         event_log_error (hashcat_ctx, "Kernel minimum runtime larger than default TDR");
+
+        device_param->at_rc = -4;
 
         return -1;
       }
@@ -437,43 +471,46 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
   // reset them fake words
   // reset other buffers in case autotune cracked something
 
+  device_param->at_rc = -5;
+
   if (device_param->is_cuda == true)
   {
     if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_pws_buf, device_param->size_pws) == -1) return -1;
-
     if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_plain_bufs, device_param->size_plains) == -1) return -1;
-
     if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_digests_shown, device_param->size_shown) == -1) return -1;
-
     if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_result, device_param->size_results) == -1) return -1;
-
     if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_tmps, device_param->size_tmps) == -1) return -1;
   }
 
   if (device_param->is_hip == true)
   {
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_pws_buf, device_param->size_pws) == -1) return -1;
-
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_plain_bufs, device_param->size_plains) == -1) return -1;
-
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_digests_shown, device_param->size_shown) == -1) return -1;
-
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_result, device_param->size_results) == -1) return -1;
-
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_tmps, device_param->size_tmps) == -1) return -1;
   }
+
+  #if defined (__APPLE__)
+  if (device_param->is_metal == true)
+  {
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_pws_buf, device_param->size_pws) == -1) return -1;
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_plain_bufs, device_param->size_plains) == -1) return -1;
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_digests_shown, device_param->size_shown) == -1) return -1;
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_result, device_param->size_results) == -1) return -1;
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_tmps, device_param->size_tmps) == -1) return -1;
+  }
+  #endif
 
   if (device_param->is_opencl == true)
   {
     if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_pws_buf, device_param->size_pws) == -1) return -1;
-
     if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_plain_bufs, device_param->size_plains) == -1) return -1;
-
     if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_digests_shown, device_param->size_shown) == -1) return -1;
-
     if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_result, device_param->size_results) == -1) return -1;
-
     if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_tmps, device_param->size_tmps) == -1) return -1;
+
+    device_param->at_rc = -6;
 
     if (hc_clFlush (hashcat_ctx, device_param->opencl_command_queue) == -1) return -1;
   }
@@ -482,8 +519,7 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
 
   device_param->exec_pos = 0;
 
-  memset (device_param->exec_msec, 0, EXEC_CACHE * sizeof (double));
-
+  memset (device_param->exec_msec,          0,          EXEC_CACHE * sizeof (double));
   memset (device_param->exec_us_prev1,      0, EXPECTED_ITERATIONS * sizeof (double));
   memset (device_param->exec_us_prev2,      0, EXPECTED_ITERATIONS * sizeof (double));
   memset (device_param->exec_us_prev3,      0, EXPECTED_ITERATIONS * sizeof (double));
@@ -517,7 +553,6 @@ HC_API_CALL void *thread_autotune (void *p)
   thread_param_t *thread_param = (thread_param_t *) p;
 
   hashcat_ctx_t *hashcat_ctx = thread_param->hashcat_ctx;
-
   backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
 
   if (backend_ctx->enabled == false) return NULL;
@@ -525,8 +560,12 @@ HC_API_CALL void *thread_autotune (void *p)
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
   if (device_param->skipped == true) return NULL;
-
   if (device_param->skipped_warning == true) return NULL;
+
+  // init autotunes status and rc
+
+  device_param->at_status = AT_STATUS_FAILED;
+  device_param->at_rc = -1; // generic error
 
   if (device_param->is_cuda == true)
   {
@@ -538,11 +577,12 @@ HC_API_CALL void *thread_autotune (void *p)
     if (hc_hipCtxPushCurrent (hashcat_ctx, device_param->hip_context) == -1) return NULL;
   }
 
-  const int rc_autotune = autotune (hashcat_ctx, device_param);
+  // check for autotune failure
 
-  if (rc_autotune == -1)
+  if (autotune (hashcat_ctx, device_param) == 0)
   {
-    // we should do something here, tell hashcat main that autotune failed to abort
+    device_param->at_status = AT_STATUS_PASSED;
+    device_param->at_rc = 0;
   }
 
   if (device_param->is_cuda == true)

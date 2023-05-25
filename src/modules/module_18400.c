@@ -21,7 +21,8 @@ static const char *HASH_NAME      = "Open Document Format (ODF) 1.2 (SHA-256, AE
 static const u64   KERN_TYPE      = 18400;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE;
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
 static const char *ST_HASH        = "$odf$*1*1*100000*32*751854d8b90731ce0579f96bea6f0d4ac2fb2f546b31f1b6af9a5f66952a0bf4*16*2185a966155baa9e2fb597298febecbc*16*c18eaae34bcbbe9119be017fe5f8b52d*0*051e0f1ce0e866f2b771029e03a6c7119aad132af54c4e45824f16f61f357a40407ab82744fe6370c7b2346075fcd4c2e58ab244411b3ab1d532a46e2321599ef13c3d3472fc2f14d480d8c33215e473da67f90540279d3ef1f62dde314fa222796046e496c951235ddf88aa754620b7810d22ebc8835c90dce9276946f52b8ea7d95d2f86e4cc725366a8b3edacc2ce88518e535991a5f84d5ea8795dc02bfb731b5f202ecaf7d4b245d928c4248709fcdf3fba2acf1a08be0c1eee7dbeda07e8c3a6983565635e99952b8ad79d31c965f245ae90b5cc3dba6387898c66fa35cad9ac9595c41b62e68efcdd73185b38e220cf004269b77ec6974474b03b7569afc3b503a2bf8b2d035756f3f4cb880d9ba815e5c944508a0bde214076c35bf0e0814a96d21ccaa744c9056948ed935209f5c7933841d2ede3d28dd84da89d477d4a0041ce6d8ddab891d929340db6daa921d69b46fd5aee306d0bcef88c38acbb495d0466df7e2f744e3d10201081215c02db5dd479a4cda15a3338969c7baec9d3d2c378a8dd30449319b149dc3b4e7f00996a59fcb5f243d0df2cbaf749241033f7865aefa960adfeb8ebf205b270f90b1f82c34f80d5a8a0db7aec89972a32f5daa2a73c5895d1fced01b3ab8e576bd2630eff01cad97781f4966d4b528e1b15f011f28ae907a352073c96b203adc7742d2b79b2e2f440b17e7856ae119e08d15d8bdf951f6d4a3f9b516da2d9a8f9dd93488f8e0119f3da19138ab787f0d7098a652cccd914aa0ff81d375bd6a5a165acc936f591639059287975cfc3ca4342e5f9501b3249a76d14e56d6d56b319e036bc0449ac7b5afa24ffbea11babed8183edf8d4fdca1c3f0d23bfd4a02797627d556634f1a9304e03737604bd86f6b5a26aa687d6df73383e0f7dfe62a131e8dbb8c3f4f13d24857dd29d76984eac6c45df7428fc79323ffa1f4e7962d705df74320141ed1f16d1ad483b872168df60315ffadbfa1b7f4afaed8a0017421bf5e05348cb5c707a5e852d6fee6077ec1c33bc707bcd97b7701ee05a03d6fa78b0d31c8c97ea16e0edf434961bd5cc7cbb7eb2553730f0405c9bd21cee09b3f7c1bc57779fdfc15f3935985737a1b522004c4436b631a39a66e8577a03f5020e6aa41952c0662c8c57f66caa483b47af38b8cb5d457245fd3241749e17433e6f929233e8862d7c584111b1991b2d6e94278e7e6e1908cee5a83d94c78b75a84a695d25aeb9fdde72174fe6dd75e8d406671f44892a385a4a1e249f61ebc993e985607423a0a5742e668d52c1ebf5cecae7c2b7908f4627b92ec49354a9ccff8cb5763ad074a00e65a485a41bf4c25ce7e6fae49358a58547b1c0ca79713e297310c0a367c3de196f1dd685ca4be643bdf1e4f6b034211d020557e37a3b6614d061010b4a3416b6b279728c245d3322";
@@ -57,6 +58,7 @@ typedef struct odf12
   u32 iv[4];
   u32 checksum[8];
   u32 encrypted_data[256];
+  int encrypted_len;
 
 } odf12_t;
 
@@ -92,91 +94,84 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   odf12_t *odf12 = (odf12_t *) esalt_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.token_cnt = 12;
 
   token.signatures_cnt    = 1;
   token.signatures_buf[0] = SIGNATURE_ODF;
 
-  token.len_min[0] = 5;
-  token.len_max[0] = 5;
   token.sep[0]     = '*';
-  token.attr[0]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[0]     = 5;
+  token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_SIGNATURE;
 
-  token.len_min[1] = 1;
-  token.len_max[1] = 1;
   token.sep[1]     = '*';
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 1;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[2] = 1;
-  token.len_max[2] = 1;
   token.sep[2]     = '*';
-  token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[2]     = 1;
+  token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
+  token.sep[3]     = '*';
   token.len_min[3] = 4;
   token.len_max[3] = 6;
-  token.sep[3]     = '*';
   token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[4] = 2;
-  token.len_max[4] = 2;
   token.sep[4]     = '*';
-  token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[4]     = 2;
+  token.attr[4]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[5] = 64;
-  token.len_max[5] = 64;
   token.sep[5]     = '*';
-  token.attr[5]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[5]     = 64;
+  token.attr[5]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
-  token.len_min[6] = 2;
-  token.len_max[6] = 2;
   token.sep[6]     = '*';
-  token.attr[6]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[6]     = 2;
+  token.attr[6]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[7] = 32;
-  token.len_max[7] = 32;
   token.sep[7]     = '*';
-  token.attr[7]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[7]     = 32;
+  token.attr[7]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
-  token.len_min[8] = 2;
-  token.len_max[8] = 2;
   token.sep[8]     = '*';
-  token.attr[8]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[8]     = 2;
+  token.attr[8]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[9] = 32;
-  token.len_max[9] = 32;
   token.sep[9]     = '*';
-  token.attr[9]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[9]     = 32;
+  token.attr[9]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
-  token.len_min[10] = 1;
-  token.len_max[10] = 1;
   token.sep[10]     = '*';
-  token.attr[10]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[10]     = 1;
+  token.attr[10]    = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len[11]     = 2048;
-  token.attr[11]    = TOKEN_ATTR_FIXED_LENGTH
+  token.len_min[11] = 16;
+  token.len_max[11] = 2048;
+  token.sep[11]     = '*';
+  token.attr[11]    = TOKEN_ATTR_VERIFY_LENGTH
                     | TOKEN_ATTR_VERIFY_HEX;
 
   const int rc_tokenizer = input_tokenizer ((const u8 *) line_buf, line_len, &token);
 
   if (rc_tokenizer != PARSER_OK) return (rc_tokenizer);
 
-  const u8 *checksum         = token.buf[5];
-  const u8 *iv               = token.buf[7];
-  const u8 *salt_buf         = token.buf[9];
-  const u8 *encrypted_data   = token.buf[11];
+  const u8 *checksum  = token.buf[5];
+  const u8 *iv        = token.buf[7];
+  const u8 *salt_buf  = token.buf[9];
 
   const u32 cipher_type   = strtol ((const char *) token.buf[1],  NULL, 10);
   const u32 checksum_type = strtol ((const char *) token.buf[2],  NULL, 10);
@@ -206,15 +201,19 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   odf12->checksum[6] = hex_to_u32 (&checksum[48]);
   odf12->checksum[7] = hex_to_u32 (&checksum[56]);
 
+  // iv
+
   odf12->iv[0] = hex_to_u32 (&iv[0]);
   odf12->iv[1] = hex_to_u32 (&iv[8]);
   odf12->iv[2] = hex_to_u32 (&iv[16]);
   odf12->iv[3] = hex_to_u32 (&iv[24]);
 
-  for (int i = 0, j = 0; i < 256; i += 1, j += 8)
-  {
-    odf12->encrypted_data[i] = hex_to_u32 (&encrypted_data[j]);
-  }
+  // ct
+
+  const int ct_len = token.len[11];
+  const u8 *ct_pos = token.buf[11];
+
+  odf12->encrypted_len = hex_decode (ct_pos, ct_len, (u8 *) odf12->encrypted_data);
 
   // salt
 
@@ -247,7 +246,17 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   const odf12_t *odf12 = (const odf12_t *) esalt_buf;
 
-  int out_len = snprintf (line_buf, line_size, "%s*1*1*%u*32*%08x%08x%08x%08x%08x%08x%08x%08x*16*%08x%08x%08x%08x*16*%08x%08x%08x%08x*0*",
+  // ct
+
+  u8 ct_buf[(256 * 4 * 2) + 1];
+
+  memset (ct_buf, 0, sizeof (ct_buf));
+
+  const int ct_len = hex_encode ((const u8 *) odf12->encrypted_data, odf12->encrypted_len, ct_buf);
+
+  ct_buf[ct_len] = 0;
+
+  const int out_len = snprintf (line_buf, line_size, "%s*1*1*%u*32*%08x%08x%08x%08x%08x%08x%08x%08x*16*%08x%08x%08x%08x*16*%08x%08x%08x%08x*0*%s",
     SIGNATURE_ODF,
     odf12->iterations,
     byte_swap_32 (odf12->checksum[0]),
@@ -265,14 +274,8 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     byte_swap_32 (salt->salt_buf[0]),
     byte_swap_32 (salt->salt_buf[1]),
     byte_swap_32 (salt->salt_buf[2]),
-    byte_swap_32 (salt->salt_buf[3]));
-
-  u8 *out_buf = (u8 *) line_buf;
-
-  for (int i = 0; i < 256; i++)
-  {
-    u32_to_hex (odf12->encrypted_data[i], out_buf + out_len); out_len += 8;
-  }
+    byte_swap_32 (salt->salt_buf[3]),
+    (char *) ct_buf);
 
   return out_len;
 }
@@ -286,6 +289,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -304,6 +308,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

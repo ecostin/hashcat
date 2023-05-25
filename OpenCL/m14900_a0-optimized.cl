@@ -7,13 +7,13 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 CONSTANT_VK u8a c_ftable[256] =
@@ -52,7 +52,7 @@ CONSTANT_VK u8a c_ftable[256] =
   0xbd, 0xa8, 0x3a, 0x01, 0x05, 0x59, 0x2a, 0x46
 };
 
-DECLSPEC void g (LOCAL_AS u8 *s_ftable, const u32 *key, const int k, const u32 *wx, u32 *out)
+DECLSPEC void g (LOCAL_AS u8 *s_ftable, PRIVATE_AS const u32 *key, const int k, PRIVATE_AS const u32 *wx, PRIVATE_AS u32 *out)
 {
   const u32 g1 = wx[1];
   const u32 g2 = wx[0];
@@ -65,7 +65,7 @@ DECLSPEC void g (LOCAL_AS u8 *s_ftable, const u32 *key, const int k, const u32 *
   out[1] = g5;
 }
 
-DECLSPEC u32 skip32 (LOCAL_AS u8 *s_ftable, const u32 KP, const u32 *key)
+DECLSPEC u32 skip32 (LOCAL_AS u8 *s_ftable, const u32 KP, PRIVATE_AS const u32 *key)
 {
   u32 wl[2];
   u32 wr[2];
@@ -128,7 +128,7 @@ KERNEL_FQ void m14900_m04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -152,13 +152,13 @@ KERNEL_FQ void m14900_m04 (KERN_ATTR_RULES ())
    * salt
    */
 
-  const u32 KP = salt_bufs[SALT_POS].salt_buf[0];
+  const u32 KP = salt_bufs[SALT_POS_HOST].salt_buf[0];
 
   /**
    * main
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -219,7 +219,7 @@ KERNEL_FQ void m14900_s04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -243,7 +243,7 @@ KERNEL_FQ void m14900_s04 (KERN_ATTR_RULES ())
    * salt
    */
 
-  const u32 KP = salt_bufs[SALT_POS].salt_buf[0];
+  const u32 KP = salt_bufs[SALT_POS_HOST].salt_buf[0];
 
   /**
    * digest
@@ -251,7 +251,7 @@ KERNEL_FQ void m14900_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
     0,
     0,
     0
@@ -261,7 +261,7 @@ KERNEL_FQ void m14900_s04 (KERN_ATTR_RULES ())
    * main
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };

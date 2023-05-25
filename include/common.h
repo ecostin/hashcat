@@ -3,8 +3,8 @@
  * License.....: MIT
  */
 
-#ifndef _COMMON_H
-#define _COMMON_H
+#ifndef HC_COMMON_H
+#define HC_COMMON_H
 
 #define PROGNAME "hashcat"
 
@@ -143,5 +143,5 @@ but this is nededed for VS compiler which doesn't have inline keyword but has __
 #define EOL "\n"
 #endif
 
-#endif // _COMMON_H
+#endif // HC_COMMON_H
 

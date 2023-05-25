@@ -4,15 +4,16 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_amp.h)
 #endif
 
-KERNEL_FQ void amp (GLOBAL_AS pw_t *pws, GLOBAL_AS pw_t *pws_amp, CONSTANT_AS const kernel_rule_t *rules_buf, GLOBAL_AS const pw_t *combs_buf, GLOBAL_AS const bf_t *bfs_buf, const u32 combs_mode, const u64 gid_max)
+KERNEL_FQ void amp (KERN_ATTR_AMP)
 {
   const u64 gid = get_global_id (0);
 

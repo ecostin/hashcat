@@ -355,6 +355,20 @@ int check_hash (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, pla
       }
     }
 
+    #if defined (__APPLE__)
+    if (device_param->is_metal == true)
+    {
+      rc = hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, tmps, device_param->metal_d_tmps, plain->gidvid * hashconfig->tmp_size, hashconfig->tmp_size);
+
+      if (rc == -1)
+      {
+        hcfree (tmps);
+
+        return -1;
+      }
+    }
+    #endif
+
     if (device_param->is_opencl == true)
     {
       rc = hc_clEnqueueReadBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_tmps, CL_FALSE, plain->gidvid * hashconfig->tmp_size, hashconfig->tmp_size, tmps, 0, NULL, &opencl_event);
@@ -574,6 +588,13 @@ int check_cracked (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
     if (hc_hipStreamSynchronize (hashcat_ctx, device_param->hip_stream) == -1) return -1;
   }
 
+  #if defined (__APPLE__)
+  if (device_param->is_metal == true)
+  {
+    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, &num_cracked, device_param->metal_d_result, 0, sizeof (u32)) == -1) return -1;
+  }
+  #endif
+
   if (device_param->is_opencl == true)
   {
     /* blocking */
@@ -624,6 +645,20 @@ int check_cracked (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
     }
   }
 
+  #if defined (__APPLE__)
+  if (device_param->is_metal == true)
+  {
+    rc = hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, cracked, device_param->metal_d_plain_bufs, 0, num_cracked * sizeof (plain_t));
+
+    if (rc == -1)
+    {
+      hcfree (cracked);
+
+      return -1;
+    }
+  }
+  #endif
+
   if (device_param->is_opencl == true)
   {
     /* blocking */
@@ -655,6 +690,8 @@ int check_cracked (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
       hashes->digests_shown[hash_pos] = 1;
 
       hashes->digests_done++;
+
+      hashes->digests_done_new++;
 
       cpt_cracked++;
 
@@ -703,6 +740,18 @@ int check_cracked (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
         }
       }
 
+      #if defined (__APPLE__)
+      if (device_param->is_metal == true)
+      {
+        rc = run_metal_kernel_memset32 (hashcat_ctx, device_param, device_param->metal_d_digests_shown, salt_buf->digests_offset * sizeof (u32), 0, salt_buf->digests_cnt * sizeof (u32));
+
+        if (rc == -1)
+        {
+          break;
+        }
+      }
+      #endif
+
       if (device_param->is_opencl == true)
       {
         /* NOTE: run_opencl_kernel_bzero() does not handle buffer offset */
@@ -750,6 +799,13 @@ int check_cracked (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
   {
     if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_result, sizeof (u32)) == -1) return -1;
   }
+
+  #if defined (__APPLE__)
+  if (device_param->is_metal == true)
+  {
+    if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_result, sizeof (u32)) == -1) return -1;
+  }
+  #endif
 
   if (device_param->is_opencl == true)
   {
@@ -814,6 +870,8 @@ int hashes_init_filename (hashcat_ctx_t *hashcat_ctx)
       hashes->hashfile = user_options_extra->hc_hash;
     }
   }
+
+  hashes->parser_token_length_cnt = 0;
 
   return 0;
 }
@@ -1068,7 +1126,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
   else if (user_options->stdout_flag == true)
   {
   }
-  else if (user_options->backend_info == true)
+  else if (user_options->backend_info > 0)
   {
   }
   else
@@ -1174,6 +1232,20 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
             if (parser_status == PARSER_OK)
             {
+              if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+              {
+                parser_status = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+                if (parser_status == PARSER_OK)
+                {
+                  // nothing to do
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+                }
+              }
+
               hashes_buf[hashes_cnt].hash_info->split->split_group  = 0;
               hashes_buf[hashes_cnt].hash_info->split->split_origin = SPLIT_ORIGIN_LEFT;
 
@@ -1184,12 +1256,31 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
               event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
             }
 
+            if (parser_status == PARSER_TOKEN_LENGTH)
+            {
+              hashes->parser_token_length_cnt++;
+            }
+
             hash = &hashes_buf[hashes_cnt];
 
             parser_status = module_ctx->module_hash_decode (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, hash_buf + 16, 16);
 
             if (parser_status == PARSER_OK)
             {
+              if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+              {
+                parser_status = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+                if (parser_status == PARSER_OK)
+                {
+                  // nothing to do
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+                }
+              }
+
               hashes_buf[hashes_cnt].hash_info->split->split_group  = 0;
               hashes_buf[hashes_cnt].hash_info->split->split_origin = SPLIT_ORIGIN_RIGHT;
 
@@ -1198,6 +1289,11 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
             else
             {
               event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+            }
+
+            if (parser_status == PARSER_TOKEN_LENGTH)
+            {
+              hashes->parser_token_length_cnt++;
             }
           }
           else
@@ -1208,6 +1304,20 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
             if (parser_status == PARSER_OK)
             {
+              if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+              {
+                parser_status = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+                if (parser_status == PARSER_OK)
+                {
+                  // nothing to do
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+                }
+              }
+
               hashes_buf[hashes_cnt].hash_info->split->split_group  = 0;
               hashes_buf[hashes_cnt].hash_info->split->split_origin = SPLIT_ORIGIN_NONE;
 
@@ -1216,6 +1326,11 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
             else
             {
               event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+            }
+
+            if (parser_status == PARSER_TOKEN_LENGTH)
+            {
+              hashes->parser_token_length_cnt++;
             }
           }
         }
@@ -1227,11 +1342,30 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
           if (parser_status == PARSER_OK)
           {
+            if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+            {
+              parser_status = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+              if (parser_status == PARSER_OK)
+              {
+                // nothing to do
+              }
+              else
+              {
+                event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+              }
+            }
+
             hashes_cnt++;
           }
           else
           {
             event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+          }
+
+          if (parser_status == PARSER_TOKEN_LENGTH)
+          {
+            hashes->parser_token_length_cnt++;
           }
         }
       }
@@ -1387,6 +1521,33 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
               continue;
             }
 
+            if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+            {
+              int parser_status_postprocess = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+              if (parser_status_postprocess < PARSER_GLOBAL_ZERO)
+              {
+                char *tmp_line_buf;
+
+                hc_asprintf (&tmp_line_buf, "%s", line_buf);
+
+                compress_terminal_line_length (tmp_line_buf, 38, 32);
+
+                if (user_options->machine_readable == true)
+                {
+                  event_log_warning (hashcat_ctx, "%s:%u:%s:%s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hashfile '%s' on line %u (%s): %s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+
+                hcfree (tmp_line_buf);
+
+                continue;
+              }
+            }
+
             hashes_buf[hashes_cnt].hash_info->split->split_group  = line_num;
             hashes_buf[hashes_cnt].hash_info->split->split_origin = SPLIT_ORIGIN_LEFT;
 
@@ -1416,6 +1577,33 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
               hcfree (tmp_line_buf);
 
               continue;
+            }
+
+            if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+            {
+              int parser_status_postprocess = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+              if (parser_status_postprocess < PARSER_GLOBAL_ZERO)
+              {
+                char *tmp_line_buf;
+
+                hc_asprintf (&tmp_line_buf, "%s", line_buf);
+
+                compress_terminal_line_length (tmp_line_buf, 38, 32);
+
+                if (user_options->machine_readable == true)
+                {
+                  event_log_warning (hashcat_ctx, "%s:%u:%s:%s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hashfile '%s' on line %u (%s): %s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+
+                hcfree (tmp_line_buf);
+
+                continue;
+              }
             }
 
             hashes_buf[hashes_cnt].hash_info->split->split_group  = line_num;
@@ -1451,6 +1639,33 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
               continue;
             }
 
+            if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+            {
+              int parser_status_postprocess = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+              if (parser_status_postprocess < PARSER_GLOBAL_ZERO)
+              {
+                char *tmp_line_buf;
+
+                hc_asprintf (&tmp_line_buf, "%s", line_buf);
+
+                compress_terminal_line_length (tmp_line_buf, 38, 32);
+
+                if (user_options->machine_readable == true)
+                {
+                  event_log_warning (hashcat_ctx, "%s:%u:%s:%s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+                else
+                {
+                  event_log_warning (hashcat_ctx, "Hashfile '%s' on line %u (%s): %s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+                }
+
+                hcfree (tmp_line_buf);
+
+                continue;
+              }
+            }
+
             hashes_buf[hashes_cnt].hash_info->split->split_group  = line_num;
             hashes_buf[hashes_cnt].hash_info->split->split_origin = SPLIT_ORIGIN_NONE;
 
@@ -1482,7 +1697,44 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
             hcfree (tmp_line_buf);
 
+            if (parser_status == PARSER_TOKEN_LENGTH)
+            {
+              hashes->parser_token_length_cnt++;
+            }
+
             continue;
+          }
+
+          if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+          {
+            int parser_status_postprocess = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+            if (parser_status_postprocess < PARSER_GLOBAL_ZERO)
+            {
+              char *tmp_line_buf;
+
+              hc_asprintf (&tmp_line_buf, "%s", line_buf);
+
+              compress_terminal_line_length (tmp_line_buf, 38, 32);
+
+              if (user_options->machine_readable == true)
+              {
+                event_log_warning (hashcat_ctx, "%s:%u:%s:%s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+              }
+              else
+              {
+                event_log_warning (hashcat_ctx, "Hashfile '%s' on line %u (%s): %s", hashes->hashfile, line_num, tmp_line_buf, strparser (parser_status_postprocess));
+              }
+
+              hcfree (tmp_line_buf);
+
+              if (parser_status_postprocess == PARSER_TOKEN_LENGTH)
+              {
+                hashes->parser_token_length_cnt++;
+              }
+
+              continue;
+            }
           }
 
           hashes_cnt++;
@@ -1570,11 +1822,30 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
         if (parser_status == PARSER_OK)
         {
+          if (module_ctx->module_hash_decode_postprocess != MODULE_DEFAULT)
+          {
+            parser_status = module_ctx->module_hash_decode_postprocess (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, user_options, user_options_extra);
+
+            if (parser_status == PARSER_OK)
+            {
+              // nothing to do
+            }
+            else
+            {
+              event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+            }
+          }
+
           hashes_cnt++;
         }
         else
         {
           event_log_warning (hashcat_ctx, "Hash '%s': %s", input_buf, strparser (parser_status));
+        }
+
+        if (parser_status == PARSER_TOKEN_LENGTH)
+        {
+          hashes->parser_token_length_cnt++;
         }
       }
     }
@@ -1623,6 +1894,16 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
         break;
       }
     }
+  }
+
+  if (hashes->parser_token_length_cnt > 0)
+  {
+    event_log_advice (hashcat_ctx, NULL); // we can guarantee that the previous line was not an empty line
+    event_log_advice (hashcat_ctx, "* Token length exception: %u/%u hashes", hashes->parser_token_length_cnt, hashes->parser_token_length_cnt + hashes->hashes_cnt);
+    event_log_advice (hashcat_ctx, "  This error happens if the wrong hash type is specified, if the hashes are");
+    event_log_advice (hashcat_ctx, "  malformed, or if input is otherwise not as expected (for example, if the");
+    event_log_advice (hashcat_ctx, "  --username option is used but no username is present)");
+    event_log_advice (hashcat_ctx, NULL);
   }
 
   return 0;
@@ -1716,7 +1997,7 @@ int hashes_init_stage2 (hashcat_ctx_t *hashcat_ctx)
   u32 digests_cnt  = hashes_cnt;
   u32 digests_done = 0;
 
-  u32 *digests_shown     = (u32 *) hccalloc (digests_cnt, sizeof (u32));
+  u32 *digests_shown = (u32 *) hccalloc (digests_cnt, sizeof (u32));
 
   u32 salts_cnt   = 0;
   u32 salts_done  = 0;
@@ -1871,16 +2152,17 @@ int hashes_init_stage3 (hashcat_ctx_t *hashcat_ctx)
 {
   hashes_t *hashes = hashcat_ctx->hashes;
 
-  u32  digests_done  = hashes->digests_done;
-  u32 *digests_shown = hashes->digests_shown;
+  u32  digests_done      = hashes->digests_done;
+  u32  digests_done_zero = hashes->digests_done_zero;
+  u32  digests_done_pot  = hashes->digests_done_pot;
+  u32 *digests_shown     = hashes->digests_shown;
 
-  u32  salts_cnt     = hashes->salts_cnt;
-  u32  salts_done    = hashes->salts_done;
-  u32 *salts_shown   = hashes->salts_shown;
+  u32  salts_cnt         = hashes->salts_cnt;
+  u32  salts_done        = hashes->salts_done;
+  u32 *salts_shown       = hashes->salts_shown;
 
-  hash_t *hashes_buf = hashes->hashes_buf;
-
-  salt_t *salts_buf  = hashes->salts_buf;
+  hash_t *hashes_buf     = hashes->hashes_buf;
+  salt_t *salts_buf      = hashes->salts_buf;
 
   for (u32 salt_idx = 0; salt_idx < salts_cnt; salt_idx++)
   {
@@ -1892,11 +2174,24 @@ int hashes_init_stage3 (hashcat_ctx_t *hashcat_ctx)
     {
       const u32 hashes_idx = salt_buf->digests_offset + digest_idx;
 
-      if (hashes_buf[hashes_idx].cracked == 1)
+      if (hashes_buf[hashes_idx].cracked_pot == 1)
       {
         digests_shown[hashes_idx] = 1;
 
         digests_done++;
+
+        digests_done_pot++;
+
+        salt_buf->digests_done++;
+      }
+
+      if (hashes_buf[hashes_idx].cracked_zero == 1)
+      {
+        digests_shown[hashes_idx] = 1;
+
+        digests_done++;
+
+        digests_done_zero++;
 
         salt_buf->digests_done++;
       }
@@ -1912,10 +2207,12 @@ int hashes_init_stage3 (hashcat_ctx_t *hashcat_ctx)
     if (salts_done == salts_cnt) mycracked (hashcat_ctx);
   }
 
-  hashes->digests_done = digests_done;
+  hashes->digests_done      = digests_done;
+  hashes->digests_done_zero = digests_done_zero;
+  hashes->digests_done_pot  = digests_done_pot;
 
-  hashes->salts_cnt   = salts_cnt;
-  hashes->salts_done  = salts_done;
+  hashes->salts_cnt         = salts_cnt;
+  hashes->salts_done        = salts_done;
 
   return 0;
 }
@@ -1963,6 +2260,21 @@ int hashes_init_stage4 (hashcat_ctx_t *hashcat_ctx)
           hashconfig->opts_type &= ~OPTS_TYPE_ST_ADDBITS15;
           hashconfig->opts_type |=  OPTS_TYPE_PT_ADDBITS15;
         }
+      }
+    }
+  }
+
+  // https://github.com/hashcat/hashcat/issues/3641
+
+  if ((hashconfig->opts_type & OPTS_TYPE_DEEP_COMP_KERNEL) == 0)
+  {
+    if (hashconfig->attack_exec == ATTACK_EXEC_OUTSIDE_KERNEL)
+    {
+      if (hashes->digests_cnt != hashes->salts_cnt)
+      {
+        event_log_error (hashcat_ctx, "This hash-mode plugin cannot crack multiple hashes with the same salt, please select one of the hashes.");
+
+        return -1;
       }
     }
   }
@@ -2274,7 +2586,7 @@ int hashes_init_zerohash (hashcat_ctx_t *hashcat_ctx)
       next->pw_buf = (char *) hcmalloc (1);
       next->pw_len = 0;
 
-      next->cracked = 1;
+      next->cracked_zero = 1;
 
       // should we show the cracked zero hash to the user?
 
@@ -2395,6 +2707,8 @@ void hashes_logger (hashcat_ctx_t *hashcat_ctx)
   logfile_top_uint   (hashes->hashlist_format);
   logfile_top_uint   (hashes->hashes_cnt);
   logfile_top_uint   (hashes->digests_cnt);
+  logfile_top_uint   (hashes->digests_done_pot);
+  logfile_top_uint   (hashes->digests_done_zero);
   logfile_top_uint   (hashes->digests_done);
   logfile_top_uint   (hashes->salts_cnt);
   logfile_top_uint   (hashes->salts_done);

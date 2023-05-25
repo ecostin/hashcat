@@ -6,13 +6,13 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -27,14 +27,11 @@
 #define uint_to_hex_lower8(i) make_u32x (l_bin2asc[(i).s0], l_bin2asc[(i).s1], l_bin2asc[(i).s2], l_bin2asc[(i).s3], l_bin2asc[(i).s4], l_bin2asc[(i).s5], l_bin2asc[(i).s6], l_bin2asc[(i).s7], l_bin2asc[(i).s8], l_bin2asc[(i).s9], l_bin2asc[(i).sa], l_bin2asc[(i).sb], l_bin2asc[(i).sc], l_bin2asc[(i).sd], l_bin2asc[(i).se], l_bin2asc[(i).sf])
 #endif
 
-DECLSPEC void m20900m (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KERN_ATTR_BASIC (), LOCAL_AS u32 *l_bin2asc)
+DECLSPEC void m20900m (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 pw_len, KERN_ATTR_FUNC_BASIC (), LOCAL_AS u32 *l_bin2asc)
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * loop
@@ -42,7 +39,7 @@ DECLSPEC void m20900m (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
 
   u32 w0l = w0[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = ix_create_bft (bfs_buf, il_pos);
 
@@ -171,11 +168,11 @@ DECLSPEC void m20900m (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     we_t = hc_rotl32 ((wb_t ^ w6_t ^ w0_t ^ we_t), 1u); SHA1_STEP (SHA1_F1, c, d, e, a, b, we_t);
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u); SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     const u32x a0 = a;
     const u32x b0 = b;
@@ -279,10 +276,10 @@ DECLSPEC void m20900m (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     MD5_STEP (MD5_I , c, d, a, b, w2_t, MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w9_t, MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     const u32x a1 = hc_swap32 (a);
     const u32x b1 = hc_swap32 (b);
@@ -679,23 +676,20 @@ DECLSPEC void m20900m (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     MD5_STEP (MD5_I , c, d, a, b, w2_t, MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w9_t, MD5C3f, MD5S33);
 
-    a += digest[0] - MD5M_A;
-    b += digest[1] - MD5M_B;
-    c += digest[2] - MD5M_C;
-    d += digest[3] - MD5M_D;
+    a += digest[0] - make_u32x (MD5M_A);
+    b += digest[1] - make_u32x (MD5M_B);
+    c += digest[2] - make_u32x (MD5M_C);
+    d += digest[3] - make_u32x (MD5M_D);
 
     COMPARE_M_SIMD (a, d, c, b);
   }
 }
 
-DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KERN_ATTR_BASIC (), LOCAL_AS u32 *l_bin2asc)
+DECLSPEC void m20900s (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 pw_len, KERN_ATTR_FUNC_BASIC (), LOCAL_AS u32 *l_bin2asc)
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * digest
@@ -703,10 +697,10 @@ DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -715,7 +709,7 @@ DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
 
   u32 w0l = w0[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = ix_create_bft (bfs_buf, il_pos);
 
@@ -844,11 +838,11 @@ DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     we_t = hc_rotl32 ((wb_t ^ w6_t ^ w0_t ^ we_t), 1u); SHA1_STEP (SHA1_F1, c, d, e, a, b, we_t);
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u); SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     const u32x a0 = a;
     const u32x b0 = b;
@@ -952,10 +946,10 @@ DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     MD5_STEP (MD5_I , c, d, a, b, w2_t, MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w9_t, MD5C3f, MD5S33);
 
-    a += MD5M_A;
-    b += MD5M_B;
-    c += MD5M_C;
-    d += MD5M_D;
+    a += make_u32x (MD5M_A);
+    b += make_u32x (MD5M_B);
+    c += make_u32x (MD5M_C);
+    d += make_u32x (MD5M_D);
 
     const u32x a1 = hc_swap32 (a);
     const u32x b1 = hc_swap32 (b);
@@ -1349,16 +1343,16 @@ DECLSPEC void m20900s (u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KER
     MD5_STEP (MD5_I , b, c, d, a, wd_t, MD5C3b, MD5S33);
     MD5_STEP (MD5_I , a, b, c, d, w4_t, MD5C3c, MD5S30);
 
-    if (MATCHES_NONE_VS ((a+digest[0]-MD5M_A), search[0])) continue;
+    if (MATCHES_NONE_VS ((a + digest[0] - make_u32x (MD5M_A)), search[0])) continue;
 
     MD5_STEP (MD5_I , d, a, b, c, wb_t, MD5C3d, MD5S31);
     MD5_STEP (MD5_I , c, d, a, b, w2_t, MD5C3e, MD5S32);
     MD5_STEP (MD5_I , b, c, d, a, w9_t, MD5C3f, MD5S33);
 
-    a += digest[0] - MD5M_A;
-    b += digest[1] - MD5M_B;
-    c += digest[2] - MD5M_C;
-    d += digest[3] - MD5M_D;
+    a += digest[0] - make_u32x (MD5M_A);
+    b += digest[1] - make_u32x (MD5M_B);
+    c += digest[2] - make_u32x (MD5M_C);
+    d += digest[3] - make_u32x (MD5M_D);
 
     COMPARE_S_SIMD (a, d, c, b);
   }
@@ -1370,8 +1364,8 @@ KERNEL_FQ void m20900_m04 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1391,7 +1385,7 @@ KERNEL_FQ void m20900_m04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1431,7 +1425,7 @@ KERNEL_FQ void m20900_m04 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20900_m08 (KERN_ATTR_BASIC ())
@@ -1440,8 +1434,8 @@ KERNEL_FQ void m20900_m08 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1461,7 +1455,7 @@ KERNEL_FQ void m20900_m08 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1501,7 +1495,7 @@ KERNEL_FQ void m20900_m08 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20900_m16 (KERN_ATTR_BASIC ())
@@ -1510,8 +1504,8 @@ KERNEL_FQ void m20900_m16 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1531,7 +1525,7 @@ KERNEL_FQ void m20900_m16 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1571,7 +1565,7 @@ KERNEL_FQ void m20900_m16 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20900_s04 (KERN_ATTR_BASIC ())
@@ -1580,8 +1574,8 @@ KERNEL_FQ void m20900_s04 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1601,7 +1595,7 @@ KERNEL_FQ void m20900_s04 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1641,7 +1635,7 @@ KERNEL_FQ void m20900_s04 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20900_s08 (KERN_ATTR_BASIC ())
@@ -1650,8 +1644,8 @@ KERNEL_FQ void m20900_s08 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1671,7 +1665,7 @@ KERNEL_FQ void m20900_s08 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1711,7 +1705,7 @@ KERNEL_FQ void m20900_s08 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }
 
 KERNEL_FQ void m20900_s16 (KERN_ATTR_BASIC ())
@@ -1720,8 +1714,8 @@ KERNEL_FQ void m20900_s16 (KERN_ATTR_BASIC ())
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
 
   /**
@@ -1741,7 +1735,7 @@ KERNEL_FQ void m20900_s16 (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1781,5 +1775,5 @@ KERNEL_FQ void m20900_s16 (KERN_ATTR_BASIC ())
    * main
    */
 
-  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max, l_bin2asc);
+  m20900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
 }

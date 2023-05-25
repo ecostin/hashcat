@@ -4,15 +4,15 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct md5crypt_tmp
 {
@@ -20,7 +20,7 @@ typedef struct md5crypt_tmp
 
 } md5crypt_tmp_t;
 
-DECLSPEC void memcat16 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, const u32 offset, const u32 *append)
+DECLSPEC void memcat16 (PRIVATE_AS u32 *block0, PRIVATE_AS u32 *block1, PRIVATE_AS u32 *block2, PRIVATE_AS u32 *block3, const u32 offset, PRIVATE_AS const u32 *append)
 {
   u32 tmp0;
   u32 tmp1;
@@ -133,7 +133,7 @@ DECLSPEC void memcat16 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, cons
   }
 }
 
-DECLSPEC void memcat16_x80 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, const u32 offset, const u32 *append)
+DECLSPEC void memcat16_x80 (PRIVATE_AS u32 *block0, PRIVATE_AS u32 *block1, PRIVATE_AS u32 *block2, PRIVATE_AS u32 *block3, const u32 offset, PRIVATE_AS const u32 *append)
 {
   u32 tmp0;
   u32 tmp1;
@@ -248,7 +248,7 @@ DECLSPEC void memcat16_x80 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, 
   }
 }
 
-DECLSPEC void memcat8 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, const u32 offset, const u32 *append)
+DECLSPEC void memcat8 (PRIVATE_AS u32 *block0, PRIVATE_AS u32 *block1, PRIVATE_AS u32 *block2, PRIVATE_AS u32 *block3, const u32 offset, PRIVATE_AS const u32 *append)
 {
   u32 tmp0;
   u32 tmp1;
@@ -339,7 +339,7 @@ DECLSPEC void memcat8 (u32 *block0, u32 *block1, u32 *block2, u32 *block3, const
   }
 }
 
-DECLSPEC void append_1st (u32 *block0, u32 *block1, u32 *block2, u32 *block3, const u32 block_len, const u32 append)
+DECLSPEC void append_1st (PRIVATE_AS u32 *block0, PRIVATE_AS u32 *block1, PRIVATE_AS u32 *block2, PRIVATE_AS u32 *block3, const u32 block_len, const u32 append)
 {
   switch (block_len)
   {
@@ -581,7 +581,7 @@ KERNEL_FQ void m06300_init (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -598,10 +598,10 @@ KERNEL_FQ void m06300_init (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   u32 salt_buf[2];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * init
@@ -739,7 +739,7 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -765,10 +765,10 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   u32 salt_buf[2];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * digest
@@ -817,7 +817,7 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
   block3[2] = 0;
   block3[3] = 0;
 
-  for (u32 i = 0, j = loop_pos; i < loop_cnt; i++, j++)
+  for (u32 i = 0, j = LOOP_POS; i < LOOP_CNT; i++, j++)
   {
     block1[0] = 0;
     block1[1] = 0;
@@ -927,7 +927,7 @@ KERNEL_FQ void m06300_comp (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

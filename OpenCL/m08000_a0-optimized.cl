@@ -6,17 +6,17 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
-DECLSPEC void sha256_transform_m (u32x *digest, const u32x *w)
+DECLSPEC void sha256_transform_m (PRIVATE_AS u32x *digest, PRIVATE_AS const u32x *w)
 {
   u32x a = digest[0];
   u32x b = digest[1];
@@ -110,7 +110,7 @@ DECLSPEC void sha256_transform_m (u32x *digest, const u32x *w)
   digest[7] += h;
 }
 
-DECLSPEC void sha256_transform_z (u32x *digest)
+DECLSPEC void sha256_transform_z (PRIVATE_AS u32x *digest)
 {
   u32x a = digest[0];
   u32x b = digest[1];
@@ -167,7 +167,7 @@ DECLSPEC void sha256_transform_z (u32x *digest)
   digest[7] += h;
 }
 
-DECLSPEC void sha256_transform_s (u32x *digest, LOCAL_AS u32 *w)
+DECLSPEC void sha256_transform_s (PRIVATE_AS u32x *digest, LOCAL_AS u32 *w)
 {
   u32x a = digest[0];
   u32x b = digest[1];
@@ -232,9 +232,9 @@ KERNEL_FQ void m08000_m04 (KERN_ATTR_RULES ())
    * salt
    */
 
-  const u32 salt_buf0 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  const u32 salt_buf1 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  const u32 salt_buf2 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]); // 0x80
+  const u32 salt_buf0 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  const u32 salt_buf1 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  const u32 salt_buf2 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]); // 0x80
 
   /**
    * precompute final msg blocks
@@ -279,7 +279,7 @@ KERNEL_FQ void m08000_m04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -303,7 +303,7 @@ KERNEL_FQ void m08000_m04 (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -403,9 +403,9 @@ KERNEL_FQ void m08000_s04 (KERN_ATTR_RULES ())
    * salt
    */
 
-  const u32 salt_buf0 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  const u32 salt_buf1 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  const u32 salt_buf2 = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]); // 0x80
+  const u32 salt_buf0 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  const u32 salt_buf1 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  const u32 salt_buf2 = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]); // 0x80
 
   /**
    * precompute final msg blocks
@@ -450,7 +450,7 @@ KERNEL_FQ void m08000_s04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -476,17 +476,17 @@ KERNEL_FQ void m08000_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };

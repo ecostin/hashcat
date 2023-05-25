@@ -6,14 +6,14 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -69,7 +69,7 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -98,30 +98,30 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_RULES ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -230,14 +230,14 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_RULES ())
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
     wf_t = SHA256_EXPAND (wd_t, w8_t, w0_t, wf_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, b, c, d, e, f, g, h, a, wf_t, SHA256C3f);
 
-    a += SHA256M_A;
-    b += SHA256M_B;
-    c += SHA256M_C;
-    d += SHA256M_D;
-    e += SHA256M_E;
-    f += SHA256M_F;
-    g += SHA256M_G;
-    h += SHA256M_H;
+    a += make_u32x (SHA256M_A);
+    b += make_u32x (SHA256M_B);
+    c += make_u32x (SHA256M_C);
+    d += make_u32x (SHA256M_D);
+    e += make_u32x (SHA256M_E);
+    f += make_u32x (SHA256M_F);
+    g += make_u32x (SHA256M_G);
+    h += make_u32x (SHA256M_H);
 
     // final sha256
 
@@ -609,12 +609,12 @@ KERNEL_FQ void m20710_m04 (KERN_ATTR_RULES ())
 
 //    a += digest[0] - SHA256M_A;
 //    b += digest[1] - SHA256M_B;
-    c += digest[2] - SHA256M_C;
-    d += digest[3] - SHA256M_D;
+    c += digest[2] - make_u32x (SHA256M_C);
+    d += digest[3] - make_u32x (SHA256M_D);
 //    e += digest[4] - SHA256M_E;
 //    f += digest[5] - SHA256M_F;
-    g += digest[6] - SHA256M_G;
-    h += digest[7] - SHA256M_H;
+    g += digest[6] - make_u32x (SHA256M_G);
+    h += digest[7] - make_u32x (SHA256M_H);
 
     COMPARE_M_SIMD (d, h, c, g);
   }
@@ -655,7 +655,7 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -684,24 +684,24 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
   u32 salt_buf2[4];
   u32 salt_buf3[4];
 
-  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 0]);
-  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 1]);
-  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 2]);
-  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 3]);
-  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 4]);
-  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 5]);
-  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 6]);
-  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 7]);
-  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 8]);
-  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[ 9]);
-  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[10]);
-  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[11]);
-  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[12]);
-  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[13]);
-  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[14]);
-  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[15]);
+  salt_buf0[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 0]);
+  salt_buf0[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 1]);
+  salt_buf0[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 2]);
+  salt_buf0[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 3]);
+  salt_buf1[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 4]);
+  salt_buf1[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 5]);
+  salt_buf1[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 6]);
+  salt_buf1[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 7]);
+  salt_buf2[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 8]);
+  salt_buf2[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[ 9]);
+  salt_buf2[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[10]);
+  salt_buf2[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[11]);
+  salt_buf3[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[12]);
+  salt_buf3[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[13]);
+  salt_buf3[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[14]);
+  salt_buf3[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[15]);
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * digest
@@ -709,17 +709,17 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -828,14 +828,14 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
     wf_t = SHA256_EXPAND (wd_t, w8_t, w0_t, wf_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, b, c, d, e, f, g, h, a, wf_t, SHA256C3f);
 
-    a += SHA256M_A;
-    b += SHA256M_B;
-    c += SHA256M_C;
-    d += SHA256M_D;
-    e += SHA256M_E;
-    f += SHA256M_F;
-    g += SHA256M_G;
-    h += SHA256M_H;
+    a += make_u32x (SHA256M_A);
+    b += make_u32x (SHA256M_B);
+    c += make_u32x (SHA256M_C);
+    d += make_u32x (SHA256M_D);
+    e += make_u32x (SHA256M_E);
+    f += make_u32x (SHA256M_F);
+    g += make_u32x (SHA256M_G);
+    h += make_u32x (SHA256M_H);
 
     // final sha256
 
@@ -1198,14 +1198,14 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
     w7_t = SHA256_EXPAND (w5_t, w0_t, w8_t, w7_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, b, c, d, e, f, g, h, a, w7_t, SHA256C37);
     w8_t = SHA256_EXPAND (w6_t, w1_t, w9_t, w8_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, a, b, c, d, e, f, g, h, w8_t, SHA256C38);
 
-    // if (MATCHES_NONE_VS (h+digest[7]-SHA256M_H, d_rev)) continue;
+    // if (MATCHES_NONE_VS ((h + digest[7] - make_u32x (SHA256M_H)), d_rev)) continue;
 
     w9_t = SHA256_EXPAND (w7_t, w2_t, wa_t, w9_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, h, a, b, c, d, e, f, g, w9_t, SHA256C39);
     wa_t = SHA256_EXPAND (w8_t, w3_t, wb_t, wa_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, g, h, a, b, c, d, e, f, wa_t, SHA256C3a);
     wb_t = SHA256_EXPAND (w9_t, w4_t, wc_t, wb_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, f, g, h, a, b, c, d, e, wb_t, SHA256C3b);
     wc_t = SHA256_EXPAND (wa_t, w5_t, wd_t, wc_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, e, f, g, h, a, b, c, d, wc_t, SHA256C3c);
 
-    if (MATCHES_NONE_VS (h+digest[7]-SHA256M_H, search[1])) continue;
+    if (MATCHES_NONE_VS ((h + digest[7] - make_u32x (SHA256M_H)), search[1])) continue;
 
     wd_t = SHA256_EXPAND (wb_t, w6_t, we_t, wd_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, d, e, f, g, h, a, b, c, wd_t, SHA256C3d);
     we_t = SHA256_EXPAND (wc_t, w7_t, wf_t, we_t); SHA256_STEP (SHA256_F0o, SHA256_F1o, c, d, e, f, g, h, a, b, we_t, SHA256C3e);
@@ -1213,12 +1213,12 @@ KERNEL_FQ void m20710_s04 (KERN_ATTR_RULES ())
 
 //    a += digest[0] - SHA256M_A;
 //    b += digest[1] - SHA256M_B;
-    c += digest[2] - SHA256M_C;
-    d += digest[3] - SHA256M_D;
+    c += digest[2] - make_u32x (SHA256M_C);
+    d += digest[3] - make_u32x (SHA256M_D);
 //    e += digest[4] - SHA256M_E;
 //    f += digest[5] - SHA256M_F;
-    g += digest[6] - SHA256M_G;
-    h += digest[7] - SHA256M_H;
+    g += digest[6] - make_u32x (SHA256M_G);
+    h += digest[7] - make_u32x (SHA256M_H);
 
     COMPARE_S_SIMD (d, h, c, g);
   }

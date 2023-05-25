@@ -20,7 +20,8 @@ static const u32   HASH_CATEGORY  = HASH_CATEGORY_NETWORK_SERVER;
 static const char *HASH_NAME      = "KNX IP Secure - Device Authentication Code";
 static const u64   KERN_TYPE      = 25900;
 static const u32   OPTI_TYPE      = OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_DEEP_COMP_KERNEL;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
@@ -65,7 +66,7 @@ static const char *SIGNATURE_DEVICE_AUTHENTICATION_CODE = "$knx-ip-secure-device
 static const char *SALT_DEVICE_AUTHENTICATION_CODE      = "device-authentication-code.1.secure.ip.knx.org";
 static const int   ROUNDS_DEVICE_AUTHENTICATION_CODE    = 65536;
 
-char *module_jit_build_options(MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
+char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
   char *jit_build_options = NULL;
 
@@ -78,7 +79,7 @@ char *module_jit_build_options(MAYBE_UNUSED const hashconfig_t *hashconfig, MAYB
   // NVIDIA GPU
   if (device_param->opencl_device_vendor_id == VENDOR_ID_NV)
   {
-    hc_asprintf(&jit_build_options, "-D _unroll");
+    hc_asprintf (&jit_build_options, "-D _unroll");
   }
 
   // HIP
@@ -90,7 +91,7 @@ char *module_jit_build_options(MAYBE_UNUSED const hashconfig_t *hashconfig, MAYB
   // ROCM
   if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == true))
   {
-    hc_asprintf(&jit_build_options, "-D _unroll");
+    hc_asprintf (&jit_build_options, "-D _unroll");
   }
 
   return jit_build_options;
@@ -129,7 +130,9 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   blocks_t *blocks = (blocks_t *) esalt_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.token_cnt = 4;
 
@@ -138,31 +141,27 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   // Signature
   token.sep[0]     = '*';
-  token.len_min[0] = 42;
-  token.len_max[0] = 42;
-  token.attr[0]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[0]     = 42;
+  token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_SIGNATURE;
 
   // Secure Session Identifier    (from SESSION_RESPONSE)
   token.sep[1]     = '*';
-  token.len_min[1] = 4;
-  token.len_max[1] = 4;
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 4;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   // XOR of Client Public Value X (from SESSION_REQUEST)
   //    and Server Public Value Y (from SESSION_RESPONSE)
   token.sep[2]     = '*';
-  token.len_min[2] = 64;
-  token.len_max[2] = 64;
-  token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[2]     = 64;
+  token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   // Message Authentication Code  (from SESSION_RESPONSE)
   token.sep[3]     = '*';
-  token.len_min[3] = 32;
-  token.len_max[3] = 32;
-  token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[3]     = 32;
+  token.attr[3]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   const int rc_tokenizer = input_tokenizer ((const u8 *) line_buf, line_len, &token);
@@ -204,7 +203,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
                 public_value_xor[3],
                 public_value_xor[4],
                 public_value_xor[5] };
-  memcpy (blocks->b1, b1, sizeof(b1));
+  memcpy (blocks->b1, b1, sizeof (b1));
 
   memcpy (blocks->b2, &public_value_xor[6], 16);
 
@@ -213,7 +212,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   memcpy (blocks->b3, &public_value_xor[22], 10);
 
   // The salt used in the derivation of the device authentication code is constant
-  size_t salt_len = strlen(SALT_DEVICE_AUTHENTICATION_CODE); // exclude the null byte
+  size_t salt_len = strlen (SALT_DEVICE_AUTHENTICATION_CODE); // exclude the null byte
   memcpy (salt->salt_buf, SALT_DEVICE_AUTHENTICATION_CODE, salt_len);
   salt->salt_len = salt_len;
   salt->salt_iter = ROUNDS_DEVICE_AUTHENTICATION_CODE - 1;
@@ -238,8 +237,8 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   memcpy (&public_value_xor[ 6], &(blocks->b2[0]), 16);
   memcpy (&public_value_xor[22], &(blocks->b3[0]), 10);
 
-  hex_encode(secure_session_identifier, 2, secure_session_identifier_hex);
-  hex_encode(public_value_xor, 32, public_value_xor_hex);
+  hex_encode (secure_session_identifier, 2, secure_session_identifier_hex);
+  hex_encode (public_value_xor, 32, public_value_xor_hex);
 
   const int line_len = snprintf (line_buf, line_size, "%s*%s*%s*%08x%08x%08x%08x",
     SIGNATURE_DEVICE_AUTHENTICATION_CODE,
@@ -263,6 +262,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = module_deep_comp_kernel;
@@ -281,6 +281,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

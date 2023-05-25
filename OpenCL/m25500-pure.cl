@@ -6,18 +6,18 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_cipher_aes.cl"
-#include "inc_cipher_aes-gcm.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes-gcm.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct pbkdf2_sha256_tmp
 {
@@ -39,7 +39,7 @@ typedef struct pbkdf2_sha256_aes_gcm
 
 } pbkdf2_sha256_aes_gcm_t;
 
-DECLSPEC void hmac_sha256_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha256_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -89,7 +89,7 @@ KERNEL_FQ void m25500_init (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha256_hmac_ctx_t sha256_hmac_ctx;
 
@@ -113,7 +113,7 @@ KERNEL_FQ void m25500_init (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
   tmps[gid].opad[6] = sha256_hmac_ctx.opad.h[6];
   tmps[gid].opad[7] = sha256_hmac_ctx.opad.h[7];
 
-  sha256_hmac_update_global_swap (&sha256_hmac_ctx, esalt_bufs[DIGESTS_OFFSET].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha256_hmac_update_global_swap (&sha256_hmac_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   for (u32 i = 0, j = 1; i < 8; i += 8, j += 1)
   {
@@ -169,7 +169,7 @@ KERNEL_FQ void m25500_loop (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[8];
   u32x opad[8];
@@ -215,7 +215,7 @@ KERNEL_FQ void m25500_loop (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
     out[6] = packv (tmps, out, gid, i + 6);
     out[7] = packv (tmps, out, gid, i + 7);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -310,7 +310,7 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // keys
 
@@ -334,14 +334,14 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   // iv
 
-  const u32 iv[4] = {
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[0],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[1],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[2],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[3]
-  };
+  u32 iv[4];
 
-  const u32 iv_len = esalt_bufs[DIGESTS_OFFSET].iv_len;
+  iv[0] = esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[0];
+  iv[1] = esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[1];
+  iv[2] = esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[2];
+  iv[3] = esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[3];
+
+  const u32 iv_len = esalt_bufs[DIGESTS_OFFSET_HOST].iv_len;
 
   u32 J0[4] = { 0 };
 
@@ -352,22 +352,22 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
   /*
   u32 enc[14] = { 0 };
 
-  enc[ 0] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 0];
-  enc[ 1] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 1];
-  enc[ 2] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 2];
-  enc[ 3] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 3];
-  enc[ 4] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 4];
-  enc[ 5] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 5];
-  enc[ 6] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 6];
-  enc[ 7] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 7];
-  enc[ 8] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 8];
-  enc[ 9] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 9];
-  enc[10] = esalt_bufs[DIGESTS_OFFSET].ct_buf[10];
-  enc[11] = esalt_bufs[DIGESTS_OFFSET].ct_buf[11];
-  enc[12] = esalt_bufs[DIGESTS_OFFSET].ct_buf[12];
-  enc[13] = esalt_bufs[DIGESTS_OFFSET].ct_buf[13];
+  enc[ 0] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 0];
+  enc[ 1] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 1];
+  enc[ 2] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 2];
+  enc[ 3] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 3];
+  enc[ 4] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 4];
+  enc[ 5] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 5];
+  enc[ 6] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 6];
+  enc[ 7] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 7];
+  enc[ 8] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 8];
+  enc[ 9] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 9];
+  enc[10] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[10];
+  enc[11] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[11];
+  enc[12] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[12];
+  enc[13] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[13];
 
-  u32 enc_len = esalt_bufs[DIGESTS_OFFSET].ct_len;
+  u32 enc_len = esalt_bufs[DIGESTS_OFFSET_HOST].ct_len;
   */
 
   /*
@@ -386,7 +386,7 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   //AES_GCM_GHASH (subKey, aad_buf, aad_len, enc, enc_len, S);
 
-  AES_GCM_GHASH_GLOBAL (subKey, aad_buf, aad_len, esalt_bufs[DIGESTS_OFFSET].ct_buf, esalt_bufs[DIGESTS_OFFSET].ct_len, S);
+  AES_GCM_GHASH_GLOBAL (subKey, aad_buf, aad_len, esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf, esalt_bufs[DIGESTS_OFFSET_HOST].ct_len, S);
 
   AES_GCM_GCTR (key, J0, S, S_len, T, s_te0, s_te1, s_te2, s_te3, s_te4);
 
@@ -442,7 +442,7 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // keys
 
@@ -468,10 +468,10 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
   // iv
 
   const u32 iv[4] = {
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[0],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[1],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[2],
-    esalt_bufs[DIGESTS_OFFSET].iv_buf[3]
+    esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[0],
+    esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[1],
+    esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[2],
+    esalt_bufs[DIGESTS_OFFSET_HOST].iv_buf[3]
   };
 
   u32 J0[4] = {
@@ -485,22 +485,22 @@ KERNEL_FQ void m25500_comp (KERN_ATTR_TMPS_ESALT (pbkdf2_sha256_tmp_t, pbkdf2_sh
 
   u32 enc[14] = { 0 };
 
-  enc[ 0] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 0];
-  enc[ 1] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 1];
-  enc[ 2] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 2];
-  enc[ 3] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 3];
-  enc[ 4] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 4];
-  enc[ 5] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 5];
-  enc[ 6] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 6];
-  enc[ 7] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 7];
-  enc[ 8] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 8];
-  enc[ 9] = esalt_bufs[DIGESTS_OFFSET].ct_buf[ 9];
-  enc[10] = esalt_bufs[DIGESTS_OFFSET].ct_buf[10];
-  enc[11] = esalt_bufs[DIGESTS_OFFSET].ct_buf[11];
-  enc[12] = esalt_bufs[DIGESTS_OFFSET].ct_buf[12];
-  enc[13] = esalt_bufs[DIGESTS_OFFSET].ct_buf[13];
+  enc[ 0] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 0];
+  enc[ 1] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 1];
+  enc[ 2] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 2];
+  enc[ 3] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 3];
+  enc[ 4] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 4];
+  enc[ 5] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 5];
+  enc[ 6] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 6];
+  enc[ 7] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 7];
+  enc[ 8] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 8];
+  enc[ 9] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[ 9];
+  enc[10] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[10];
+  enc[11] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[11];
+  enc[12] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[12];
+  enc[13] = esalt_bufs[DIGESTS_OFFSET_HOST].ct_buf[13];
 
-  u32 enc_len = esalt_bufs[DIGESTS_OFFSET].ct_len;
+  u32 enc_len = esalt_bufs[DIGESTS_OFFSET_HOST].ct_len;
 
   u32 S[4] = { 0 };
 

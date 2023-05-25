@@ -4,13 +4,14 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_shared.h)
 #endif
 
-DECLSPEC void gpu_decompress_entry (GLOBAL_AS pw_idx_t *pws_idx, GLOBAL_AS u32 *pws_comp, pw_t *buf, const u64 gid)
+DECLSPEC void gpu_decompress_entry (GLOBAL_AS pw_idx_t *pws_idx, GLOBAL_AS u32 *pws_comp, PRIVATE_AS pw_t *buf, const u64 gid)
 {
   const u32 off = pws_idx[gid].off;
   const u32 cnt = pws_idx[gid].cnt;
@@ -93,7 +94,7 @@ DECLSPEC void gpu_decompress_entry (GLOBAL_AS pw_idx_t *pws_idx, GLOBAL_AS u32 *
   *buf = pw;
 }
 
-KERNEL_FQ void gpu_decompress (GLOBAL_AS pw_idx_t *pws_idx, GLOBAL_AS u32 *pws_comp, GLOBAL_AS pw_t *pws_buf, const u64 gid_max)
+KERNEL_FQ void gpu_decompress (KERN_ATTR_GPU_DECOMPRESS)
 {
   const u64 gid = get_global_id (0);
 
@@ -106,7 +107,7 @@ KERNEL_FQ void gpu_decompress (GLOBAL_AS pw_idx_t *pws_idx, GLOBAL_AS u32 *pws_c
   pws_buf[gid] = pw;
 }
 
-KERNEL_FQ void gpu_memset (GLOBAL_AS uint4 *buf, const u32 value, const u64 gid_max)
+KERNEL_FQ void gpu_memset (KERN_ATTR_GPU_MEMSET)
 {
   const u64 gid = get_global_id (0);
 
@@ -128,14 +129,19 @@ KERNEL_FQ void gpu_memset (GLOBAL_AS uint4 *buf, const u32 value, const u64 gid_
   r.y = value;
   r.z = value;
   r.w = value;
+  #elif defined IS_METAL
+  r.x = value;
+  r.y = value;
+  r.z = value;
+  r.w = value;
   #endif
 
   buf[gid] = r;
 }
 
-KERNEL_FQ void gpu_bzero(GLOBAL_AS uint4* buf, const u64 gid_max)
+KERNEL_FQ void gpu_bzero (KERN_ATTR_GPU_BZERO)
 {
-  const u64 gid = get_global_id(0);
+  const u64 gid = get_global_id (0);
 
   if (gid >= gid_max) return;
 
@@ -155,12 +161,17 @@ KERNEL_FQ void gpu_bzero(GLOBAL_AS uint4* buf, const u64 gid_max)
   r.y = 0;
   r.z = 0;
   r.w = 0;
+  #elif defined IS_METAL
+  r.x = 0;
+  r.y = 0;
+  r.z = 0;
+  r.w = 0;
   #endif
 
   buf[gid] = r;
 }
 
-KERNEL_FQ void gpu_atinit (GLOBAL_AS pw_t *buf, const u64 gid_max)
+KERNEL_FQ void gpu_atinit (KERN_ATTR_GPU_ATINIT)
 {
   const u64 gid = get_global_id (0);
 
@@ -242,7 +253,7 @@ KERNEL_FQ void gpu_atinit (GLOBAL_AS pw_t *buf, const u64 gid_max)
   buf[gid] = pw;
 }
 
-KERNEL_FQ void gpu_utf8_to_utf16 (GLOBAL_AS pw_t *pws_buf, const u64 gid_max)
+KERNEL_FQ void gpu_utf8_to_utf16 (KERN_ATTR_GPU_UTF8_TO_UTF16)
 {
   const u64 gid = get_global_id (0);
 
@@ -257,6 +268,9 @@ KERNEL_FQ void gpu_utf8_to_utf16 (GLOBAL_AS pw_t *pws_buf, const u64 gid_max)
   hc_enc_t hc_enc;
 
   hc_enc_init (&hc_enc);
+
+  // note that this can result in pw_len = -1
+  // need to check for pw_len in kernel
 
   pw_out.pw_len = hc_enc_next (&hc_enc, pw_in.i, pw_in.pw_len, 256, pw_out.i, 256);
 

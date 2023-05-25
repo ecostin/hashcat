@@ -6,15 +6,15 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
 DECLSPEC int is_valid_bitcoinj_8 (const u8 v)
@@ -90,7 +90,7 @@ KERNEL_FQ void m22500_m04 (KERN_ATTR_RULES ())
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -112,25 +112,25 @@ KERNEL_FQ void m22500_m04 (KERN_ATTR_RULES ())
 
   u32 salt_buf[2];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
   u32 data[8];
 
-  data[0] = salt_bufs[SALT_POS].salt_buf[2];
-  data[1] = salt_bufs[SALT_POS].salt_buf[3];
-  data[2] = salt_bufs[SALT_POS].salt_buf[4];
-  data[3] = salt_bufs[SALT_POS].salt_buf[5];
-  data[4] = salt_bufs[SALT_POS].salt_buf[6];
-  data[5] = salt_bufs[SALT_POS].salt_buf[7];
-  data[6] = salt_bufs[SALT_POS].salt_buf[8];
-  data[7] = salt_bufs[SALT_POS].salt_buf[9];
+  data[0] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  data[1] = salt_bufs[SALT_POS_HOST].salt_buf[3];
+  data[2] = salt_bufs[SALT_POS_HOST].salt_buf[4];
+  data[3] = salt_bufs[SALT_POS_HOST].salt_buf[5];
+  data[4] = salt_bufs[SALT_POS_HOST].salt_buf[6];
+  data[5] = salt_bufs[SALT_POS_HOST].salt_buf[7];
+  data[6] = salt_bufs[SALT_POS_HOST].salt_buf[8];
+  data[7] = salt_bufs[SALT_POS_HOST].salt_buf[9];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -609,9 +609,9 @@ KERNEL_FQ void m22500_m04 (KERN_ATTR_RULES ())
       if (out[3] != 0x41202145) continue; // "A !E"
     }
 
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, il_pos, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, il_pos, 0, 0);
     }
   }
 }
@@ -685,7 +685,7 @@ KERNEL_FQ void m22500_s04 (KERN_ATTR_RULES ())
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -707,25 +707,25 @@ KERNEL_FQ void m22500_s04 (KERN_ATTR_RULES ())
 
   u32 salt_buf[2];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
   u32 data[8];
 
-  data[0] = salt_bufs[SALT_POS].salt_buf[2];
-  data[1] = salt_bufs[SALT_POS].salt_buf[3];
-  data[2] = salt_bufs[SALT_POS].salt_buf[4];
-  data[3] = salt_bufs[SALT_POS].salt_buf[5];
-  data[4] = salt_bufs[SALT_POS].salt_buf[6];
-  data[5] = salt_bufs[SALT_POS].salt_buf[7];
-  data[6] = salt_bufs[SALT_POS].salt_buf[8];
-  data[7] = salt_bufs[SALT_POS].salt_buf[9];
+  data[0] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  data[1] = salt_bufs[SALT_POS_HOST].salt_buf[3];
+  data[2] = salt_bufs[SALT_POS_HOST].salt_buf[4];
+  data[3] = salt_bufs[SALT_POS_HOST].salt_buf[5];
+  data[4] = salt_bufs[SALT_POS_HOST].salt_buf[6];
+  data[5] = salt_bufs[SALT_POS_HOST].salt_buf[7];
+  data[6] = salt_bufs[SALT_POS_HOST].salt_buf[8];
+  data[7] = salt_bufs[SALT_POS_HOST].salt_buf[9];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -1204,9 +1204,9 @@ KERNEL_FQ void m22500_s04 (KERN_ATTR_RULES ())
       if (out[3] != 0x41202145) continue; // "A !E"
     }
 
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, il_pos, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, il_pos, 0, 0);
     }
   }
 }

@@ -6,17 +6,17 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct agilekey_tmp
 {
@@ -28,7 +28,7 @@ typedef struct agilekey_tmp
 
 } agilekey_tmp_t;
 
-DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha1_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -72,7 +72,7 @@ KERNEL_FQ void m06600_init (KERN_ATTR_TMPS (agilekey_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha1_hmac_ctx_t sha1_hmac_ctx;
 
@@ -95,10 +95,10 @@ KERNEL_FQ void m06600_init (KERN_ATTR_TMPS (agilekey_tmp_t))
 
   u32 s[16] = { 0 };
 
-  s[0] = salt_bufs[SALT_POS].salt_buf[0];
-  s[1] = salt_bufs[SALT_POS].salt_buf[1];
+  s[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  s[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
-  sha1_hmac_update_swap (&sha1_hmac_ctx, s, salt_bufs[SALT_POS].salt_len);
+  sha1_hmac_update_swap (&sha1_hmac_ctx, s, salt_bufs[SALT_POS_HOST].salt_len);
 
   for (u32 i = 0, j = 1; i < 4; i += 5, j += 1)
   {
@@ -148,7 +148,7 @@ KERNEL_FQ void m06600_loop (KERN_ATTR_TMPS (agilekey_tmp_t))
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[5];
   u32x opad[5];
@@ -182,7 +182,7 @@ KERNEL_FQ void m06600_loop (KERN_ATTR_TMPS (agilekey_tmp_t))
     out[3] = packv (tmps, out, gid, i + 3);
     out[4] = packv (tmps, out, gid, i + 4);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -286,7 +286,7 @@ KERNEL_FQ void m06600_comp (KERN_ATTR_TMPS (agilekey_tmp_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * salt
@@ -294,18 +294,18 @@ KERNEL_FQ void m06600_comp (KERN_ATTR_TMPS (agilekey_tmp_t))
 
   const u32 iv[4] =
   {
-    salt_bufs[SALT_POS].salt_buf[ 4],
-    salt_bufs[SALT_POS].salt_buf[ 5],
-    salt_bufs[SALT_POS].salt_buf[ 6],
-    salt_bufs[SALT_POS].salt_buf[ 7]
+    salt_bufs[SALT_POS_HOST].salt_buf[ 4],
+    salt_bufs[SALT_POS_HOST].salt_buf[ 5],
+    salt_bufs[SALT_POS_HOST].salt_buf[ 6],
+    salt_bufs[SALT_POS_HOST].salt_buf[ 7]
   };
 
   const u32 data[4] =
   {
-    salt_bufs[SALT_POS].salt_buf[ 8],
-    salt_bufs[SALT_POS].salt_buf[ 9],
-    salt_bufs[SALT_POS].salt_buf[10],
-    salt_bufs[SALT_POS].salt_buf[11]
+    salt_bufs[SALT_POS_HOST].salt_buf[ 8],
+    salt_bufs[SALT_POS_HOST].salt_buf[ 9],
+    salt_bufs[SALT_POS_HOST].salt_buf[10],
+    salt_bufs[SALT_POS_HOST].salt_buf[11]
   };
 
   /**

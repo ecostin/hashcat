@@ -6,15 +6,15 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct md5crypt_tmp
 {
@@ -30,7 +30,7 @@ KERNEL_FQ void m06300_init (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * init
@@ -45,13 +45,13 @@ KERNEL_FQ void m06300_init (KERN_ATTR_TMPS (md5crypt_tmp_t))
     w[idx] = pws[gid].i[idx];
   }
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   u32 s[64] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt_len; i += 4, idx += 1)
   {
-    s[idx] = salt_bufs[SALT_POS].salt_buf[idx];
+    s[idx] = salt_bufs[SALT_POS_HOST].salt_buf[idx];
   }
 
   /**
@@ -130,7 +130,7 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * init
@@ -145,13 +145,13 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
     w[idx] = pws[gid].i[idx];
   }
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   u32 s[64] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt_len; i += 4, idx += 1)
   {
-    s[idx] = salt_bufs[SALT_POS].salt_buf[idx];
+    s[idx] = salt_bufs[SALT_POS_HOST].salt_buf[idx];
   }
 
   /**
@@ -169,7 +169,7 @@ KERNEL_FQ void m06300_loop (KERN_ATTR_TMPS (md5crypt_tmp_t))
    * loop
    */
 
-  for (u32 i = 0, j = loop_pos; i < loop_cnt; i++, j++)
+  for (u32 i = 0, j = LOOP_POS; i < LOOP_CNT; i++, j++)
   {
     md5_ctx_t md5_ctx;
 
@@ -225,7 +225,7 @@ KERNEL_FQ void m06300_comp (KERN_ATTR_TMPS (md5crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

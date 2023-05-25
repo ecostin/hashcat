@@ -14,6 +14,8 @@ cpan install Authen::Passphrase::LANManager \
              Authen::Passphrase::MySQL323   \
              Authen::Passphrase::NTHash     \
              Authen::Passphrase::PHPass     \
+             Bitcoin::Crypto                \
+             Bitcoin::Crypto::Base58        \
              Compress::Zlib                 \
              Convert::EBCDIC                \
              Crypt::AuthEnc::GCM            \
@@ -48,6 +50,7 @@ cpan install Authen::Passphrase::LANManager \
              Digest::Keccak                 \
              Digest::MD4                    \
              Digest::MD5                    \
+             Digest::MurmurHash3            \
              Digest::Perl::MD5              \
              Digest::SHA                    \
              Digest::SHA1                   \
@@ -55,7 +58,7 @@ cpan install Authen::Passphrase::LANManager \
              Digest::SipHash                \
              Encode                         \
              JSON                           \
-             MIME::Base32                   \
+             Math::BigInt                   \
              MIME::Base64                   \
              Net::DNS::RR::NSEC3            \
              Net::DNS::SEC                  \
@@ -67,11 +70,20 @@ ERRORS=$((ERRORS+$?))
 
 pip3 install pygost
 
+ERRORS=$((ERRORS+$?))
+
 # pip3 uninstall -y pycryptoplus pycrypto pycryptodome
 
 pip3 install pycryptoplus
+
+ERRORS=$((ERRORS+$?))
+
 # pip3 uninstall -y pycryptodome # latest versions do not require this work around anymore
 pip3 install pycrypto
+
+ERRORS=$((ERRORS+$?))
+
+pip3 install cryptography
 
 ERRORS=$((ERRORS+$?))
 

@@ -20,8 +20,8 @@ static const u32   HASH_CATEGORY  = HASH_CATEGORY_PASSWORD_MANAGER;
 static const char *HASH_NAME      = "KeePass 1 (AES/Twofish) and KeePass 2 (AES)";
 static const u64   KERN_TYPE      = 13400;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
-                                  | OPTS_TYPE_MAXIMUM_THREADS;
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
 static const char *ST_HASH        = "$keepass$*2*24569*0*c40432355cce7348c48053ceea0a28e7d18859c4ea47e3a799c6300861f64b95*265dafcc42e1537ff42e97e1e283c70014133be0fe2d420b4d24c6d57c9d2207*a00e20a852694c15aabb074d61b902fa*48dd553fb96f7996635f2414bfe6a1a8429ef0ffb71a1752abbef31853172c35*a44ae659958ad7fae8c8952cb83f3cf03fec2371ce22a8bf7fac1e687af2f249*1*64*5a26ea376cc5afc955104c334571d30486acbac512a94b75ca82a9e31dd97bf7";
@@ -110,21 +110,21 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
    && (line_buf[line_len - (64 + 1 + 2 + 1 + 1)] == '1')
    && (line_buf[line_len - (64 + 1 + 2 + 1 + 0)] == '*')) is_keyfile_present = true;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.signatures_cnt    = 1;
   token.signatures_buf[0] = SIGNATURE_KEEPASS;
 
   token.sep[0]     = '*';
-  token.len_min[0] = 9;
-  token.len_max[0] = 9;
-  token.attr[0]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[0]     = 9;
+  token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_SIGNATURE;
 
   token.sep[1]     = '*';
-  token.len_min[1] = 1;
-  token.len_max[1] = 1;
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 1;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
   token.sep[2]     = '*';
@@ -148,33 +148,28 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     token.token_cnt  = 11;
 
     token.sep[4]     = '*';
-    token.len_min[4] = 32;
-    token.len_max[4] = 32;
-    token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[4]     = 32;
+    token.attr[4]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[5]     = '*';
-    token.len_min[5] = 64;
-    token.len_max[5] = 64;
-    token.attr[5]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[5]     = 64;
+    token.attr[5]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[6]     = '*';
-    token.len_min[6] = 32;
-    token.len_max[6] = 32;
-    token.attr[6]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[6]     = 32;
+    token.attr[6]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[7]     = '*';
-    token.len_min[7] = 64;
-    token.len_max[7] = 64;
-    token.attr[7]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[7]     = 64;
+    token.attr[7]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[8]     = '*';
-    token.len_min[8] = 1;
-    token.len_max[8] = 1;
-    token.attr[8]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[8]     = 1;
+    token.attr[8]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_DIGIT;
 
     token.sep[9]     = '*';
@@ -194,21 +189,18 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
       token.token_cnt = 14;
 
       token.sep[11]     = '*';
-      token.len_min[11] = 1;
-      token.len_max[11] = 1;
-      token.attr[11]    = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[11]     = 1;
+      token.attr[11]    = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_DIGIT;
 
       token.sep[12]     = '*';
-      token.len_min[12] = 2;
-      token.len_max[12] = 2;
-      token.attr[12]    = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[12]     = 2;
+      token.attr[12]    = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_DIGIT;
 
       token.sep[13]     = '*';
-      token.len_min[13] = 64;
-      token.len_max[13] = 64;
-      token.attr[13]    = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[13]     = 64;
+      token.attr[13]    = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_HEX;
     }
   }
@@ -217,33 +209,28 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     token.token_cnt  = 9;
 
     token.sep[4]     = '*';
-    token.len_min[4] = 64;
-    token.len_max[4] = 64;
-    token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[4]     = 64;
+    token.attr[4]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[5]     = '*';
-    token.len_min[5] = 64;
-    token.len_max[5] = 64;
-    token.attr[5]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[5]     = 64;
+    token.attr[5]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[6]     = '*';
-    token.len_min[6] = 32;
-    token.len_max[6] = 32;
-    token.attr[6]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[6]     = 32;
+    token.attr[6]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[7]     = '*';
-    token.len_min[7] = 64;
-    token.len_max[7] = 64;
-    token.attr[7]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[7]     = 64;
+    token.attr[7]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[8]     = '*';
-    token.len_min[8] = 64;
-    token.len_max[8] = 64;
-    token.attr[8]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[8]     = 64;
+    token.attr[8]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     if (is_keyfile_present == true)
@@ -251,21 +238,18 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
       token.token_cnt = 12;
 
       token.sep[9]      = '*';
-      token.len_min[9]  = 1;
-      token.len_max[9]  = 1;
-      token.attr[9]     = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[9]      = 1;
+      token.attr[9]     = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_DIGIT;
 
       token.sep[10]     = '*';
-      token.len_min[10] = 2;
-      token.len_max[10] = 2;
-      token.attr[10]    = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[10]     = 2;
+      token.attr[10]    = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_DIGIT;
 
       token.sep[11]     = '*';
-      token.len_min[11] = 64;
-      token.len_max[11] = 64;
-      token.attr[11]    = TOKEN_ATTR_VERIFY_LENGTH
+      token.len[11]     = 64;
+      token.attr[11]    = TOKEN_ATTR_FIXED_LENGTH
                         | TOKEN_ATTR_VERIFY_HEX;
     }
   }
@@ -494,16 +478,24 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     digest[3] = keepass->expected_bytes[3];
   }
 
-  salt->salt_buf[0] = keepass->transf_random_seed[0];
-  salt->salt_buf[1] = keepass->transf_random_seed[1];
-  salt->salt_buf[2] = keepass->transf_random_seed[2];
-  salt->salt_buf[3] = keepass->transf_random_seed[3];
-  salt->salt_buf[4] = keepass->transf_random_seed[4];
-  salt->salt_buf[5] = keepass->transf_random_seed[5];
-  salt->salt_buf[6] = keepass->transf_random_seed[6];
-  salt->salt_buf[7] = keepass->transf_random_seed[7];
+  salt->salt_buf[ 0] = keepass->transf_random_seed[0];
+  salt->salt_buf[ 1] = keepass->transf_random_seed[1];
+  salt->salt_buf[ 2] = keepass->transf_random_seed[2];
+  salt->salt_buf[ 3] = keepass->transf_random_seed[3];
+  salt->salt_buf[ 4] = keepass->transf_random_seed[4];
+  salt->salt_buf[ 5] = keepass->transf_random_seed[5];
+  salt->salt_buf[ 6] = keepass->transf_random_seed[6];
+  salt->salt_buf[ 7] = keepass->transf_random_seed[7];
+  salt->salt_buf[ 8] = keepass->keyfile[0];
+  salt->salt_buf[ 9] = keepass->keyfile[1];
+  salt->salt_buf[10] = keepass->keyfile[2];
+  salt->salt_buf[11] = keepass->keyfile[3];
+  salt->salt_buf[12] = keepass->keyfile[4];
+  salt->salt_buf[13] = keepass->keyfile[5];
+  salt->salt_buf[14] = keepass->keyfile[6];
+  salt->salt_buf[15] = keepass->keyfile[7];
 
-  salt->salt_len = 32;
+  salt->salt_len = 64;
 
   return (PARSER_OK);
 }
@@ -653,6 +645,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -671,6 +664,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

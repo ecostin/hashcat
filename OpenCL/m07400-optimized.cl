@@ -4,15 +4,15 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -26,7 +26,7 @@ typedef struct sha256crypt_tmp
 
 } sha256crypt_tmp_t;
 
-DECLSPEC void init_ctx (u32 *digest)
+DECLSPEC void init_ctx (PRIVATE_AS u32 *digest)
 {
   digest[0] = SHA256M_A;
   digest[1] = SHA256M_B;
@@ -38,7 +38,7 @@ DECLSPEC void init_ctx (u32 *digest)
   digest[7] = SHA256M_H;
 }
 
-DECLSPEC u32 memcat16 (u32 *block, const u32 offset, const u32 *append, const u32 append_len)
+DECLSPEC u32 memcat16 (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -165,7 +165,7 @@ DECLSPEC u32 memcat16 (u32 *block, const u32 offset, const u32 *append, const u3
   return new_len;
 }
 
-DECLSPEC u32 memcat16c (u32 *block, const u32 offset, const u32 *append, const u32 append_len, u32 *digest)
+DECLSPEC u32 memcat16c (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len, PRIVATE_AS u32 *digest)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -328,7 +328,7 @@ DECLSPEC u32 memcat16c (u32 *block, const u32 offset, const u32 *append, const u
   return new_len;
 }
 
-DECLSPEC u32 memcat16s (u32 *block, const u32 offset, const u32 *append, const u32 append_len)
+DECLSPEC u32 memcat16s (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -469,7 +469,7 @@ DECLSPEC u32 memcat16s (u32 *block, const u32 offset, const u32 *append, const u
   return new_len;
 }
 
-DECLSPEC u32 memcat16sc (u32 *block, const u32 offset, const u32 *append, const u32 append_len, u32 *digest)
+DECLSPEC u32 memcat16sc (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len, PRIVATE_AS u32 *digest)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -651,7 +651,7 @@ DECLSPEC u32 memcat16sc (u32 *block, const u32 offset, const u32 *append, const 
   return new_len;
 }
 
-DECLSPEC void truncate_block_5x4_be_S (u32 *w0, const u32 len)
+DECLSPEC void truncate_block_5x4_be_S (PRIVATE_AS u32 *w0, const u32 len)
 {
   switch (len)
   {
@@ -777,7 +777,7 @@ DECLSPEC void truncate_block_5x4_be_S (u32 *w0, const u32 len)
   }
 }
 
-DECLSPEC u32 memcat20 (u32 *block, const u32 offset, const u32 *append, const u32 append_len)
+DECLSPEC u32 memcat20 (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -942,7 +942,7 @@ DECLSPEC u32 memcat20 (u32 *block, const u32 offset, const u32 *append, const u3
   return offset + append_len;
 }
 
-DECLSPEC u32 memcat20_x80 (u32 *block, const u32 offset, const u32 *append, const u32 append_len)
+DECLSPEC u32 memcat20_x80 (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -1108,7 +1108,7 @@ DECLSPEC u32 memcat20_x80 (u32 *block, const u32 offset, const u32 *append, cons
   return offset + append_len;
 }
 
-DECLSPEC u32 memcat24 (u32 *block, const u32 offset, const u32 *append, const u32 append_len)
+DECLSPEC u32 memcat24 (PRIVATE_AS u32 *block, const u32 offset, PRIVATE_AS const u32 *append, const u32 append_len)
 {
   u32 in0 = append[0];
   u32 in1 = append[1];
@@ -1186,7 +1186,7 @@ KERNEL_FQ void m07400_init (KERN_ATTR_TMPS (sha256crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -1203,13 +1203,13 @@ KERNEL_FQ void m07400_init (KERN_ATTR_TMPS (sha256crypt_tmp_t))
 
   u32 salt_buf[5];
 
-  salt_buf[0] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[0]);
-  salt_buf[1] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[1]);
-  salt_buf[2] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[2]);
-  salt_buf[3] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[3]);
-  salt_buf[4] = hc_swap32_S (salt_bufs[SALT_POS].salt_buf[4]);
+  salt_buf[0] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[0]);
+  salt_buf[1] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[1]);
+  salt_buf[2] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[2]);
+  salt_buf[3] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[3]);
+  salt_buf[4] = hc_swap32_S (salt_bufs[SALT_POS_HOST].salt_buf[4]);
 
-  const u32 salt_len = MIN (salt_bufs[SALT_POS].salt_len, 20);
+  const u32 salt_len = MIN (salt_bufs[SALT_POS_HOST].salt_len, 20);
 
   /**
    * buffers
@@ -1534,7 +1534,7 @@ KERNEL_FQ void m07400_loop (KERN_ATTR_TMPS (sha256crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u32 pw_len = MIN (pws[gid].pw_len, 15);
 
@@ -1568,7 +1568,7 @@ KERNEL_FQ void m07400_loop (KERN_ATTR_TMPS (sha256crypt_tmp_t))
   alt_result[6] = tmps[gid].alt_result[6];
   alt_result[7] = tmps[gid].alt_result[7];
 
-  const u32 salt_len = MIN (salt_bufs[SALT_POS].salt_len, 20);
+  const u32 salt_len = MIN (salt_bufs[SALT_POS_HOST].salt_len, 20);
 
   // just an optimization
 
@@ -1584,7 +1584,7 @@ KERNEL_FQ void m07400_loop (KERN_ATTR_TMPS (sha256crypt_tmp_t))
   /* Repeatedly run the collected hash value through SHA256 to burn
      CPU cycles.  */
 
-  for (u32 i = 0, j = loop_pos; i < loop_cnt; i++, j++)
+  for (u32 i = 0, j = LOOP_POS; i < LOOP_CNT; i++, j++)
   {
     u32 tmp[8];
 
@@ -1745,7 +1745,7 @@ KERNEL_FQ void m07400_comp (KERN_ATTR_TMPS (sha256crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

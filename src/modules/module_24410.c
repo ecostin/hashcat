@@ -21,7 +21,8 @@ static const char *HASH_NAME      = "PKCS#8 Private Keys (PBKDF2-HMAC-SHA1 + 3DE
 static const u64   KERN_TYPE      = 24410;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_SUGGEST_KG;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
@@ -42,6 +43,30 @@ u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 
+#define PKCS_MIN_SALT_LEN     ( 8)
+#define PKCS_MAX_SALT_LEN     (32)
+#define PKCS_MIN_SALT_HEX_LEN (PKCS_MIN_SALT_LEN * 2)
+#define PKCS_MAX_SALT_HEX_LEN (PKCS_MAX_SALT_LEN * 2)
+
+#define PKCS_MIN_IV_LEN     ( 8)
+#define PKCS_MAX_IV_LEN     (16)
+#define PKCS_MIN_IV_HEX_LEN (PKCS_MIN_IV_LEN * 2)
+#define PKCS_MAX_IV_HEX_LEN (PKCS_MAX_IV_LEN * 2)
+
+typedef enum pkcs_cipher {
+  PKCS_CIPHER_3DES        = 1,
+  PKCS_CIPHER_AES_128_CBC = 2,
+  PKCS_CIPHER_AES_192_CBC = 3,
+  PKCS_CIPHER_AES_256_CBC = 4,
+} pkcs_cipher_t;
+
+typedef enum pkcs_cipher_block_size {
+  PKCS_CIPHER_BLOCK_SIZE_3DES        =  8,
+  PKCS_CIPHER_BLOCK_SIZE_AES_128_CBC = 16,
+  PKCS_CIPHER_BLOCK_SIZE_AES_192_CBC = 16,
+  PKCS_CIPHER_BLOCK_SIZE_AES_256_CBC = 16,
+} pkcs_cipher_block_size_t;
+
 typedef struct pkcs_sha1_tmp
 {
   u32  ipad[5];
@@ -54,7 +79,7 @@ typedef struct pkcs_sha1_tmp
 
 typedef struct pkcs
 {
-  int cipher;
+  int cipher; // pkcs_cipher_t
 
   u32 data_buf[16384];
   int data_len;
@@ -95,7 +120,9 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   pkcs_t *pkcs = (pkcs_t *) esalt_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.token_cnt  = 8;
 
@@ -107,20 +134,18 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
                    | TOKEN_ATTR_VERIFY_SIGNATURE;
 
   token.sep[1]     = '$';
-  token.len_min[1] = 1;
-  token.len_max[1] = 1;
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 1;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
   token.sep[2]     = '$';
-  token.len_min[2] = 1;
-  token.len_max[2] = 1;
-  token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[2]     = 1;
+  token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
   token.sep[3]     = '$';
-  token.len_min[3] = 16;
-  token.len_max[3] = 16;
+  token.len_min[3] = PKCS_MIN_SALT_HEX_LEN;
+  token.len_max[3] = PKCS_MAX_SALT_HEX_LEN;
   token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
@@ -131,8 +156,8 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
   token.sep[5]     = '$';
-  token.len_min[5] = 16;  // can be either 16 or 32
-  token.len_max[5] = 32;  // exact check deeper in decoder code
+  token.len_min[5] = PKCS_MIN_IV_HEX_LEN;  // can be either 16 or 32
+  token.len_max[5] = PKCS_MAX_IV_HEX_LEN;  // exact check deeper in decoder code
   token.attr[5]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
@@ -164,10 +189,10 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   int cipher = hc_strtoul ((const char *) cipher_pos, NULL, 10);
 
-  if ((cipher != 1)
-   && (cipher != 2)
-   && (cipher != 3)
-   && (cipher != 4)) return (PARSER_CIPHER);
+  if ((cipher != PKCS_CIPHER_3DES)
+   && (cipher != PKCS_CIPHER_AES_128_CBC)
+   && (cipher != PKCS_CIPHER_AES_192_CBC)
+   && (cipher != PKCS_CIPHER_AES_256_CBC)) return (PARSER_CIPHER);
 
   pkcs->cipher = cipher;
 
@@ -175,10 +200,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   const u8 *salt_pos = token.buf[3];
 
-  salt->salt_buf[0] = hex_to_u32 (salt_pos + 0);
-  salt->salt_buf[1] = hex_to_u32 (salt_pos + 8);
-
-  salt->salt_len = 8;
+  salt->salt_len = hex_decode (salt_pos, token.len[3], (u8 *) salt->salt_buf);
 
   // iter
 
@@ -193,22 +215,10 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   const u8 *iv_pos = token.buf[5];
   const int iv_len = token.len[5];
 
-  if (cipher == 1)
-  {
-    if (iv_len != 16) return (PARSER_SALT_LENGTH);
+  if ((cipher == PKCS_CIPHER_3DES) && (iv_len != PKCS_MIN_IV_HEX_LEN)) return (PARSER_SALT_LENGTH);
+  if ((cipher != PKCS_CIPHER_3DES) && (iv_len != PKCS_MAX_IV_HEX_LEN)) return (PARSER_SALT_LENGTH);
 
-    pkcs->iv_buf[0] = hex_to_u32 (iv_pos + 0);
-    pkcs->iv_buf[1] = hex_to_u32 (iv_pos + 8);
-  }
-  else
-  {
-    if (iv_len != 32) return (PARSER_SALT_LENGTH);
-
-    pkcs->iv_buf[0] = hex_to_u32 (iv_pos +  0);
-    pkcs->iv_buf[1] = hex_to_u32 (iv_pos +  8);
-    pkcs->iv_buf[2] = hex_to_u32 (iv_pos + 16);
-    pkcs->iv_buf[3] = hex_to_u32 (iv_pos + 24);
-  }
+  hex_decode (iv_pos, iv_len, (u8 *) pkcs->iv_buf);
 
   // data length
 
@@ -229,10 +239,10 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   int cipher_bs = 0;
 
-       if (cipher == 1) { cipher_bs =  8; }
-  else if (cipher == 2) { cipher_bs = 16; }
-  else if (cipher == 3) { cipher_bs = 16; }
-  else if (cipher == 4) { cipher_bs = 16; }
+       if (cipher == PKCS_CIPHER_3DES)        { cipher_bs = PKCS_CIPHER_BLOCK_SIZE_3DES; }
+  else if (cipher == PKCS_CIPHER_AES_128_CBC) { cipher_bs = PKCS_CIPHER_BLOCK_SIZE_AES_128_CBC; }
+  else if (cipher == PKCS_CIPHER_AES_192_CBC) { cipher_bs = PKCS_CIPHER_BLOCK_SIZE_AES_192_CBC; }
+  else if (cipher == PKCS_CIPHER_AES_256_CBC) { cipher_bs = PKCS_CIPHER_BLOCK_SIZE_AES_256_CBC; }
 
   if (pkcs->data_len % cipher_bs) return (PARSER_HASH_LENGTH);
 
@@ -250,36 +260,40 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   pkcs_t *pkcs = (pkcs_t *) esalt_buf;
 
-  u8 *out_buf = (u8 *) line_buf;
+  // salt
 
-  int out_len;
+  char salt_buf[PKCS_MAX_SALT_HEX_LEN + 1] = { 0 };
 
-  if (pkcs->cipher == 1)
+  hex_encode ((const u8 *) salt->salt_buf, salt->salt_len, (u8 *) salt_buf);
+
+  // iv
+
+  char iv[PKCS_MAX_IV_HEX_LEN + 1] = { 0 };
+
+  int iv_len = 0;
+
+  if (pkcs->cipher == PKCS_CIPHER_3DES)
   {
-    out_len = snprintf ((char *) out_buf, line_size, "%s1$%d$%08x%08x$%d$%08x%08x$%d$",
-      SIGNATURE_PEM,
-      pkcs->cipher,
-      byte_swap_32 (salt->salt_buf[0]),
-      byte_swap_32 (salt->salt_buf[1]),
-      salt->salt_iter + 1,
-      byte_swap_32 (pkcs->iv_buf[0]),
-      byte_swap_32 (pkcs->iv_buf[1]),
-      pkcs->data_len);
+    iv_len = PKCS_MIN_IV_LEN;
   }
   else
   {
-    out_len = snprintf ((char *) out_buf, line_size, "%s1$%d$%08x%08x$%d$%08x%08x%08x%08x$%d$",
-      SIGNATURE_PEM,
-      pkcs->cipher,
-      byte_swap_32 (salt->salt_buf[0]),
-      byte_swap_32 (salt->salt_buf[1]),
-      salt->salt_iter + 1,
-      byte_swap_32 (pkcs->iv_buf[0]),
-      byte_swap_32 (pkcs->iv_buf[1]),
-      byte_swap_32 (pkcs->iv_buf[2]),
-      byte_swap_32 (pkcs->iv_buf[3]),
-      pkcs->data_len);
+    iv_len = PKCS_MAX_IV_LEN;
   }
+
+  hex_encode((const u8 *) pkcs->iv_buf, iv_len, (u8 *) iv);
+
+  // output
+
+  u8 *out_buf = (u8 *) line_buf;
+
+  int out_len = snprintf ((char *) out_buf, line_size, "%s1$%d$%s$%d$%s$%d$",
+    SIGNATURE_PEM,
+    pkcs->cipher,
+    salt_buf,
+    salt->salt_iter + 1,
+    iv,
+    pkcs->data_len);
 
   out_len += hex_encode ((const u8 *) pkcs->data_buf, pkcs->data_len, (u8 *) out_buf + out_len);
 
@@ -295,6 +309,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -313,6 +328,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

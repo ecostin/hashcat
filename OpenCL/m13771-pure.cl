@@ -6,22 +6,21 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_streebog512.cl"
-#include "inc_cipher_aes.cl"
-#include "inc_cipher_twofish.cl"
-#include "inc_cipher_serpent.cl"
-#include "inc_cipher_camellia.cl"
-#include "inc_cipher_kuznyechik.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_streebog512.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_twofish.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_serpent.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_camellia.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_kuznyechik.cl)
 #endif
 
 typedef struct vc
 {
-  u32 salt_buf[32];
   u32 data_buf[112];
   u32 keyfile_buf16[16];
   u32 keyfile_buf32[32];
@@ -38,10 +37,10 @@ typedef struct vc
 } vc_t;
 
 #ifdef KERNEL_STATIC
-#include "inc_truecrypt_crc32.cl"
-#include "inc_truecrypt_xts.cl"
-#include "inc_veracrypt_xts.cl"
-#include "inc_veracrypt_keyfile.cl"
+#include M2S(INCLUDE_PATH/inc_truecrypt_crc32.cl)
+#include M2S(INCLUDE_PATH/inc_truecrypt_xts.cl)
+#include M2S(INCLUDE_PATH/inc_veracrypt_xts.cl)
+#include M2S(INCLUDE_PATH/inc_veracrypt_keyfile.cl)
 #endif
 
 typedef struct vc64_sbog_tmp
@@ -61,7 +60,7 @@ typedef struct vc64_sbog_tmp
 
 } vc64_sbog_tmp_t;
 
-DECLSPEC int check_header_0512 (GLOBAL_AS const vc_t *esalt_bufs, GLOBAL_AS u64 *key, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4, SHM_TYPE u32 *s_td0, SHM_TYPE u32 *s_td1, SHM_TYPE u32 *s_td2, SHM_TYPE u32 *s_td3, SHM_TYPE u32 *s_td4)
+DECLSPEC int check_header_0512 (GLOBAL_AS const vc_t *esalt_bufs, GLOBAL_AS const kernel_param_t *kernel_param, GLOBAL_AS u64 *key, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4, SHM_TYPE u32 *s_td0, SHM_TYPE u32 *s_td1, SHM_TYPE u32 *s_td2, SHM_TYPE u32 *s_td3, SHM_TYPE u32 *s_td4)
 {
   u32 key1[8];
   u32 key2[8];
@@ -83,16 +82,16 @@ DECLSPEC int check_header_0512 (GLOBAL_AS const vc_t *esalt_bufs, GLOBAL_AS u64 
   key2[6] = hc_swap32_S (h32_from_64_S (key[0]));
   key2[7] = hc_swap32_S (l32_from_64_S (key[0]));
 
-  if (verify_header_serpent    (esalt_bufs[0].data_buf, esalt_bufs[0].signature, key1, key2) == 1) return 0;
-  if (verify_header_twofish    (esalt_bufs[0].data_buf, esalt_bufs[0].signature, key1, key2) == 1) return 0;
-  if (verify_header_camellia   (esalt_bufs[0].data_buf, esalt_bufs[0].signature, key1, key2) == 1) return 0;
-  if (verify_header_kuznyechik (esalt_bufs[0].data_buf, esalt_bufs[0].signature, key1, key2) == 1) return 0;
-  if (verify_header_aes        (esalt_bufs[0].data_buf, esalt_bufs[0].signature, key1, key2, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) == 1) return 0;
+  if (verify_header_serpent    (esalt_bufs[DIGESTS_OFFSET_HOST].data_buf, esalt_bufs[DIGESTS_OFFSET_HOST].signature, key1, key2) == 1) return 0;
+  if (verify_header_twofish    (esalt_bufs[DIGESTS_OFFSET_HOST].data_buf, esalt_bufs[DIGESTS_OFFSET_HOST].signature, key1, key2) == 1) return 0;
+  if (verify_header_camellia   (esalt_bufs[DIGESTS_OFFSET_HOST].data_buf, esalt_bufs[DIGESTS_OFFSET_HOST].signature, key1, key2) == 1) return 0;
+  if (verify_header_kuznyechik (esalt_bufs[DIGESTS_OFFSET_HOST].data_buf, esalt_bufs[DIGESTS_OFFSET_HOST].signature, key1, key2) == 1) return 0;
+  if (verify_header_aes        (esalt_bufs[DIGESTS_OFFSET_HOST].data_buf, esalt_bufs[DIGESTS_OFFSET_HOST].signature, key1, key2, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) == 1) return 0;
 
   return -1;
 }
 
-DECLSPEC void hmac_streebog512_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u64x *ipad_hash, u64x *opad_hash, u64x *ipad_raw, u64x *opad_raw, u64x *digest, SHM_TYPE u64a (*s_sbob_sl64)[256])
+DECLSPEC void hmac_streebog512_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u64x *ipad_hash, PRIVATE_AS u64x *opad_hash, PRIVATE_AS u64x *ipad_raw, PRIVATE_AS u64x *opad_raw, PRIVATE_AS u64x *digest, SHM_TYPE u64a (*s_sbob_sl64)[256])
 {
   const u64x nullbuf[8] = { 0 };
   u64x counterbuf[8]    = { 0 };
@@ -183,13 +182,13 @@ KERNEL_FQ void m13771_init (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
   const u64 lid = get_local_id (0);
   const u64 lsz = get_local_size (0);
 
-  const int keyboard_layout_mapping_cnt = esalt_bufs[DIGESTS_OFFSET].keyboard_layout_mapping_cnt;
+  const int keyboard_layout_mapping_cnt = esalt_bufs[DIGESTS_OFFSET_HOST].keyboard_layout_mapping_cnt;
 
   LOCAL_VK keyboard_layout_mapping_t s_keyboard_layout_mapping_buf[256];
 
   for (u32 i = lid; i < 256; i += lsz)
   {
-    s_keyboard_layout_mapping_buf[i] = esalt_bufs[DIGESTS_OFFSET].keyboard_layout_mapping_buf[i];
+    s_keyboard_layout_mapping_buf[i] = esalt_bufs[DIGESTS_OFFSET_HOST].keyboard_layout_mapping_buf[i];
   }
 
   SYNC_THREADS ();
@@ -218,7 +217,7 @@ KERNEL_FQ void m13771_init (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -263,7 +262,7 @@ KERNEL_FQ void m13771_init (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
 
   hc_execute_keyboard_layout_mapping (w, pw_len, s_keyboard_layout_mapping_buf, keyboard_layout_mapping_cnt);
 
-  pw_len = hc_apply_keyfile_vc (w, pw_len, &esalt_bufs[DIGESTS_OFFSET]);
+  pw_len = hc_apply_keyfile_vc (w, pw_len, &esalt_bufs[DIGESTS_OFFSET_HOST]);
 
   streebog512_hmac_ctx_t streebog512_hmac_ctx;
 
@@ -305,7 +304,7 @@ KERNEL_FQ void m13771_init (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
   tmps[gid].opad_raw[6] = streebog512_hmac_ctx.opad.s[6];
   tmps[gid].opad_raw[7] = streebog512_hmac_ctx.opad.s[7];
 
-  streebog512_hmac_update_global_swap (&streebog512_hmac_ctx, esalt_bufs[DIGESTS_OFFSET].salt_buf, 64);
+  streebog512_hmac_update_global_swap (&streebog512_hmac_ctx, salt_bufs[SALT_POS_HOST].salt_buf, 64);
 
   for (u32 i = 0, j = 1; i < 8; i += 8, j += 1)
   {
@@ -391,23 +390,23 @@ KERNEL_FQ void m13771_loop (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
 
   #endif
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   // this is the pim range check
   // it is guaranteed that only 0 or 1 innerloops will match a "pim" mark (each 1000 iterations)
   // therefore the module limits the inner loop iteration count to 1000
   // if the key_pim is set, we know that we have to save and check the key for this pim
 
-  const int pim_multi = esalt_bufs[DIGESTS_OFFSET].pim_multi;
-  const int pim_start = esalt_bufs[DIGESTS_OFFSET].pim_start;
-  const int pim_stop  = esalt_bufs[DIGESTS_OFFSET].pim_stop;
+  const int pim_multi = esalt_bufs[DIGESTS_OFFSET_HOST].pim_multi;
+  const int pim_start = esalt_bufs[DIGESTS_OFFSET_HOST].pim_start;
+  const int pim_stop  = esalt_bufs[DIGESTS_OFFSET_HOST].pim_stop;
 
   int pim    = 0;
   int pim_at = 0;
 
-  for (u32 j = 0; j < loop_cnt; j++)
+  for (u32 j = 0; j < LOOP_CNT; j++)
   {
-    const int iter_abs = 1 + loop_pos + j;
+    const int iter_abs = 1 + LOOP_POS + j;
 
     if ((iter_abs % pim_multi) == pim_multi - 1)
     {
@@ -489,7 +488,7 @@ KERNEL_FQ void m13771_loop (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
     out[6] = pack64v (tmps, out, gid, i + 6);
     out[7] = pack64v (tmps, out, gid, i + 7);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -620,13 +619,13 @@ KERNEL_FQ void m13771_loop_extended (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u32 pim_check = tmps[gid].pim_check;
 
   if (pim_check)
   {
-    if (check_header_0512 (esalt_bufs, tmps[gid].pim_key, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) != -1)
+    if (check_header_0512 (esalt_bufs, kernel_param, tmps[gid].pim_key, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) != -1)
     {
       tmps[gid].pim = pim_check;
     }
@@ -692,22 +691,22 @@ KERNEL_FQ void m13771_comp (KERN_ATTR_TMPS_ESALT (vc64_sbog_tmp_t, vc_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   if (tmps[gid].pim)
   {
-    if (hc_atomic_inc (&hashes_shown[0]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
   }
   else
   {
-    if (check_header_0512 (esalt_bufs, tmps[gid].out, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) != -1)
+    if (check_header_0512 (esalt_bufs, kernel_param, tmps[gid].out, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4) != -1)
     {
-      if (hc_atomic_inc (&hashes_shown[0]) == 0)
+      if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
       {
-        mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, 0, gid, 0, 0, 0);
+        mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
       }
     }
   }

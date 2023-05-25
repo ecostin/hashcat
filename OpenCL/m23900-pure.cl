@@ -6,12 +6,12 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -33,14 +33,14 @@ KERNEL_FQ void m23900_init (KERN_ATTR_TMPS_ESALT (bestcrypt_tmp_t, bestcrypt_t))
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const int salt_pw_len = 8 + MIN (pws[gid].pw_len, 56);
 
   u32 comb[16];
 
-  comb[ 0] = salt_bufs[SALT_POS].salt_buf[0];
-  comb[ 1] = salt_bufs[SALT_POS].salt_buf[1];
+  comb[ 0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  comb[ 1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
 
   comb[ 2] = hc_swap32_S (pws[gid].i[ 0]); // in theory BE is faster because it
   comb[ 3] = hc_swap32_S (pws[gid].i[ 1]); // avoids several other byte swaps later on
@@ -107,7 +107,7 @@ KERNEL_FQ void m23900_loop (KERN_ATTR_TMPS_ESALT (bestcrypt_tmp_t, bestcrypt_t))
 {
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const int salt_pw_len = 8 + MIN (pws[gid].pw_len, 56);
 
@@ -308,7 +308,7 @@ KERNEL_FQ void m23900_comp (KERN_ATTR_TMPS_ESALT (bestcrypt_tmp_t, bestcrypt_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // final transform of sha256:
 
@@ -365,10 +365,10 @@ KERNEL_FQ void m23900_comp (KERN_ATTR_TMPS_ESALT (bestcrypt_tmp_t, bestcrypt_t))
   {
     u32 data[4];
 
-    data[0] = esalt_bufs[DIGESTS_OFFSET].data[i + 0];
-    data[1] = esalt_bufs[DIGESTS_OFFSET].data[i + 1];
-    data[2] = esalt_bufs[DIGESTS_OFFSET].data[i + 2];
-    data[3] = esalt_bufs[DIGESTS_OFFSET].data[i + 3];
+    data[0] = esalt_bufs[DIGESTS_OFFSET_HOST].data[i + 0];
+    data[1] = esalt_bufs[DIGESTS_OFFSET_HOST].data[i + 1];
+    data[2] = esalt_bufs[DIGESTS_OFFSET_HOST].data[i + 2];
+    data[3] = esalt_bufs[DIGESTS_OFFSET_HOST].data[i + 3];
 
     u32 out[4];
 
@@ -444,9 +444,9 @@ KERNEL_FQ void m23900_comp (KERN_ATTR_TMPS_ESALT (bestcrypt_tmp_t, bestcrypt_t))
       (digest[2] == res[18]) &&
       (digest[3] == res[19]))
   {
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
 
     return;

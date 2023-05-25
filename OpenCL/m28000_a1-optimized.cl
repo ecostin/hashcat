@@ -7,11 +7,11 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 typedef struct crc64
@@ -165,7 +165,7 @@ DECLSPEC u64 round_crc64jones (u64 a, const u64 v, SHM_TYPE u64 *s_crc64jonestab
   return a;
 }
 
-DECLSPEC u64 crc64jones (const u32 *w, const u32 pw_len, const u64 iv, SHM_TYPE u64 *s_crc64jonestab)
+DECLSPEC u64 crc64jones (PRIVATE_AS const u32 *w, const u32 pw_len, const u64 iv, SHM_TYPE u64 *s_crc64jonestab)
 {
   u64 a = iv;
 
@@ -224,7 +224,7 @@ KERNEL_FQ void m28000_m04 (KERN_ATTR_ESALT (crc64_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * Base
@@ -248,13 +248,13 @@ KERNEL_FQ void m28000_m04 (KERN_ATTR_ESALT (crc64_t))
    * salt
    */
 
-  const u64 iv = esalt_bufs[DIGESTS_OFFSET].iv;
+  const u64 iv = esalt_bufs[DIGESTS_OFFSET_HOST].iv;
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32 pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -292,7 +292,7 @@ KERNEL_FQ void m28000_m04 (KERN_ATTR_ESALT (crc64_t))
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -396,7 +396,7 @@ KERNEL_FQ void m28000_s04 (KERN_ATTR_ESALT (crc64_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * Base
@@ -420,7 +420,7 @@ KERNEL_FQ void m28000_s04 (KERN_ATTR_ESALT (crc64_t))
    * salt
    */
 
-  const u64 iv = esalt_bufs[DIGESTS_OFFSET].iv;
+  const u64 iv = esalt_bufs[DIGESTS_OFFSET_HOST].iv;
 
   /**
    * digest
@@ -428,8 +428,8 @@ KERNEL_FQ void m28000_s04 (KERN_ATTR_ESALT (crc64_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
     0,
     0
   };
@@ -438,7 +438,7 @@ KERNEL_FQ void m28000_s04 (KERN_ATTR_ESALT (crc64_t))
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32 pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -476,7 +476,7 @@ KERNEL_FQ void m28000_s04 (KERN_ATTR_ESALT (crc64_t))
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }

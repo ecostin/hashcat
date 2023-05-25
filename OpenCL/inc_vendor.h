@@ -3,17 +3,25 @@
  * License.....: MIT
  */
 
-#ifndef _INC_VENDOR_H
-#define _INC_VENDOR_H
+#ifndef INC_VENDOR_H
+#define INC_VENDOR_H
 
-#if defined _CPU_OPENCL_EMU_H
+#if defined HC_CPU_OPENCL_EMU_H
 #define IS_NATIVE
 #elif defined __CUDACC__
 #define IS_CUDA
 #elif defined __HIPCC__
 #define IS_HIP
+#elif defined __METAL__ || defined __METAL_MACOS__
+#define IS_METAL
 #else
 #define IS_OPENCL
+#endif
+
+#if defined IS_METAL
+#include <metal_stdlib>
+
+using namespace metal;
 #endif
 
 #if defined IS_NATIVE
@@ -22,6 +30,7 @@
 #define GLOBAL_AS
 #define LOCAL_VK
 #define LOCAL_AS
+#define PRIVATE_AS
 #define KERNEL_FQ
 #elif defined IS_CUDA
 #define CONSTANT_VK __constant__
@@ -29,6 +38,7 @@
 #define GLOBAL_AS
 #define LOCAL_VK    __shared__
 #define LOCAL_AS
+#define PRIVATE_AS
 #define KERNEL_FQ   extern "C" __global__
 #elif defined IS_HIP
 #define CONSTANT_VK __constant__
@@ -36,13 +46,23 @@
 #define GLOBAL_AS
 #define LOCAL_VK    __shared__
 #define LOCAL_AS
+#define PRIVATE_AS
 #define KERNEL_FQ   extern "C" __global__
+#elif defined IS_METAL
+#define CONSTANT_VK constant
+#define CONSTANT_AS constant
+#define GLOBAL_AS   device
+#define LOCAL_VK    threadgroup
+#define LOCAL_AS    threadgroup
+#define PRIVATE_AS  thread
+#define KERNEL_FQ   kernel
 #elif defined IS_OPENCL
 #define CONSTANT_VK __constant
 #define CONSTANT_AS __constant
 #define GLOBAL_AS   __global
 #define LOCAL_VK    __local
 #define LOCAL_AS    __local
+#define PRIVATE_AS
 #define KERNEL_FQ   __kernel
 #endif
 
@@ -122,16 +142,19 @@
  * fast but pure kernels on rocm is a good example
  */
 
+#ifdef NO_INLINE
+#define HC_INLINE
+#else
+#define HC_INLINE inline static
+#endif
+
 #if defined IS_AMD && defined IS_GPU
-#define DECLSPEC inline static
+#define DECLSPEC HC_INLINE
 #elif defined IS_HIP
-#define DECLSPEC __device__
+#define DECLSPEC __device__ HC_INLINE
 #else
 #define DECLSPEC
 #endif
-
-#define INLINE0 __attribute__ ((noinline))
-#define INLINE1 __attribute__ ((inline))
 
 /**
  * AMD specific
@@ -177,4 +200,14 @@
 //#define USE_SWIZZLE
 #endif
 
+#ifdef IS_METAL
+#define USE_ROTATE
+
+// Metal support max VECT_SIZE = 4
+#define s0 x
+#define s1 y
+#define s2 z
+#define s3 w
 #endif
+
+#endif // INC_VENDOR_H

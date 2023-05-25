@@ -18,13 +18,14 @@ static const u32   DGST_POS0      = 0;
 static const u32   DGST_POS1      = 1;
 static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 3;
-static const u32   DGST_SIZE      = DGST_SIZE_4_5;
+static const u32   DGST_SIZE      = DGST_SIZE_4_32;
 static const u32   HASH_CATEGORY  = HASH_CATEGORY_FDE;
-static const char *HASH_NAME      = "TrueCrypt RIPEMD160 + XTS 512 bit";
+static const char *HASH_NAME      = "TrueCrypt RIPEMD160 + XTS 512 bit (legacy)";
 static const u64   KERN_TYPE      = 6211;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_BINARY_HASHFILE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
@@ -45,6 +46,11 @@ u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 
+#define TC_SALT_LEN       (               64)
+#define TC_DATA_LEN       (              448)
+#define TC_HEADER_LEN     (              512)
+#define TC_HEADER_HEX_LEN (TC_HEADER_LEN * 2)
+
 typedef struct tc_tmp
 {
   u32 ipad[16];
@@ -57,8 +63,7 @@ typedef struct tc_tmp
 
 typedef struct tc
 {
-  u32 salt_buf[32];
-  u32 data_buf[112];
+  u32 data_buf[TC_DATA_LEN / 4];
   u32 keyfile_buf16[16];
   u32 keyfile_buf32[32];
   u32 keyfile_enabled;
@@ -74,8 +79,8 @@ static const float MIN_SUFFICIENT_ENTROPY_FILE = 7.0f;
 
 bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
-  // AMD Radeon Pro W5700X Compute Engine; 1.2 (Apr 22 2021 21:54:44); 11.3.1; 20E241
-  if ((device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE) && (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU))
+  // AMD Radeon Pro W5700X, Metal.Version.: 261.13, compiler hangs
+  if (device_param->is_metal == true)
   {
     return true;
   }
@@ -123,22 +128,11 @@ u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED con
 
 int module_hash_init_selftest (MAYBE_UNUSED const hashconfig_t *hashconfig, hash_t *hash)
 {
-  const size_t st_hash_len = strlen (hashconfig->st_hash);
+  char header[TC_HEADER_LEN + 1] = { 0 };
 
-  char *tmpdata = (char *) hcmalloc (st_hash_len / 2);
+  hex_decode ((const u8 *) hashconfig->st_hash, TC_HEADER_HEX_LEN, (u8 *) header);
 
-  for (size_t i = 0, j = 0; j < st_hash_len; i += 1, j += 2)
-  {
-    const u8 c = hex_to_u8 ((const u8 *) hashconfig->st_hash + j);
-
-    tmpdata[i] = c;
-  }
-
-  const int parser_status = module_hash_decode (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, tmpdata, st_hash_len / 2);
-
-
-
-  hcfree (tmpdata);
+  const int parser_status = module_hash_decode (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, header, TC_HEADER_LEN);
 
   return parser_status;
 }
@@ -151,21 +145,19 @@ int module_hash_binary_parse (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
 
   if (hc_fopen (&fp, hashes->hashfile, "rb") == false) return (PARSER_HAVE_ERRNO);
 
-  #define TC_HEADER_SIZE 512
+  char *in = (char *) hcmalloc (TC_HEADER_LEN);
 
-  char *in = (char *) hcmalloc (TC_HEADER_SIZE);
-
-  const size_t n = hc_fread (in, 1, TC_HEADER_SIZE, &fp);
+  const size_t n = hc_fread (in, 1, TC_HEADER_LEN, &fp);
 
   hc_fclose (&fp);
 
-  if (n != TC_HEADER_SIZE) return (PARSER_TC_FILE_SIZE);
+  if (n != TC_HEADER_LEN) return (PARSER_TC_FILE_SIZE);
 
   hash_t *hashes_buf = hashes->hashes_buf;
 
   hash_t *hash = &hashes_buf[0];
 
-  const int parser_status = module_hash_decode (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, in, TC_HEADER_SIZE);
+  const int parser_status = module_hash_decode (hashconfig, hash->digest, hash->salt, hash->esalt, hash->hook_salt, hash->hash_info, in, TC_HEADER_LEN);
 
   if (parser_status != PARSER_OK) return 0;
 
@@ -218,23 +210,33 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   tc_t *tc = (tc_t *) esalt_buf;
 
+  // entropy
+
   const float entropy = get_entropy ((const u8 *) line_buf, line_len);
 
   if (entropy < MIN_SUFFICIENT_ENTROPY_FILE) return (PARSER_INSUFFICIENT_ENTROPY);
 
-  memcpy (tc->salt_buf, line_buf, 64);
+  // salt
 
-  memcpy (tc->data_buf, line_buf + 64, 512 - 64);
+  memcpy (salt->salt_buf, line_buf, TC_SALT_LEN);
 
-  salt->salt_buf[0] = tc->salt_buf[0];
+  salt->salt_len = TC_SALT_LEN;
 
-  salt->salt_len = 4;
+  // iter
 
   salt->salt_iter = ROUNDS_TRUECRYPT_2K - 1;
 
+  // data
+
+  memcpy (tc->data_buf, line_buf + TC_SALT_LEN, TC_DATA_LEN);
+
+  // signature
+
   tc->signature = 0x45555254; // "TRUE"
 
-  digest[0] = tc->data_buf[0];
+  // fake digest
+
+  memcpy (digest, tc->data_buf, TC_DATA_LEN / 4);
 
   return (PARSER_OK);
 }
@@ -248,6 +250,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -266,6 +269,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = module_hash_binary_parse;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

@@ -3,8 +3,8 @@
  * License.....: MIT
  */
 
-#ifndef _CONVERT_H
-#define _CONVERT_H
+#ifndef HC_CONVERT_H
+#define HC_CONVERT_H
 
 #include <ctype.h>
 
@@ -20,6 +20,10 @@ bool is_valid_base64b_string  (const u8 *s, const size_t len);
 bool is_valid_base64b_char    (const u8 c);
 bool is_valid_base64c_string  (const u8 *s, const size_t len);
 bool is_valid_base64c_char    (const u8 c);
+bool is_valid_base58_string   (const u8 *s, const size_t len);
+bool is_valid_base58_char     (const u8 c);
+bool is_valid_bech32_string   (const u8 *s, const size_t len);
+bool is_valid_bech32_char     (const u8 c);
 bool is_valid_hex_string      (const u8 *s, const size_t len);
 bool is_valid_hex_char        (const u8 c);
 bool is_valid_digit_string    (const u8 *s, const size_t len);
@@ -78,4 +82,4 @@ u64 v64_from_v32ab (const u32 v32a, const u32 v32b);
 int hex_decode (const u8 *in_buf, const int in_len, u8 *out_buf);
 int hex_encode (const u8 *in_buf, const int in_len, u8 *out_buf);
 
-#endif // _CONVERT_H
+#endif // HC_CONVERT_H

@@ -6,13 +6,13 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -54,7 +54,7 @@ KERNEL_FQ void m12600_mxx (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * salt
@@ -62,14 +62,14 @@ KERNEL_FQ void m12600_mxx (KERN_ATTR_VECTOR ())
 
   u32 pc256[8];
 
-  pc256[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  pc256[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  pc256[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  pc256[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  pc256[4] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  pc256[5] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  pc256[6] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  pc256[7] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  pc256[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  pc256[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  pc256[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  pc256[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  pc256[4] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  pc256[5] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  pc256[6] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  pc256[7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
 
   /**
    * base
@@ -90,7 +90,7 @@ KERNEL_FQ void m12600_mxx (KERN_ATTR_VECTOR ())
 
   u32x w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 
@@ -201,7 +201,7 @@ KERNEL_FQ void m12600_sxx (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest
@@ -209,10 +209,10 @@ KERNEL_FQ void m12600_sxx (KERN_ATTR_VECTOR ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -221,14 +221,14 @@ KERNEL_FQ void m12600_sxx (KERN_ATTR_VECTOR ())
 
   u32 pc256[8];
 
-  pc256[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  pc256[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  pc256[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  pc256[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  pc256[4] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  pc256[5] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  pc256[6] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  pc256[7] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  pc256[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  pc256[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  pc256[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  pc256[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  pc256[4] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  pc256[5] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  pc256[6] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  pc256[7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
 
   /**
    * base
@@ -249,7 +249,7 @@ KERNEL_FQ void m12600_sxx (KERN_ATTR_VECTOR ())
 
   u32x w0l = w[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 

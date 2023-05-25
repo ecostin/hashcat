@@ -6,13 +6,13 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 typedef struct chacha20
@@ -41,7 +41,7 @@ typedef struct chacha20
     x[b] = hc_rotl32 (x[b] ^ x[c], 7);  \
   } while (0);
 
-DECLSPEC void chacha20_transform (const u32x *w0, const u32x *w1, const u32 *position, const u32 offset, const u32 *iv, const u32 *plain, u32x *digest)
+DECLSPEC void chacha20_transform (PRIVATE_AS const u32x *w0, PRIVATE_AS const u32x *w1, PRIVATE_AS const u32 *position, const u32 offset, PRIVATE_AS const u32 *iv, PRIVATE_AS const u32 *plain, PRIVATE_AS u32x *digest)
 {
   /**
    * Key expansion
@@ -248,7 +248,7 @@ KERNEL_FQ void m15400_m04 (KERN_ATTR_RULES_ESALT (chacha20_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -273,22 +273,22 @@ KERNEL_FQ void m15400_m04 (KERN_ATTR_RULES_ESALT (chacha20_t))
   u32 position[2] = { 0 };
   u32 offset      = 0;
 
-  position[0] = esalt_bufs[DIGESTS_OFFSET].position[0];
-  position[1] = esalt_bufs[DIGESTS_OFFSET].position[1];
+  position[0] = esalt_bufs[DIGESTS_OFFSET_HOST].position[0];
+  position[1] = esalt_bufs[DIGESTS_OFFSET_HOST].position[1];
 
-  offset = esalt_bufs[DIGESTS_OFFSET].offset;
+  offset = esalt_bufs[DIGESTS_OFFSET_HOST].offset;
 
-  iv[0] = esalt_bufs[DIGESTS_OFFSET].iv[0];
-  iv[1] = esalt_bufs[DIGESTS_OFFSET].iv[1];
+  iv[0] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[0];
+  iv[1] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[1];
 
-  plain[0] = esalt_bufs[DIGESTS_OFFSET].plain[0];
-  plain[1] = esalt_bufs[DIGESTS_OFFSET].plain[1];
+  plain[0] = esalt_bufs[DIGESTS_OFFSET_HOST].plain[0];
+  plain[1] = esalt_bufs[DIGESTS_OFFSET_HOST].plain[1];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -326,7 +326,7 @@ KERNEL_FQ void m15400_s04 (KERN_ATTR_RULES_ESALT (chacha20_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -351,16 +351,16 @@ KERNEL_FQ void m15400_s04 (KERN_ATTR_RULES_ESALT (chacha20_t))
   u32 position[2] = { 0 };
   u32 offset      = 0;
 
-  position[0] = esalt_bufs[DIGESTS_OFFSET].position[0];
-  position[1] = esalt_bufs[DIGESTS_OFFSET].position[1];
+  position[0] = esalt_bufs[DIGESTS_OFFSET_HOST].position[0];
+  position[1] = esalt_bufs[DIGESTS_OFFSET_HOST].position[1];
 
-  offset = esalt_bufs[DIGESTS_OFFSET].offset;
+  offset = esalt_bufs[DIGESTS_OFFSET_HOST].offset;
 
-  iv[0] = esalt_bufs[DIGESTS_OFFSET].iv[0];
-  iv[1] = esalt_bufs[DIGESTS_OFFSET].iv[1];
+  iv[0] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[0];
+  iv[1] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[1];
 
-  plain[0] = esalt_bufs[DIGESTS_OFFSET].plain[0];
-  plain[1] = esalt_bufs[DIGESTS_OFFSET].plain[1];
+  plain[0] = esalt_bufs[DIGESTS_OFFSET_HOST].plain[0];
+  plain[1] = esalt_bufs[DIGESTS_OFFSET_HOST].plain[1];
 
   /**
    * digest
@@ -368,17 +368,17 @@ KERNEL_FQ void m15400_s04 (KERN_ATTR_RULES_ESALT (chacha20_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };

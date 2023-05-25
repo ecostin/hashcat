@@ -6,11 +6,11 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
 #define PERM_OP(a,b,tt,n,m) \
@@ -353,7 +353,7 @@ CONSTANT_VK u32a c_tripcode_salt[128] =
 #define BOX(i,n,S) make_u32x ((S)[(n)][(i).s0], (S)[(n)][(i).s1], (S)[(n)][(i).s2], (S)[(n)][(i).s3], (S)[(n)][(i).s4], (S)[(n)][(i).s5], (S)[(n)][(i).s6], (S)[(n)][(i).s7], (S)[(n)][(i).s8], (S)[(n)][(i).s9], (S)[(n)][(i).sa], (S)[(n)][(i).sb], (S)[(n)][(i).sc], (S)[(n)][(i).sd], (S)[(n)][(i).se], (S)[(n)][(i).sf])
 #endif
 
-DECLSPEC void _des_crypt_keysetup (u32 c, u32x d, u32x *Kc, u32x *Kd, LOCAL_AS u32 (*s_skb)[64])
+DECLSPEC void _des_crypt_keysetup (u32 c, u32x d, PRIVATE_AS u32x *Kc, PRIVATE_AS u32x *Kd, LOCAL_AS u32 (*s_skb)[64])
 {
   u32 tt;
 
@@ -422,7 +422,7 @@ DECLSPEC void _des_crypt_keysetup (u32 c, u32x d, u32x *Kc, u32x *Kd, LOCAL_AS u
   }
 }
 
-DECLSPEC void _des_crypt_encrypt (u32 *iv, u32 mask, u32x *Kc, u32x *Kd, LOCAL_AS u32 (*s_SPtrans)[64])
+DECLSPEC void _des_crypt_encrypt (PRIVATE_AS u32 *iv, u32 mask, PRIVATE_AS u32x *Kc, PRIVATE_AS u32x *Kd, LOCAL_AS u32 (*s_SPtrans)[64])
 {
   const u32 E1 = (mask >> 2) & 0x3f0;
   const u32 E0 = mask & 0x3f;
@@ -539,7 +539,7 @@ KERNEL_FQ void m16000_mxx (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -563,7 +563,7 @@ KERNEL_FQ void m16000_mxx (KERN_ATTR_BASIC ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32 pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -601,7 +601,7 @@ KERNEL_FQ void m16000_mxx (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -711,7 +711,7 @@ KERNEL_FQ void m16000_sxx (KERN_ATTR_BASIC ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -737,8 +737,8 @@ KERNEL_FQ void m16000_sxx (KERN_ATTR_BASIC ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
     0,
     0
   };
@@ -747,7 +747,7 @@ KERNEL_FQ void m16000_sxx (KERN_ATTR_BASIC ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32 pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -785,7 +785,7 @@ KERNEL_FQ void m16000_sxx (KERN_ATTR_BASIC ())
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }

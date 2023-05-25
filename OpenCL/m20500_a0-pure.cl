@@ -61,13 +61,13 @@ Related publication: https://scitepress.org/PublicationsDetail.aspx?ID=KLPzPqStp
 
 */
 
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
 
 #define MSB(x)          ((x) >> 24)
 #define CRC32(x,c,t)    (((x) >> 8) ^ (t)[((x) ^ (c)) & 0xff])
@@ -174,7 +174,7 @@ KERNEL_FQ void m20500_sxx (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest
@@ -182,9 +182,9 @@ KERNEL_FQ void m20500_sxx (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[2],
     0
   };
 
@@ -198,7 +198,7 @@ KERNEL_FQ void m20500_sxx (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw_t t = PASTE_PW;
 
@@ -248,7 +248,7 @@ KERNEL_FQ void m20500_mxx (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -260,7 +260,7 @@ KERNEL_FQ void m20500_mxx (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw_t t = PASTE_PW;
 

@@ -27,11 +27,13 @@ static const char *HASH_NAME      = "WPA-PMKID-PMK";
 static const u64   KERN_TYPE      = 16801;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_AUX1
                                   | OPTS_TYPE_DEEP_COMP_KERNEL
                                   | OPTS_TYPE_POTFILE_NOPASS
-                                  | OPTS_TYPE_COPY_TMPS;
+                                  | OPTS_TYPE_COPY_TMPS
+                                  | OPTS_TYPE_AUTODETECT_DISABLE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "5b13d4babb3714ccc62c9f71864bc984efd6a55f237c7a87fc2151e1ca658a9d";
 static const char *ST_HASH        = "2582a8281bf9d4308d6f5731d0e61c61:4604ba734d4e:89acf0e761f4";
@@ -276,6 +278,24 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
 
   m16801_aux = m16801_aux1;
 
+  kernel_param_t kernel_param;
+
+  kernel_param.bitmap_mask         = 0;
+  kernel_param.bitmap_shift1       = 0;
+  kernel_param.bitmap_shift2       = 0;
+  kernel_param.salt_pos_host       = 0;
+  kernel_param.loop_pos            = 0;
+  kernel_param.loop_cnt            = 0;
+  kernel_param.il_cnt              = 0;
+  kernel_param.digests_cnt         = 1;
+  kernel_param.digests_offset_host = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.pws_pos             = 0;
+  kernel_param.gid_max             = 1;
+
   m16801_aux
   (
     NULL,               // pws
@@ -302,19 +322,7 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
     NULL,               // d_extra1_buf
     NULL,               // d_extra2_buf
     NULL,               // d_extra3_buf
-    0,                  // bitmap_mask
-    0,                  // bitmap_shift1
-    0,                  // bitmap_shift2
-    0,                  // salt_pos
-    0,                  // loop_pos
-    0,                  // loop_cnt
-    0,                  // il_cnt
-    1,                  // digests_cnt
-    0,                  // digests_offset
-    0,                  // combs_mode
-    0,                  // salt_repeat
-    0,                  // pws_pos
-    1                   // gid_max
+    &kernel_param       // kernel_param
   );
 
   const bool r = (d_return_buf == 0) ? false : true;
@@ -345,28 +353,27 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   // start normal parsing
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   // real 16801 pmkid hash-lines
 
   token.token_cnt  = 3;
 
   token.sep[0]     = sep;
-  token.len_min[0] = 32;
-  token.len_max[0] = 32;
-  token.attr[0]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[0]     = 32;
+  token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   token.sep[1]     = sep;
-  token.len_min[1] = 12;
-  token.len_max[1] = 12;
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 12;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   token.sep[2]     = sep;
-  token.len_min[2] = 12;
-  token.len_max[2] = 12;
-  token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[2]     = 12;
+  token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   const int rc_tokenizer = input_tokenizer ((const u8 *) line_buf, line_len, &token);
@@ -378,21 +385,18 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     token.token_cnt  = 4;
 
     token.sep[0]     = sep;
-    token.len_min[0] = 32;
-    token.len_max[0] = 32;
-    token.attr[0]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[0]     = 32;
+    token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[1]     = sep;
-    token.len_min[1] = 12;
-    token.len_max[1] = 12;
-    token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[1]     = 12;
+    token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[2]     = sep;
-    token.len_min[2] = 12;
-    token.len_max[2] = 12;
-    token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
+    token.len[2]     = 12;
+    token.attr[2]    = TOKEN_ATTR_FIXED_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
     token.sep[3]     = sep;
@@ -589,6 +593,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = module_benchmark_mask;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = module_deep_comp_kernel;
@@ -607,6 +612,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = module_hash_binary_save;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = module_hash_decode_potfile;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

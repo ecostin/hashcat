@@ -7,15 +7,15 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_cipher_rc4.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_rc4.cl)
 #endif
 
 typedef struct oldoffice01
@@ -41,7 +41,7 @@ KERNEL_FQ void m09710_m04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -69,16 +69,16 @@ KERNEL_FQ void m09710_m04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
   u32 encryptedVerifier[4];
 
-  encryptedVerifier[0] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[0];
-  encryptedVerifier[1] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[1];
-  encryptedVerifier[2] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[2];
-  encryptedVerifier[3] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[3];
+  encryptedVerifier[0] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[0];
+  encryptedVerifier[1] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[1];
+  encryptedVerifier[2] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[2];
+  encryptedVerifier[3] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[3];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -119,11 +119,11 @@ KERNEL_FQ void m09710_m04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
     // now the RC4 part
 
-    rc4_init_128 (S, digest);
+    rc4_init_128 (S, digest, lid);
 
     u32 out[4];
 
-    u8 j = rc4_next_16 (S, 0, 0, encryptedVerifier, out);
+    u8 j = rc4_next_16 (S, 0, 0, encryptedVerifier, out, lid);
 
     w0[0] = out[0];
     w0[1] = out[1];
@@ -149,7 +149,7 @@ KERNEL_FQ void m09710_m04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
     md5_transform (w0, w1, w2, w3, digest);
 
-    rc4_next_16 (S, 16, j, digest, out);
+    rc4_next_16 (S, 16, j, digest, out, lid);
 
     COMPARE_M_SIMD (out[0], out[1], out[2], out[3]);
   }
@@ -177,7 +177,7 @@ KERNEL_FQ void m09710_s04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -205,10 +205,10 @@ KERNEL_FQ void m09710_s04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
   u32 encryptedVerifier[4];
 
-  encryptedVerifier[0] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[0];
-  encryptedVerifier[1] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[1];
-  encryptedVerifier[2] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[2];
-  encryptedVerifier[3] = esalt_bufs[DIGESTS_OFFSET].encryptedVerifier[3];
+  encryptedVerifier[0] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[0];
+  encryptedVerifier[1] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[1];
+  encryptedVerifier[2] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[2];
+  encryptedVerifier[3] = esalt_bufs[DIGESTS_OFFSET_HOST].encryptedVerifier[3];
 
   /**
    * digest
@@ -216,17 +216,17 @@ KERNEL_FQ void m09710_s04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -267,11 +267,11 @@ KERNEL_FQ void m09710_s04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
     // now the RC4 part
 
-    rc4_init_128 (S, digest);
+    rc4_init_128 (S, digest, lid);
 
     u32 out[4];
 
-    u8 j = rc4_next_16 (S, 0, 0, encryptedVerifier, out);
+    u8 j = rc4_next_16 (S, 0, 0, encryptedVerifier, out, lid);
 
     w0[0] = out[0];
     w0[1] = out[1];
@@ -297,7 +297,7 @@ KERNEL_FQ void m09710_s04 (KERN_ATTR_RULES_ESALT (oldoffice01_t))
 
     md5_transform (w0, w1, w2, w3, digest);
 
-    rc4_next_16 (S, 16, j, digest, out);
+    rc4_next_16 (S, 16, j, digest, out, lid);
 
     COMPARE_S_SIMD (out[0], out[1], out[2], out[3]);
   }

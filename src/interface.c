@@ -37,6 +37,18 @@ bool module_load (hashcat_ctx_t *hashcat_ctx, module_ctx_t *module_ctx, const u3
 
   module_filename (folder_config, hash_mode, module_file, HCBUFSIZ_TINY);
 
+  struct stat s;
+
+  memset (&s, 0, sizeof (struct stat));
+
+  if (stat (module_file, &s) == -1)
+  {
+    event_log_warning (hashcat_ctx, "Either the specified hash mode does not exist in the official repository,");
+    event_log_warning (hashcat_ctx, "or the file(s) could not be found. Please check that the hash mode number is");
+    event_log_warning (hashcat_ctx, "correct and that the files are in the correct place.");
+    event_log_warning (hashcat_ctx, NULL);
+  }
+
   module_ctx->module_handle = hc_dlopen (module_file);
 
   if (module_ctx->module_handle == NULL)
@@ -84,6 +96,7 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   // set some boring defaults
 
   hashconfig->benchmark_mask          = default_benchmark_mask          (hashconfig, user_options, user_options_extra);
+  hashconfig->benchmark_charset       = default_benchmark_charset       (hashconfig, user_options, user_options_extra);
   hashconfig->dictstat_disable        = default_dictstat_disable        (hashconfig, user_options, user_options_extra);
   hashconfig->esalt_size              = default_esalt_size              (hashconfig, user_options, user_options_extra);
   hashconfig->forced_outfile_format   = default_forced_outfile_format   (hashconfig, user_options, user_options_extra);
@@ -138,6 +151,7 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   CHECK_DEFINED (module_ctx->module_benchmark_esalt);
   CHECK_DEFINED (module_ctx->module_benchmark_hook_salt);
   CHECK_DEFINED (module_ctx->module_benchmark_mask);
+  CHECK_DEFINED (module_ctx->module_benchmark_charset);
   CHECK_DEFINED (module_ctx->module_benchmark_salt);
   CHECK_DEFINED (module_ctx->module_build_plain_postprocess);
   CHECK_DEFINED (module_ctx->module_deep_comp_kernel);
@@ -158,6 +172,7 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   CHECK_DEFINED (module_ctx->module_hash_binary_save);
   CHECK_DEFINED (module_ctx->module_hash_category);
   CHECK_DEFINED (module_ctx->module_hash_decode);
+  CHECK_DEFINED (module_ctx->module_hash_decode_postprocess);
   CHECK_DEFINED (module_ctx->module_hash_decode_potfile);
   CHECK_DEFINED (module_ctx->module_hash_decode_zero_hash);
   CHECK_DEFINED (module_ctx->module_hash_encode);
@@ -279,7 +294,7 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->hex_charset)
   {
-    hashconfig->opts_type |= OPTS_TYPE_PT_HEX;
+    hashconfig->opts_type |= OPTS_TYPE_MT_HEX;
   }
 
   if (user_options->hex_wordlist)
@@ -406,6 +421,7 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   hashconfig->is_salted = is_salted;
 
   if (module_ctx->module_benchmark_mask           != MODULE_DEFAULT) hashconfig->benchmark_mask          = module_ctx->module_benchmark_mask           (hashconfig, user_options, user_options_extra);
+  if (module_ctx->module_benchmark_charset        != MODULE_DEFAULT) hashconfig->benchmark_charset       = module_ctx->module_benchmark_charset        (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_dictstat_disable         != MODULE_DEFAULT) hashconfig->dictstat_disable        = module_ctx->module_dictstat_disable         (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_esalt_size               != MODULE_DEFAULT) hashconfig->esalt_size              = module_ctx->module_esalt_size               (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_forced_outfile_format    != MODULE_DEFAULT) hashconfig->forced_outfile_format   = module_ctx->module_forced_outfile_format    (hashconfig, user_options, user_options_extra);
@@ -438,16 +454,8 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   hashconfig->kernel_threads_min  = default_kernel_threads_min  (hashconfig, user_options, user_options_extra);
   hashconfig->kernel_threads_max  = default_kernel_threads_max  (hashconfig, user_options, user_options_extra);
 
-  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
-  {
-    // we can't reject password candidates based on plugin specific password length boundaries, because they are not checked inside count_words()
-  }
-  else
-  {
-    if (module_ctx->module_pw_max != MODULE_DEFAULT) hashconfig->pw_max = module_ctx->module_pw_max (hashconfig, user_options, user_options_extra);
-    if (module_ctx->module_pw_min != MODULE_DEFAULT) hashconfig->pw_min = module_ctx->module_pw_min (hashconfig, user_options, user_options_extra);
-  }
-
+  if (module_ctx->module_pw_max             != MODULE_DEFAULT) hashconfig->pw_max             = module_ctx->module_pw_max             (hashconfig, user_options, user_options_extra);
+  if (module_ctx->module_pw_min             != MODULE_DEFAULT) hashconfig->pw_min             = module_ctx->module_pw_min             (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_salt_max           != MODULE_DEFAULT) hashconfig->salt_max           = module_ctx->module_salt_max           (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_salt_min           != MODULE_DEFAULT) hashconfig->salt_min           = module_ctx->module_salt_min           (hashconfig, user_options, user_options_extra);
   if (module_ctx->module_kernel_accel_min   != MODULE_DEFAULT) hashconfig->kernel_accel_min   = module_ctx->module_kernel_accel_min   (hashconfig, user_options, user_options_extra);
@@ -543,6 +551,11 @@ const char *default_benchmark_mask (MAYBE_UNUSED const hashconfig_t *hashconfig,
   const char *mask = "?b?b?b?b?b?b?b";
 
   return mask;
+}
+
+const char *default_benchmark_charset (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  return NULL;
 }
 
 u32 default_hash_mode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)

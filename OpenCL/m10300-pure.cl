@@ -4,15 +4,15 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct saph_sha1_tmp
 {
@@ -28,7 +28,7 @@ KERNEL_FQ void m10300_init (KERN_ATTR_TMPS (saph_sha1_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha1_ctx_t ctx;
 
@@ -36,7 +36,7 @@ KERNEL_FQ void m10300_init (KERN_ATTR_TMPS (saph_sha1_tmp_t))
 
   sha1_update_global_swap (&ctx, pws[gid].i, pws[gid].pw_len);
 
-  sha1_update_global_swap (&ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha1_update_global_swap (&ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   sha1_final (&ctx);
 
@@ -55,7 +55,7 @@ KERNEL_FQ void m10300_loop (KERN_ATTR_TMPS (saph_sha1_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * init
@@ -83,7 +83,7 @@ KERNEL_FQ void m10300_loop (KERN_ATTR_TMPS (saph_sha1_tmp_t))
    * loop
    */
 
-  for (u32 i = 0; i < loop_cnt; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     u32 w0[4];
     u32 w1[4];
@@ -135,7 +135,7 @@ KERNEL_FQ void m10300_comp (KERN_ATTR_TMPS (saph_sha1_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

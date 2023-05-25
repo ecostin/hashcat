@@ -3,8 +3,8 @@
  * License.....: MIT
  */
 
-#ifndef _EXT_NVRTC_H
-#define _EXT_NVRTC_H
+#ifndef HC_EXT_NVRTC_H
+#define HC_EXT_NVRTC_H
 
 /**
  * from cuda.h (/usr/local/cuda-10.1/targets/x86_64-linux/include/nvrtc.h)
@@ -84,4 +84,16 @@ typedef hc_nvrtc_lib_t NVRTC_PTR;
 
 int nvrtc_make_options_array_from_string (char *string, char **options);
 
-#endif // _EXT_NVRTC_H
+int  nvrtc_init                (void *hashcat_ctx);
+void nvrtc_close               (void *hashcat_ctx);
+
+int hc_nvrtcCreateProgram      (void *hashcat_ctx, nvrtcProgram *prog, const char *src, const char *name, int numHeaders, const char * const *headers, const char * const *includeNames);
+int hc_nvrtcDestroyProgram     (void *hashcat_ctx, nvrtcProgram *prog);
+int hc_nvrtcCompileProgram     (void *hashcat_ctx, nvrtcProgram prog, int numOptions, const char * const *options);
+int hc_nvrtcGetProgramLogSize  (void *hashcat_ctx, nvrtcProgram prog, size_t *logSizeRet);
+int hc_nvrtcGetProgramLog      (void *hashcat_ctx, nvrtcProgram prog, char *log);
+int hc_nvrtcGetPTXSize         (void *hashcat_ctx, nvrtcProgram prog, size_t *ptxSizeRet);
+int hc_nvrtcGetPTX             (void *hashcat_ctx, nvrtcProgram prog, char *ptx);
+int hc_nvrtcVersion            (void *hashcat_ctx, int *major, int *minor);
+
+#endif // HC_EXT_NVRTC_H

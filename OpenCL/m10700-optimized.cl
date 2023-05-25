@@ -4,45 +4,39 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_hash_sha384.cl"
-#include "inc_hash_sha512.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha384.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
-
-#if defined IS_AMD && defined IS_GPU
-#define INLINE
-#elif defined IS_HIP
-#define INLINE INLINE0
-#else
-#define INLINE
-#endif
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct pdf
 {
-  int  V;
-  int  R;
-  int  P;
+  int V;
+  int R;
+  int P;
 
-  int  enc_md;
+  int enc_md;
 
-  u32  id_buf[8];
-  u32  u_buf[32];
-  u32  o_buf[32];
+  u32 id_buf[8];
+  u32 u_buf[32];
+  u32 o_buf[32];
 
-  int  id_len;
-  int  o_len;
-  int  u_len;
+  int id_len;
+  int o_len;
+  int u_len;
 
-  u32  rc4key[2];
-  u32  rc4data[2];
+  u32 rc4key[2];
+  u32 rc4data[2];
+
+  int P_minus;
 
 } pdf_t;
 
@@ -79,7 +73,7 @@ typedef struct
 
 } ctx_t;
 
-DECLSPEC void orig_sha256_transform (const u32 *w0, const u32 *w1, const u32 *w2, const u32 *w3, u32 *digest)
+DECLSPEC void orig_sha256_transform (PRIVATE_AS const u32 *w0, PRIVATE_AS const u32 *w1, PRIVATE_AS const u32 *w2, PRIVATE_AS const u32 *w3, PRIVATE_AS u32 *digest)
 {
   u32 t0[4];
   u32 t1[4];
@@ -106,7 +100,7 @@ DECLSPEC void orig_sha256_transform (const u32 *w0, const u32 *w1, const u32 *w2
   sha256_transform (t0, t1, t2, t3, digest);
 }
 
-DECLSPEC void orig_sha384_transform (const u64 *w0, const u64 *w1, const u64 *w2, const u64 *w3, u64 *digest)
+DECLSPEC void orig_sha384_transform (PRIVATE_AS const u64 *w0, PRIVATE_AS const u64 *w1, PRIVATE_AS const u64 *w2, PRIVATE_AS const u64 *w3, PRIVATE_AS u64 *digest)
 {
   u32 t0[4];
   u32 t1[4];
@@ -153,7 +147,7 @@ DECLSPEC void orig_sha384_transform (const u64 *w0, const u64 *w1, const u64 *w2
   sha384_transform (t0, t1, t2, t3, t4, t5, t6, t7, digest);
 }
 
-DECLSPEC void orig_sha512_transform (const u64 *w0, const u64 *w1, const u64 *w2, const u64 *w3, u64 *digest)
+DECLSPEC void orig_sha512_transform (PRIVATE_AS const u64 *w0, PRIVATE_AS const u64 *w1, PRIVATE_AS const u64 *w2, PRIVATE_AS const u64 *w3, PRIVATE_AS u64 *digest)
 {
   u32 t0[4];
   u32 t1[4];
@@ -219,7 +213,7 @@ DECLSPEC void orig_sha512_transform (const u64 *w0, const u64 *w1, const u64 *w2
 #define WORDMAXSZ4  (WORDMAXSZ  / 4)
 #define AESSZ4      (AESSZ      / 4)
 
-DECLSPEC void make_sc (LOCAL_AS u32 *sc, const u32 *pw, const u32 pw_len, const u32 *bl, const u32 bl_len)
+DECLSPEC void make_sc (LOCAL_AS u32 *sc, PRIVATE_AS const u32 *pw, const u32 pw_len, PRIVATE_AS const u32 *bl, const u32 bl_len)
 {
   const u32 bd = bl_len / 4;
 
@@ -271,7 +265,7 @@ DECLSPEC void make_sc (LOCAL_AS u32 *sc, const u32 *pw, const u32 pw_len, const 
   }
 }
 
-DECLSPEC void make_pt_with_offset (u32 *pt, const u32 offset, LOCAL_AS const u32 *sc, const u32 pwbl_len)
+DECLSPEC void make_pt_with_offset (PRIVATE_AS u32 *pt, const u32 offset, LOCAL_AS const u32 *sc, const u32 pwbl_len)
 {
   const u32 m = offset % pwbl_len;
 
@@ -301,7 +295,7 @@ DECLSPEC void make_pt_with_offset (u32 *pt, const u32 offset, LOCAL_AS const u32
   #endif
 }
 
-DECLSPEC void make_w_with_offset (ctx_t *ctx, const u32 W_len, const u32 offset, LOCAL_AS const u32 *sc, const u32 pwbl_len, u32 *iv, const u32 *ks, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
+DECLSPEC void make_w_with_offset (PRIVATE_AS ctx_t *ctx, const u32 W_len, const u32 offset, LOCAL_AS const u32 *sc, const u32 pwbl_len, PRIVATE_AS u32 *iv, PRIVATE_AS const u32 *ks, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
 {
   for (u32 k = 0, wk = 0; k < W_len; k += AESSZ, wk += AESSZ4)
   {
@@ -323,7 +317,7 @@ DECLSPEC void make_w_with_offset (ctx_t *ctx, const u32 W_len, const u32 offset,
   }
 }
 
-DECLSPEC INLINE u32 do_round (LOCAL_AS u32 *sc, const u32 *pw, const u32 pw_len, ctx_t *ctx, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
+DECLSPEC u32 do_round (LOCAL_AS u32 *sc, PRIVATE_AS const u32 *pw, const u32 pw_len, PRIVATE_AS ctx_t *ctx, SHM_TYPE u32 *s_te0, SHM_TYPE u32 *s_te1, SHM_TYPE u32 *s_te2, SHM_TYPE u32 *s_te3, SHM_TYPE u32 *s_te4)
 {
   // make scratch buffer
 
@@ -577,7 +571,7 @@ KERNEL_FQ void m10700_init (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha256_ctx_t ctx;
 
@@ -585,7 +579,7 @@ KERNEL_FQ void m10700_init (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
 
   sha256_update_global_swap (&ctx, pws[gid].i, pws[gid].pw_len);
 
-  sha256_update_global_swap (&ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha256_update_global_swap (&ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   sha256_final (&ctx);
 
@@ -640,7 +634,7 @@ KERNEL_FQ void m10700_loop (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -653,9 +647,7 @@ KERNEL_FQ void m10700_loop (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
   w0[2] = pws[gid].i[2];
   w0[3] = pws[gid].i[3];
 
-  const u32 pw_len = pws[gid].pw_len & 63;
-
-  if (pw_len == 0) return;
+  const u32 pw_len = pws[gid].pw_len & 31;
 
   /**
    * digest
@@ -678,12 +670,12 @@ KERNEL_FQ void m10700_loop (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
 
   u32 ex = 0;
 
-  for (u32 i = 0, j = loop_pos; i < loop_cnt; i++, j++)
+  for (u32 i = 0, j = LOOP_POS; i < LOOP_CNT; i++, j++)
   {
     ex = do_round (s_sc[lid], w0, pw_len, &ctx, s_te0, s_te1, s_te2, s_te3, s_te4);
   }
 
-  if ((loop_pos + loop_cnt) == 64)
+  if ((LOOP_POS + LOOP_CNT) == 64)
   {
     for (u32 i = 64; i < (ex & 0xff) + 32; i++)
     {
@@ -711,7 +703,7 @@ KERNEL_FQ void m10700_comp (KERN_ATTR_TMPS_ESALT (pdf17l8_tmp_t, pdf_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

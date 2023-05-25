@@ -6,12 +6,12 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
 #endif
 
 CONSTANT_VK u32a padding[8] =
@@ -28,22 +28,24 @@ CONSTANT_VK u32a padding[8] =
 
 typedef struct pdf
 {
-  int  V;
-  int  R;
-  int  P;
+  int V;
+  int R;
+  int P;
 
-  int  enc_md;
+  int enc_md;
 
-  u32  id_buf[8];
-  u32  u_buf[32];
-  u32  o_buf[32];
+  u32 id_buf[8];
+  u32 u_buf[32];
+  u32 o_buf[32];
 
-  int  id_len;
-  int  o_len;
-  int  u_len;
+  int id_len;
+  int o_len;
+  int u_len;
 
-  u32  rc4key[2];
-  u32  rc4data[2];
+  u32 rc4key[2];
+  u32 rc4data[2];
+
+  int P_minus;
 
 } pdf_t;
 
@@ -61,7 +63,7 @@ KERNEL_FQ void m10420_m04 (KERN_ATTR_ESALT (pdf_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -83,29 +85,29 @@ KERNEL_FQ void m10420_m04 (KERN_ATTR_ESALT (pdf_t))
 
   u32 o_buf[8];
 
-  o_buf[0] = esalt_bufs[DIGESTS_OFFSET].o_buf[0];
-  o_buf[1] = esalt_bufs[DIGESTS_OFFSET].o_buf[1];
-  o_buf[2] = esalt_bufs[DIGESTS_OFFSET].o_buf[2];
-  o_buf[3] = esalt_bufs[DIGESTS_OFFSET].o_buf[3];
-  o_buf[4] = esalt_bufs[DIGESTS_OFFSET].o_buf[4];
-  o_buf[5] = esalt_bufs[DIGESTS_OFFSET].o_buf[5];
-  o_buf[6] = esalt_bufs[DIGESTS_OFFSET].o_buf[6];
-  o_buf[7] = esalt_bufs[DIGESTS_OFFSET].o_buf[7];
+  o_buf[0] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[0];
+  o_buf[1] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[1];
+  o_buf[2] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[2];
+  o_buf[3] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[3];
+  o_buf[4] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[4];
+  o_buf[5] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[5];
+  o_buf[6] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[6];
+  o_buf[7] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[7];
 
-  u32 P = esalt_bufs[DIGESTS_OFFSET].P;
+  u32 P = esalt_bufs[DIGESTS_OFFSET_HOST].P;
 
   u32 id_buf[4];
 
-  id_buf[0] = esalt_bufs[DIGESTS_OFFSET].id_buf[0];
-  id_buf[1] = esalt_bufs[DIGESTS_OFFSET].id_buf[1];
-  id_buf[2] = esalt_bufs[DIGESTS_OFFSET].id_buf[2];
-  id_buf[3] = esalt_bufs[DIGESTS_OFFSET].id_buf[3];
+  id_buf[0] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[0];
+  id_buf[1] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[1];
+  id_buf[2] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[2];
+  id_buf[3] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[3];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -143,7 +145,7 @@ KERNEL_FQ void m10420_m04 (KERN_ATTR_ESALT (pdf_t))
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }
@@ -282,7 +284,7 @@ KERNEL_FQ void m10420_s04 (KERN_ATTR_ESALT (pdf_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -304,23 +306,23 @@ KERNEL_FQ void m10420_s04 (KERN_ATTR_ESALT (pdf_t))
 
   u32 o_buf[8];
 
-  o_buf[0] = esalt_bufs[DIGESTS_OFFSET].o_buf[0];
-  o_buf[1] = esalt_bufs[DIGESTS_OFFSET].o_buf[1];
-  o_buf[2] = esalt_bufs[DIGESTS_OFFSET].o_buf[2];
-  o_buf[3] = esalt_bufs[DIGESTS_OFFSET].o_buf[3];
-  o_buf[4] = esalt_bufs[DIGESTS_OFFSET].o_buf[4];
-  o_buf[5] = esalt_bufs[DIGESTS_OFFSET].o_buf[5];
-  o_buf[6] = esalt_bufs[DIGESTS_OFFSET].o_buf[6];
-  o_buf[7] = esalt_bufs[DIGESTS_OFFSET].o_buf[7];
+  o_buf[0] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[0];
+  o_buf[1] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[1];
+  o_buf[2] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[2];
+  o_buf[3] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[3];
+  o_buf[4] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[4];
+  o_buf[5] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[5];
+  o_buf[6] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[6];
+  o_buf[7] = esalt_bufs[DIGESTS_OFFSET_HOST].o_buf[7];
 
-  u32 P = esalt_bufs[DIGESTS_OFFSET].P;
+  u32 P = esalt_bufs[DIGESTS_OFFSET_HOST].P;
 
   u32 id_buf[4];
 
-  id_buf[0] = esalt_bufs[DIGESTS_OFFSET].id_buf[0];
-  id_buf[1] = esalt_bufs[DIGESTS_OFFSET].id_buf[1];
-  id_buf[2] = esalt_bufs[DIGESTS_OFFSET].id_buf[2];
-  id_buf[3] = esalt_bufs[DIGESTS_OFFSET].id_buf[3];
+  id_buf[0] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[0];
+  id_buf[1] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[1];
+  id_buf[2] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[2];
+  id_buf[3] = esalt_bufs[DIGESTS_OFFSET_HOST].id_buf[3];
 
   /**
    * digest
@@ -328,8 +330,8 @@ KERNEL_FQ void m10420_s04 (KERN_ATTR_ESALT (pdf_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
     0,
     0
   };
@@ -338,7 +340,7 @@ KERNEL_FQ void m10420_s04 (KERN_ATTR_ESALT (pdf_t))
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x pw_r_len = pwlenx_create_combt (combs_buf, il_pos) & 63;
 
@@ -376,7 +378,7 @@ KERNEL_FQ void m10420_s04 (KERN_ATTR_ESALT (pdf_t))
     wordr1[2] = ix_create_combt (combs_buf, il_pos, 6);
     wordr1[3] = ix_create_combt (combs_buf, il_pos, 7);
 
-    if (combs_mode == COMBINATOR_MODE_BASE_LEFT)
+    if (COMBS_MODE == COMBINATOR_MODE_BASE_LEFT)
     {
       switch_buffer_by_offset_le_VV (wordr0, wordr1, wordr2, wordr3, pw_l_len);
     }

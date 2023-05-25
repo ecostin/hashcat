@@ -29,7 +29,8 @@ static const char *HASH_NAME      = "WPA-EAPOL-PBKDF2";
 static const u64   KERN_TYPE      = 2500;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_AUX1
                                   | OPTS_TYPE_AUX2
                                   | OPTS_TYPE_AUX3
@@ -543,6 +544,24 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
     return false;
   }
 
+  kernel_param_t kernel_param;
+
+  kernel_param.bitmap_mask         = 0;
+  kernel_param.bitmap_shift1       = 0;
+  kernel_param.bitmap_shift2       = 0;
+  kernel_param.salt_pos_host       = 0;
+  kernel_param.loop_pos            = 0;
+  kernel_param.loop_cnt            = 0;
+  kernel_param.il_cnt              = 0;
+  kernel_param.digests_cnt         = 1;
+  kernel_param.digests_offset_host = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.combs_mode          = 0;
+  kernel_param.salt_repeat         = 0;
+  kernel_param.pws_pos             = 0;
+  kernel_param.gid_max             = 1;
+
   m02500_aux
   (
     NULL,               // pws
@@ -569,19 +588,7 @@ bool module_potfile_custom_check (MAYBE_UNUSED const hashconfig_t *hashconfig, M
     NULL,               // d_extra1_buf
     NULL,               // d_extra2_buf
     NULL,               // d_extra3_buf
-    0,                  // bitmap_mask
-    0,                  // bitmap_shift1
-    0,                  // bitmap_shift2
-    0,                  // salt_pos
-    0,                  // loop_pos
-    0,                  // loop_cnt
-    0,                  // il_cnt
-    1,                  // digests_cnt
-    0,                  // digests_offset
-    0,                  // combs_mode
-    0,                  // salt_repeat
-    0,                  // pws_pos
-    1                   // gid_max
+    &kernel_param       // kernel_param
   );
 
   const bool r = (d_return_buf == 0) ? false : true;
@@ -905,6 +912,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = module_benchmark_mask;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = module_deep_comp_kernel;
@@ -923,6 +931,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = module_hash_binary_count;
   module_ctx->module_hash_binary_parse        = module_hash_binary_parse;
   module_ctx->module_hash_binary_save         = module_hash_binary_save;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = module_hash_decode_potfile;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

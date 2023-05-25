@@ -6,16 +6,16 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct lotus8_tmp
 {
@@ -115,7 +115,7 @@ CONSTANT_VK u32a lotus_magic_table[256] =
 
 #define BOX1(S,i) (S)[(i)]
 
-DECLSPEC void lotus_mix (u32 *in, SHM_TYPE const u32 *s_lotus_magic_table)
+DECLSPEC void lotus_mix (PRIVATE_AS u32 *in, SHM_TYPE const u32 *s_lotus_magic_table)
 {
   u8 p = 0;
 
@@ -138,7 +138,7 @@ DECLSPEC void lotus_mix (u32 *in, SHM_TYPE const u32 *s_lotus_magic_table)
   }
 }
 
-DECLSPEC void lotus_transform_password (const u32 *in, u32 *out, SHM_TYPE const u32 *s_lotus_magic_table)
+DECLSPEC void lotus_transform_password (PRIVATE_AS const u32 *in, PRIVATE_AS u32 *out, SHM_TYPE const u32 *s_lotus_magic_table)
 {
   u8 t = (u8) (out[3] >> 24);
 
@@ -156,7 +156,7 @@ DECLSPEC void lotus_transform_password (const u32 *in, u32 *out, SHM_TYPE const 
   }
 }
 
-DECLSPEC void pad (u32 *w, const u32 len)
+DECLSPEC void pad (PRIVATE_AS u32 *w, const u32 len)
 {
   const u32 val = 16 - len;
 
@@ -235,7 +235,7 @@ DECLSPEC void pad (u32 *w, const u32 len)
   }
 }
 
-DECLSPEC void mdtransform_norecalc (u32 *state, const u32 *block, SHM_TYPE const u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform_norecalc (PRIVATE_AS u32 *state, PRIVATE_AS const u32 *block, SHM_TYPE const u32 *s_lotus_magic_table)
 {
   u32 x[12];
 
@@ -260,14 +260,14 @@ DECLSPEC void mdtransform_norecalc (u32 *state, const u32 *block, SHM_TYPE const
   state[3] = x[3];
 }
 
-DECLSPEC void mdtransform (u32 *state, u32 *checksum, const u32 *block, SHM_TYPE const u32 *s_lotus_magic_table)
+DECLSPEC void mdtransform (PRIVATE_AS u32 *state, PRIVATE_AS u32 *checksum, PRIVATE_AS const u32 *block, SHM_TYPE const u32 *s_lotus_magic_table)
 {
   mdtransform_norecalc (state, block, s_lotus_magic_table);
 
   lotus_transform_password (block, checksum, s_lotus_magic_table);
 }
 
-DECLSPEC void domino_big_md (const u32 *saved_key, const u32 size, u32 *state, SHM_TYPE const u32 *s_lotus_magic_table)
+DECLSPEC void domino_big_md (PRIVATE_AS const u32 *saved_key, const u32 size, PRIVATE_AS u32 *state, SHM_TYPE const u32 *s_lotus_magic_table)
 {
   u32 checksum[4];
 
@@ -306,10 +306,10 @@ DECLSPEC void domino_big_md (const u32 *saved_key, const u32 size, u32 *state, S
   mdtransform_norecalc (state, checksum, s_lotus_magic_table);
 }
 
-DECLSPEC void base64_encode (u8 *base64_hash, const u32 len, const u8 *base64_plain)
+DECLSPEC void base64_encode (PRIVATE_AS u8 *base64_hash, const u32 len, PRIVATE_AS const u8 *base64_plain)
 {
-  u8 *out_ptr = (u8 *) base64_hash;
-  u8 *in_ptr  = (u8 *) base64_plain;
+  PRIVATE_AS u8 *out_ptr = (PRIVATE_AS u8 *) base64_hash;
+  PRIVATE_AS u8 *in_ptr  = (PRIVATE_AS u8 *) base64_plain;
 
   u32 i;
 
@@ -330,7 +330,7 @@ DECLSPEC void base64_encode (u8 *base64_hash, const u32 len, const u8 *base64_pl
   }
 }
 
-DECLSPEC void lotus6_base64_encode (u8 *base64_hash, const u32 salt0, const u32 salt1, const u32 a, const u32 b, const u32 c)
+DECLSPEC void lotus6_base64_encode (PRIVATE_AS u8 *base64_hash, const u32 salt0, const u32 salt1, const u32 a, const u32 b, const u32 c)
 {
   u8 tmp[24]; // size 22 (=pw_len) is needed but base64 needs size divisible by 4
 
@@ -388,7 +388,7 @@ DECLSPEC void lotus6_base64_encode (u8 *base64_hash, const u32 salt0, const u32 
   base64_hash[21] = ')';
 }
 
-DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha1_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -464,7 +464,7 @@ KERNEL_FQ void m09100_init (KERN_ATTR_TMPS (lotus8_tmp_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -518,10 +518,10 @@ KERNEL_FQ void m09100_init (KERN_ATTR_TMPS (lotus8_tmp_t))
 
   u32 salt_buf0[4];
 
-  salt_buf0[0] = salt_bufs[SALT_POS].salt_buf[ 0];
-  salt_buf0[1] = salt_bufs[SALT_POS].salt_buf[ 1];
-  salt_buf0[2] = salt_bufs[SALT_POS].salt_buf[ 2];
-  salt_buf0[3] = salt_bufs[SALT_POS].salt_buf[ 3];
+  salt_buf0[0] = salt_bufs[SALT_POS_HOST].salt_buf[ 0];
+  salt_buf0[1] = salt_bufs[SALT_POS_HOST].salt_buf[ 1];
+  salt_buf0[2] = salt_bufs[SALT_POS_HOST].salt_buf[ 2];
+  salt_buf0[3] = salt_bufs[SALT_POS_HOST].salt_buf[ 3];
 
   const u32 salt0 = salt_buf0[0];
   const u32 salt1 = (salt_buf0[1] & 0xff) | ('(' << 8);
@@ -655,7 +655,7 @@ KERNEL_FQ void m09100_init (KERN_ATTR_TMPS (lotus8_tmp_t))
   tmps[gid].opad[3] = sha1_hmac_ctx.opad.h[3];
   tmps[gid].opad[4] = sha1_hmac_ctx.opad.h[4];
 
-  sha1_hmac_update_global_swap (&sha1_hmac_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha1_hmac_update_global_swap (&sha1_hmac_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   for (u32 i = 0, j = 1; i < 2; i += 5, j += 1)
   {
@@ -700,7 +700,7 @@ KERNEL_FQ void m09100_loop (KERN_ATTR_TMPS (lotus8_tmp_t))
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[5];
   u32x opad[5];
@@ -734,7 +734,7 @@ KERNEL_FQ void m09100_loop (KERN_ATTR_TMPS (lotus8_tmp_t))
     out[3] = packv (tmps, out, gid, i + 3);
     out[4] = packv (tmps, out, gid, i + 4);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -789,7 +789,7 @@ KERNEL_FQ void m09100_comp (KERN_ATTR_TMPS (lotus8_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

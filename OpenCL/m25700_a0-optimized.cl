@@ -6,16 +6,16 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #endif
 
-DECLSPEC u32 MurmurHash (const u32 seed, const u32 *w, const int pw_len)
+DECLSPEC u32 MurmurHash (const u32 seed, PRIVATE_AS const u32 *w, const u32 pw_len)
 {
   u32 hash = seed;
 
@@ -24,26 +24,21 @@ DECLSPEC u32 MurmurHash (const u32 seed, const u32 *w, const int pw_len)
 
   hash += 0xdeadbeef;
 
-  int i;
-  int j;
+  const u32 blocks = pw_len / 4;
 
-  for (i = 0, j = 0; i < pw_len - 3; i += 4, j += 1)
+  if (pw_len >= 4)
   {
-    const u32 tmp = w[j];
+    for (u32 i = 0; i < blocks; i++)
+    {
+      const u32 tmp = (hash + w[i]) * M;
 
-    hash += tmp;
-    hash *= M;
-    hash ^= hash >> R;
+      hash = tmp ^ (tmp >> R);
+    }
   }
 
-  if (pw_len & 3)
-  {
-    const u32 tmp = w[j];
+  const u32 tmp = (hash + w[blocks]) * M;
 
-    hash += tmp;
-    hash *= M;
-    hash ^= hash >> R;
-  }
+  hash = (pw_len & 3) ? (tmp ^ (tmp >> R)) : hash;
 
   hash *= M;
   hash ^= hash >> 10;
@@ -70,7 +65,7 @@ KERNEL_FQ void m25700_m04 (KERN_ATTR_RULES ())
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -90,13 +85,13 @@ KERNEL_FQ void m25700_m04 (KERN_ATTR_RULES ())
    * seed
    */
 
-  const u32 seed = salt_bufs[SALT_POS].salt_buf[0];
+  const u32 seed = salt_bufs[SALT_POS_HOST].salt_buf[0];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w[16] = { 0 };
 
@@ -135,7 +130,7 @@ KERNEL_FQ void m25700_s04 (KERN_ATTR_RULES ())
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 pw_buf0[4];
   u32 pw_buf1[4];
@@ -157,7 +152,7 @@ KERNEL_FQ void m25700_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
     0,
     0,
     0
@@ -167,13 +162,13 @@ KERNEL_FQ void m25700_s04 (KERN_ATTR_RULES ())
    * seed
    */
 
-  const u32 seed = salt_bufs[SALT_POS].salt_buf[0];
+  const u32 seed = salt_bufs[SALT_POS_HOST].salt_buf[0];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w[16] = { 0 };
 

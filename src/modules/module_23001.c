@@ -23,7 +23,8 @@ static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_PRECOMPUTE_INIT
                                   | OPTI_TYPE_NOT_ITERATED
                                   | OPTI_TYPE_NOT_SALTED;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_BE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_BE
                                   | OPTS_TYPE_PT_ADD80
                                   | OPTS_TYPE_PT_ADDBITS15;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
@@ -69,71 +70,64 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   securezip_t *securezip = (securezip_t *) esalt_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.token_cnt   = 11;
 
   token.signatures_cnt    = 1;
   token.signatures_buf[0] = SIGNATURE_SECUREZIP;
 
-  token.len_min[0]  = 6;
-  token.len_max[0]  = 6;
   token.sep[0]      = '*';
-  token.attr[0]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[0]      = 6;
+  token.attr[0]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_SIGNATURE;
 
-  token.len_min[1]  = 1;
-  token.len_max[1]  = 1;
   token.sep[1]      = '*';
-  token.attr[1]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]      = 1;
+  token.attr[1]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[2]  = 1;
-  token.len_max[2]  = 1;
   token.sep[2]      = '*';
-  token.attr[2]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[2]      = 1;
+  token.attr[2]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[3]  = 3;
-  token.len_max[3]  = 3;
   token.sep[3]      = '*';
-  token.attr[3]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[3]      = 3;
+  token.attr[3]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[4]  = 1;
-  token.len_max[4]  = 1;
   token.sep[4]      = '*';
-  token.attr[4]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[4]      = 1;
+  token.attr[4]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
+  token.sep[5]      = '*';
   token.len_min[5]  = 0;
   token.len_max[5]  = 32;
-  token.sep[5]      = '*';
   token.attr[5]     = TOKEN_ATTR_VERIFY_LENGTH
                     | TOKEN_ATTR_VERIFY_HEX;
 
-  token.len_min[6]  = 288;
-  token.len_max[6]  = 288;
   token.sep[6]      = '*';
-  token.attr[6]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[6]      = 288;
+  token.attr[6]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_HEX;
 
-  token.len_min[7]  = 1;
-  token.len_max[7]  = 1;
   token.sep[7]      = '*';
-  token.attr[7]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[7]      = 1;
+  token.attr[7]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[8]  = 1;
-  token.len_max[8]  = 1;
   token.sep[8]      = '*';
-  token.attr[8]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[8]      = 1;
+  token.attr[8]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[9]  = 1;
-  token.len_max[9]  = 1;
   token.sep[9]      = '*';
-  token.attr[9]     = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[9]      = 1;
+  token.attr[9]     = TOKEN_ATTR_FIXED_LENGTH
                     | TOKEN_ATTR_VERIFY_DIGIT;
 
   token.len_min[10] = 0;
@@ -250,6 +244,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -268,6 +263,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

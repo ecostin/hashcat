@@ -6,17 +6,17 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md5.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 #define SNMPV3_SALT_MAX             1500
 #define SNMPV3_ENGINEID_MAX         34
@@ -67,7 +67,7 @@ KERNEL_FQ void m25000_init (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -82,13 +82,13 @@ KERNEL_FQ void m25000_init (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
     w[idx] = pws[gid].i[idx];
   }
 
-  u8 *src_ptr = (u8 *) w;
+  PRIVATE_AS u8 *src_ptr = (PRIVATE_AS u8 *) w;
 
   // password 64 times, also swapped
 
   u32 dst_buf[16];
 
-  u8 *dst_ptr = (u8 *) dst_buf;
+  PRIVATE_AS u8 *dst_ptr = (PRIVATE_AS u8 *) dst_buf;
 
   int tmp_idx = 0;
 
@@ -173,7 +173,7 @@ KERNEL_FQ void m25000_loop (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 h_md5[4];
 
@@ -205,7 +205,7 @@ KERNEL_FQ void m25000_loop (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
       tmp_shared[i] = tmps[gid].tmp_md5[i];
     }
 
-    for (int i = 0, j = loop_pos; i < loop_cnt; i += 64, j += 64)
+    for (int i = 0, j = LOOP_POS; i < LOOP_CNT; i += 64, j += 64)
     {
       const int idx = (j % pw_len64) / 4; // the optimization trick is to be able to do this
 
@@ -241,7 +241,7 @@ KERNEL_FQ void m25000_loop (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
       tmp_shared[i] = tmps[gid].tmp_sha1[i];
     }
 
-    for (int i = 0, j = loop_pos; i < loop_cnt; i += 64, j += 64)
+    for (int i = 0, j = LOOP_POS; i < LOOP_CNT; i += 64, j += 64)
     {
       const int idx = (j % pw_len64) / 4; // the optimization trick is to be able to do this
 
@@ -272,7 +272,7 @@ KERNEL_FQ void m25000_loop (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
   }
   else
   {
-    for (int i = 0, j = loop_pos; i < loop_cnt; i += 64, j += 64)
+    for (int i = 0, j = LOOP_POS; i < LOOP_CNT; i += 64, j += 64)
     {
       const int idx = (j % pw_len64) / 4; // the optimization trick is to be able to do this
 
@@ -345,7 +345,7 @@ KERNEL_FQ void m25000_comp (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
   u32 w1[4];
@@ -461,9 +461,9 @@ KERNEL_FQ void m25000_comp (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   // engineID
 
-  md5_update_global (&md5_ctx, esalt_bufs[DIGESTS_OFFSET].engineID_buf, esalt_bufs[DIGESTS_OFFSET].engineID_len);
+  md5_update_global (&md5_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].engineID_buf, esalt_bufs[DIGESTS_OFFSET_HOST].engineID_len);
 
-  sha1_update_global_swap (&sha1_ctx, esalt_bufs[DIGESTS_OFFSET].engineID_buf, esalt_bufs[DIGESTS_OFFSET].engineID_len);
+  sha1_update_global_swap (&sha1_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].engineID_buf, esalt_bufs[DIGESTS_OFFSET_HOST].engineID_len);
 
   // md5
 
@@ -533,7 +533,7 @@ KERNEL_FQ void m25000_comp (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   md5_hmac_init (&md5_hmac_ctx, w, 16);
 
-  md5_hmac_update_global (&md5_hmac_ctx, esalt_bufs[DIGESTS_OFFSET].salt_buf, esalt_bufs[DIGESTS_OFFSET].salt_len);
+  md5_hmac_update_global (&md5_hmac_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].salt_buf, esalt_bufs[DIGESTS_OFFSET_HOST].salt_len);
 
   md5_hmac_final (&md5_hmac_ctx);
 
@@ -573,7 +573,7 @@ KERNEL_FQ void m25000_comp (KERN_ATTR_TMPS_ESALT (hmac_md5_tmp_t, snmpv3_t))
 
   sha1_hmac_init (&sha1_hmac_ctx, w, 20);
 
-  sha1_hmac_update_global_swap (&sha1_hmac_ctx, esalt_bufs[DIGESTS_OFFSET].salt_buf, esalt_bufs[DIGESTS_OFFSET].salt_len);
+  sha1_hmac_update_global_swap (&sha1_hmac_ctx, esalt_bufs[DIGESTS_OFFSET_HOST].salt_buf, esalt_bufs[DIGESTS_OFFSET_HOST].salt_len);
 
   sha1_hmac_final (&sha1_hmac_ctx);
 

@@ -6,17 +6,22 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_cipher_aes.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
+
+typedef struct lastpass
+{
+    u32 iv[4];
+} lastpass_t;
 
 typedef struct lastpass_tmp
 {
@@ -28,7 +33,7 @@ typedef struct lastpass_tmp
 
 } lastpass_tmp_t;
 
-DECLSPEC void hmac_sha256_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha256_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -70,7 +75,7 @@ DECLSPEC void hmac_sha256_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *i
   sha256_transform_vector (w0, w1, w2, w3, digest);
 }
 
-KERNEL_FQ void m06800_init (KERN_ATTR_TMPS (lastpass_tmp_t))
+KERNEL_FQ void m06800_init (KERN_ATTR_TMPS_ESALT (lastpass_tmp_t, lastpass_t))
 {
   /**
    * base
@@ -78,7 +83,7 @@ KERNEL_FQ void m06800_init (KERN_ATTR_TMPS (lastpass_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha256_hmac_ctx_t sha256_hmac_ctx;
 
@@ -102,7 +107,7 @@ KERNEL_FQ void m06800_init (KERN_ATTR_TMPS (lastpass_tmp_t))
   tmps[gid].opad[6] = sha256_hmac_ctx.opad.h[6];
   tmps[gid].opad[7] = sha256_hmac_ctx.opad.h[7];
 
-  sha256_hmac_update_global_swap (&sha256_hmac_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha256_hmac_update_global_swap (&sha256_hmac_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   for (u32 i = 0, j = 1; i < 8; i += 8, j += 1)
   {
@@ -154,11 +159,11 @@ KERNEL_FQ void m06800_init (KERN_ATTR_TMPS (lastpass_tmp_t))
   }
 }
 
-KERNEL_FQ void m06800_loop (KERN_ATTR_TMPS (lastpass_tmp_t))
+KERNEL_FQ void m06800_loop (KERN_ATTR_TMPS_ESALT (lastpass_tmp_t, lastpass_t))
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[8];
   u32x opad[8];
@@ -204,7 +209,7 @@ KERNEL_FQ void m06800_loop (KERN_ATTR_TMPS (lastpass_tmp_t))
     out[6] = packv (tmps, out, gid, i + 6);
     out[7] = packv (tmps, out, gid, i + 7);
 
-    for (u32 j = 0; j < loop_cnt; j++)
+    for (u32 j = 0; j < LOOP_CNT; j++)
     {
       u32x w0[4];
       u32x w1[4];
@@ -260,7 +265,7 @@ KERNEL_FQ void m06800_loop (KERN_ATTR_TMPS (lastpass_tmp_t))
   }
 }
 
-KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS (lastpass_tmp_t))
+KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS_ESALT (lastpass_tmp_t, lastpass_t))
 {
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
@@ -317,7 +322,7 @@ KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS (lastpass_tmp_t))
 
   #endif
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 ukey[8];
 
@@ -337,10 +342,10 @@ KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS (lastpass_tmp_t))
   {
     const u32 data[4] =
     {
-      digests_buf[DIGESTS_OFFSET].digest_buf[0],
-      digests_buf[DIGESTS_OFFSET].digest_buf[1],
-      digests_buf[DIGESTS_OFFSET].digest_buf[2],
-      digests_buf[DIGESTS_OFFSET].digest_buf[3],
+      digests_buf[DIGESTS_OFFSET_HOST].digest_buf[0],
+      digests_buf[DIGESTS_OFFSET_HOST].digest_buf[1],
+      digests_buf[DIGESTS_OFFSET_HOST].digest_buf[2],
+      digests_buf[DIGESTS_OFFSET_HOST].digest_buf[3],
     };
 
     #define KEYLEN 60
@@ -353,19 +358,24 @@ KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS (lastpass_tmp_t))
 
     AES256_decrypt (ks, data, out, s_td0, s_td1, s_td2, s_td3, s_td4);
 
-    u32 salt_len = salt_bufs[SALT_POS].salt_len;
+    u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
     u32 salt_buf[4];
 
-    salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-    salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
-    salt_buf[2] = salt_bufs[SALT_POS].salt_buf[2];
-    salt_buf[3] = salt_bufs[SALT_POS].salt_buf[3];
+    salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+    salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+    salt_buf[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+    salt_buf[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
 
     out[0] = hc_swap32_S (out[0]);
     out[1] = hc_swap32_S (out[1]);
     out[2] = hc_swap32_S (out[2]);
     out[3] = hc_swap32_S (out[3]);
+
+    out[0] ^= esalt_bufs[DIGESTS_OFFSET_HOST].iv[0];
+    out[1] ^= esalt_bufs[DIGESTS_OFFSET_HOST].iv[1];
+    out[2] ^= esalt_bufs[DIGESTS_OFFSET_HOST].iv[2];
+    out[3] ^= esalt_bufs[DIGESTS_OFFSET_HOST].iv[3];
 
     truncate_block_4x4_le_S (out, salt_len);
 
@@ -374,9 +384,9 @@ KERNEL_FQ void m06800_comp (KERN_ATTR_TMPS (lastpass_tmp_t))
      && (out[2] == salt_buf[2])
      && (out[3] == salt_buf[3]))
     {
-      if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+      if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
       {
-        mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, 0, 0, 0);
+        mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
       }
     }
   }

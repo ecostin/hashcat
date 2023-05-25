@@ -6,17 +6,17 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha256.cl"
-#include "inc_hash_sha512.cl"
-#include "inc_ecc_secp256k1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
+#include M2S(INCLUDE_PATH/inc_ecc_secp256k1.cl)
 #endif
 
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct electrum
 {
@@ -37,7 +37,7 @@ typedef struct electrum_tmp
 
 } electrum_tmp_t;
 
-DECLSPEC void hmac_sha512_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *w4, u32x *w5, u32x *w6, u32x *w7, u64x *ipad, u64x *opad, u64x *digest)
+DECLSPEC void hmac_sha512_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *w4, PRIVATE_AS u32x *w5, PRIVATE_AS u32x *w6, PRIVATE_AS u32x *w7, PRIVATE_AS u64x *ipad, PRIVATE_AS u64x *opad, PRIVATE_AS u64x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -103,7 +103,7 @@ KERNEL_FQ void m21700_init (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   sha512_hmac_ctx_t sha512_hmac_ctx;
 
@@ -196,7 +196,7 @@ KERNEL_FQ void m21700_loop (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 {
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u64x ipad[8];
   u64x opad[8];
@@ -240,7 +240,7 @@ KERNEL_FQ void m21700_loop (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
   out[6] = pack64v (tmps, out, gid, 6);
   out[7] = pack64v (tmps, out, gid, 7);
 
-  for (u32 j = 0; j < loop_cnt; j++)
+  for (u32 j = 0; j < LOOP_CNT; j++)
   {
     u32x w0[4];
     u32x w1[4];
@@ -323,7 +323,7 @@ KERNEL_FQ void m21700_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u64 out[8];
 
@@ -379,7 +379,7 @@ KERNEL_FQ void m21700_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
    * the main secp256k1 point multiplication by a scalar/tweak:
    */
 
-  GLOBAL_AS secp256k1_t *coords = (GLOBAL_AS secp256k1_t *) &esalt_bufs[DIGESTS_OFFSET].coords;
+  GLOBAL_AS secp256k1_t *coords = (GLOBAL_AS secp256k1_t *) &esalt_bufs[DIGESTS_OFFSET_HOST].coords;
 
   u32 pubkey[64] = { 0 }; // for point_mul () we need: 1 + 32 bytes (for sha512 () we need more)
 
@@ -401,9 +401,9 @@ KERNEL_FQ void m21700_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
    * sha256-hmac () of the data_buf
    */
 
-  GLOBAL_AS u32 *data_buf = (GLOBAL_AS u32 *) esalt_bufs[DIGESTS_OFFSET].data_buf;
+  GLOBAL_AS u32 *data_buf = (GLOBAL_AS u32 *) esalt_bufs[DIGESTS_OFFSET_HOST].data_buf;
 
-  u32 data_len = esalt_bufs[DIGESTS_OFFSET].data_len;
+  u32 data_len = esalt_bufs[DIGESTS_OFFSET_HOST].data_len;
 
   u32 key[16] = { 0 };
 

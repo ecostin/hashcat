@@ -7,14 +7,14 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md4.cl"
-#include "inc_hash_md5.cl"
-#include "inc_cipher_rc4.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md4.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md5.cl)
+#include M2S(INCLUDE_PATH/inc_cipher_rc4.cl)
 #endif
 
 typedef struct krb5tgs
@@ -23,10 +23,11 @@ typedef struct krb5tgs
   u32 checksum[4];
   u32 edata2[5120];
   u32 edata2_len;
+  u32 format;
 
 } krb5tgs_t;
 
-DECLSPEC void hmac_md5_pad (u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *ipad, u32 *opad)
+DECLSPEC void hmac_md5_pad (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, PRIVATE_AS u32 *ipad, PRIVATE_AS u32 *opad)
 {
   w0[0] = w0[0] ^ 0x36363636;
   w0[1] = w0[1] ^ 0x36363636;
@@ -77,7 +78,7 @@ DECLSPEC void hmac_md5_pad (u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *ipad, u32 *
   md5_transform (w0, w1, w2, w3, opad);
 }
 
-DECLSPEC void hmac_md5_run (u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *ipad, u32 *opad, u32 *digest)
+DECLSPEC void hmac_md5_run (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, PRIVATE_AS u32 *ipad, PRIVATE_AS u32 *opad, PRIVATE_AS u32 *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -111,9 +112,9 @@ DECLSPEC void hmac_md5_run (u32 *w0, u32 *w1, u32 *w2, u32 *w3, u32 *ipad, u32 *
   md5_transform (w0, w1, w2, w3, digest);
 }
 
-DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 *edata2, const u32 edata2_len, const u32 *K2, const u32 *checksum)
+DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, PRIVATE_AS u32 *data, GLOBAL_AS const u32 *edata2, const u32 edata2_len, PRIVATE_AS const u32 *K2, PRIVATE_AS const u32 *checksum, const u64 lid)
 {
-  rc4_init_128 (S, data);
+  rc4_init_128 (S, data, lid);
 
   u32 out0[4];
   u32 out1[4];
@@ -132,15 +133,15 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
     next headers follow the same ASN1 "type-length-data" scheme
   */
 
-  j = rc4_next_16_global (S, i, j, edata2 + 0, out0); i += 16;
+  j = rc4_next_16_global (S, i, j, edata2 + 0, out0, lid); i += 16;
 
   if (((out0[2] & 0xff00ffff) != 0x30008163) && ((out0[2] & 0x0000ffff) != 0x00008263)) return 0;
 
-  j = rc4_next_16_global (S, i, j, edata2 + 4, out1); i += 16;
+  j = rc4_next_16_global (S, i, j, edata2 + 4, out1, lid); i += 16;
 
   if (((out1[0] & 0x00ffffff) != 0x00000503) && (out1[0] != 0x050307A0)) return 0;
 
-  rc4_init_128 (S, data);
+  rc4_init_128 (S, data, lid);
 
   i = 0;
   j = 0;
@@ -178,10 +179,10 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
 
   for (edata2_left = edata2_len; edata2_left >= 64; edata2_left -= 64)
   {
-    j = rc4_next_16_global (S, i, j, edata2, w0); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w1); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w2); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w3); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w0, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w1, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w2, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w3, lid); i += 16; edata2 += 4;
 
     md5_transform (w0, w1, w2, w3, ipad);
   }
@@ -205,7 +206,7 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
 
   if (edata2_left < 16)
   {
-    j = rc4_next_16_global (S, i, j, edata2, w0); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w0, lid); i += 16; edata2 += 4;
 
     truncate_block_4x4_le_S (w0, edata2_left & 0xf);
 
@@ -218,8 +219,8 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
   }
   else if (edata2_left < 32)
   {
-    j = rc4_next_16_global (S, i, j, edata2, w0); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w1); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w0, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w1, lid); i += 16; edata2 += 4;
 
     truncate_block_4x4_le_S (w1, edata2_left & 0xf);
 
@@ -232,9 +233,9 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
   }
   else if (edata2_left < 48)
   {
-    j = rc4_next_16_global (S, i, j, edata2, w0); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w1); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w2); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w0, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w1, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w2, lid); i += 16; edata2 += 4;
 
     truncate_block_4x4_le_S (w2, edata2_left & 0xf);
 
@@ -247,10 +248,10 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
   }
   else
   {
-    j = rc4_next_16_global (S, i, j, edata2, w0); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w1); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w2); i += 16; edata2 += 4;
-    j = rc4_next_16_global (S, i, j, edata2, w3); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w0, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w1, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w2, lid); i += 16; edata2 += 4;
+    j = rc4_next_16_global (S, i, j, edata2, w3, lid); i += 16; edata2 += 4;
 
     truncate_block_4x4_le_S (w3, edata2_left & 0xf);
 
@@ -315,7 +316,7 @@ DECLSPEC int decrypt_and_check (LOCAL_AS u32 *S, u32 *data, GLOBAL_AS const u32 
   return 1;
 }
 
-DECLSPEC void kerb_prepare (const u32 *w0, const u32 *w1, const u32 pw_len, const u32 *checksum, u32 *digest, u32 *K2)
+DECLSPEC void kerb_prepare (PRIVATE_AS const u32 *w0, PRIVATE_AS const u32 *w1, const u32 pw_len, PRIVATE_AS const u32 *checksum, PRIVATE_AS u32 *digest, PRIVATE_AS u32 *K2)
 {
   /**
    * pads
@@ -451,14 +452,11 @@ DECLSPEC void kerb_prepare (const u32 *w0, const u32 *w1, const u32 pw_len, cons
   hmac_md5_run (w0_t, w1_t, w2_t, w3_t, ipad, opad, digest);
 }
 
-DECLSPEC void m13100 (LOCAL_AS u32 *S, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const u32 pw_len, KERN_ATTR_ESALT (krb5tgs_t))
+DECLSPEC void m13100 (LOCAL_AS u32 *S, PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 pw_len, KERN_ATTR_FUNC_ESALT (krb5tgs_t))
 {
   /**
-   * modifier
+   * modifiers are taken from args
    */
-
-  const u64 gid = get_global_id (0);
-  const u64 lid = get_local_id (0);
 
   /**
    * salt
@@ -466,10 +464,10 @@ DECLSPEC void m13100 (LOCAL_AS u32 *S, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const
 
   u32 checksum[4];
 
-  checksum[0] = esalt_bufs[DIGESTS_OFFSET].checksum[0];
-  checksum[1] = esalt_bufs[DIGESTS_OFFSET].checksum[1];
-  checksum[2] = esalt_bufs[DIGESTS_OFFSET].checksum[2];
-  checksum[3] = esalt_bufs[DIGESTS_OFFSET].checksum[3];
+  checksum[0] = esalt_bufs[DIGESTS_OFFSET_HOST].checksum[0];
+  checksum[1] = esalt_bufs[DIGESTS_OFFSET_HOST].checksum[1];
+  checksum[2] = esalt_bufs[DIGESTS_OFFSET_HOST].checksum[2];
+  checksum[3] = esalt_bufs[DIGESTS_OFFSET_HOST].checksum[3];
 
   /**
    * loop
@@ -477,7 +475,7 @@ DECLSPEC void m13100 (LOCAL_AS u32 *S, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const
 
   u32 w0l = w0[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos++)
   {
     const u32 w0r = bfs_buf[il_pos].i;
 
@@ -500,11 +498,11 @@ DECLSPEC void m13100 (LOCAL_AS u32 *S, u32 *w0, u32 *w1, u32 *w2, u32 *w3, const
     tmp[2] = digest[2];
     tmp[3] = digest[3];
 
-    if (decrypt_and_check (S, tmp, esalt_bufs[DIGESTS_OFFSET].edata2, esalt_bufs[DIGESTS_OFFSET].edata2_len, K2, checksum) == 1)
+    if (decrypt_and_check (S, tmp, esalt_bufs[DIGESTS_OFFSET_HOST].edata2, esalt_bufs[DIGESTS_OFFSET_HOST].edata2_len, K2, checksum, lid) == 1)
     {
-      if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET]) == 0)
+      if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
       {
-        mark_hash (plains_buf, d_return_buf, SALT_POS, digests_cnt, 0, DIGESTS_OFFSET + 0, gid, il_pos, 0, 0);
+        mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, il_pos, 0, 0);
       }
     }
   }
@@ -516,10 +514,11 @@ KERNEL_FQ void m13100_m04 (KERN_ATTR_ESALT (krb5tgs_t))
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -557,7 +556,7 @@ KERNEL_FQ void m13100_m04 (KERN_ATTR_ESALT (krb5tgs_t))
 
   LOCAL_VK u32 S[64 * FIXED_LOCAL_SIZE];
 
-  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m13100_m08 (KERN_ATTR_ESALT (krb5tgs_t))
@@ -566,10 +565,11 @@ KERNEL_FQ void m13100_m08 (KERN_ATTR_ESALT (krb5tgs_t))
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -607,7 +607,7 @@ KERNEL_FQ void m13100_m08 (KERN_ATTR_ESALT (krb5tgs_t))
 
   LOCAL_VK u32 S[64 * FIXED_LOCAL_SIZE];
 
-  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m13100_m16 (KERN_ATTR_ESALT (krb5tgs_t))
@@ -620,10 +620,11 @@ KERNEL_FQ void m13100_s04 (KERN_ATTR_ESALT (krb5tgs_t))
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -661,7 +662,7 @@ KERNEL_FQ void m13100_s04 (KERN_ATTR_ESALT (krb5tgs_t))
 
   LOCAL_VK u32 S[64 * FIXED_LOCAL_SIZE];
 
-  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m13100_s08 (KERN_ATTR_ESALT (krb5tgs_t))
@@ -670,10 +671,11 @@ KERNEL_FQ void m13100_s08 (KERN_ATTR_ESALT (krb5tgs_t))
    * base
    */
 
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -711,7 +713,7 @@ KERNEL_FQ void m13100_s08 (KERN_ATTR_ESALT (krb5tgs_t))
 
   LOCAL_VK u32 S[64 * FIXED_LOCAL_SIZE];
 
-  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, bitmap_mask, bitmap_shift1, bitmap_shift2, SALT_POS, loop_pos, loop_cnt, il_cnt, digests_cnt, DIGESTS_OFFSET, combs_mode, salt_repeat, pws_pos, gid_max);
+  m13100 (S, w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz);
 }
 
 KERNEL_FQ void m13100_s16 (KERN_ATTR_ESALT (krb5tgs_t))

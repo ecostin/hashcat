@@ -4,18 +4,18 @@
  */
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_hash_sha512.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
-#define PUTCHAR64_BE(a,p,c) ((u8 *)(a))[(p) ^ 7] = (u8) (c)
-#define GETCHAR64_BE(a,p)   ((u8 *)(a))[(p) ^ 7]
+#define PUTCHAR64_BE(a,p,c) ((PRIVATE_AS u8 *)(a))[(p) ^ 7] = (u8) (c)
+#define GETCHAR64_BE(a,p)   ((PRIVATE_AS u8 *)(a))[(p) ^ 7]
 
 typedef struct sha512crypt_tmp
 {
@@ -39,7 +39,7 @@ typedef struct
 
 } orig_sha512_ctx_t;
 
-DECLSPEC void sha512_transform_transport (const u64 *w, u64 *digest)
+DECLSPEC void sha512_transform_transport (PRIVATE_AS const u64 *w, PRIVATE_AS u64 *digest)
 {
   u32 t0[4];
   u32 t1[4];
@@ -86,7 +86,7 @@ DECLSPEC void sha512_transform_transport (const u64 *w, u64 *digest)
   sha512_transform (t0, t1, t2, t3, t4, t5, t6, t7, digest);
 }
 
-DECLSPEC void orig_sha512_init (orig_sha512_ctx_t *sha512_ctx)
+DECLSPEC void orig_sha512_init (PRIVATE_AS orig_sha512_ctx_t *sha512_ctx)
 {
   sha512_ctx->state[0] = SHA512M_A;
   sha512_ctx->state[1] = SHA512M_B;
@@ -100,7 +100,7 @@ DECLSPEC void orig_sha512_init (orig_sha512_ctx_t *sha512_ctx)
   sha512_ctx->len = 0;
 }
 
-DECLSPEC void orig_sha512_update (orig_sha512_ctx_t *sha512_ctx, const u64 *buf, int len)
+DECLSPEC void orig_sha512_update (PRIVATE_AS orig_sha512_ctx_t *sha512_ctx, PRIVATE_AS const u64 *buf, int len)
 {
   int pos = sha512_ctx->len & 0x7f;
 
@@ -133,7 +133,7 @@ DECLSPEC void orig_sha512_update (orig_sha512_ctx_t *sha512_ctx, const u64 *buf,
   }
 }
 
-DECLSPEC void orig_sha512_final (orig_sha512_ctx_t *sha512_ctx)
+DECLSPEC void orig_sha512_final (PRIVATE_AS orig_sha512_ctx_t *sha512_ctx)
 {
   int pos = sha512_ctx->len & 0x7f;
 
@@ -179,7 +179,7 @@ KERNEL_FQ void m01800_init (KERN_ATTR_TMPS (sha512crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u32 w0[4];
 
@@ -196,12 +196,12 @@ KERNEL_FQ void m01800_init (KERN_ATTR_TMPS (sha512crypt_tmp_t))
 
   u32 salt_buf[4];
 
-  salt_buf[0] = salt_bufs[SALT_POS].salt_buf[0];
-  salt_buf[1] = salt_bufs[SALT_POS].salt_buf[1];
-  salt_buf[2] = salt_bufs[SALT_POS].salt_buf[2];
-  salt_buf[3] = salt_bufs[SALT_POS].salt_buf[3];
+  salt_buf[0] = salt_bufs[SALT_POS_HOST].salt_buf[0];
+  salt_buf[1] = salt_bufs[SALT_POS_HOST].salt_buf[1];
+  salt_buf[2] = salt_bufs[SALT_POS_HOST].salt_buf[2];
+  salt_buf[3] = salt_bufs[SALT_POS_HOST].salt_buf[3];
 
-  u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   /**
    * buffers
@@ -308,7 +308,7 @@ KERNEL_FQ void m01800_loop (KERN_ATTR_TMPS (sha512crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   u64 l_p_bytes0[2];
 
@@ -322,7 +322,7 @@ KERNEL_FQ void m01800_loop (KERN_ATTR_TMPS (sha512crypt_tmp_t))
   l_s_bytes0[0] = tmps[gid].l_s_bytes[0];
   l_s_bytes0[1] = tmps[gid].l_s_bytes[1];
 
-  const u32 salt_len = salt_bufs[SALT_POS].salt_len;
+  const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len;
 
   u32 wpc_len[8];
 
@@ -404,7 +404,7 @@ KERNEL_FQ void m01800_loop (KERN_ATTR_TMPS (sha512crypt_tmp_t))
   /* Repeatedly run the collected hash value through SHA512 to burn
      CPU cycles.  */
 
-  for (u32 i = 0, j = loop_pos; i < loop_cnt; i++, j++)
+  for (u32 i = 0, j = LOOP_POS; i < LOOP_CNT; i++, j++)
   {
     const u32 j1 = (j & 1) ? 1 : 0;
     const u32 j3 = (j % 3) ? 2 : 0;
@@ -485,7 +485,7 @@ KERNEL_FQ void m01800_comp (KERN_ATTR_TMPS (sha512crypt_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

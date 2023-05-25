@@ -61,11 +61,11 @@ Related publication: https://scitepress.org/PublicationsDetail.aspx?ID=KLPzPqStp
 
 */
 
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 
 typedef struct pkzip_extra
 {
@@ -331,7 +331,7 @@ CONSTANT_VK int lsbk0_count1[256] =
   249, 250, 252, 253, 253, 254, 255, 256
 };
 
-DECLSPEC int derivelast6bytes (const u32x k0, const u32x k1, const u32x k2, u32 *password, LOCAL_AS u32 *l_crc32tab, LOCAL_AS u32 *l_icrc32tab, LOCAL_AS u32 *l_lsbk0, LOCAL_AS int *l_lsbk0_count0, LOCAL_AS int *l_lsbk0_count1)
+DECLSPEC int derivelast6bytes (const u32x k0, const u32x k1, const u32x k2, PRIVATE_AS u32 *password, LOCAL_AS u32 *l_crc32tab, LOCAL_AS u32 *l_icrc32tab, LOCAL_AS u32 *l_lsbk0, LOCAL_AS int *l_lsbk0_count0, LOCAL_AS int *l_lsbk0_count1)
 {
   // step 1
   const u32 k2_1 = INVCRC32 (k2,   (k1   >> 24), l_icrc32tab);
@@ -509,7 +509,7 @@ KERNEL_FQ void m20510_sxx (KERN_ATTR_VECTOR ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest
@@ -533,9 +533,9 @@ KERNEL_FQ void m20510_sxx (KERN_ATTR_VECTOR ())
    * reverse
    */
 
-  u32 prep0 = hc_swap32_S (digests_buf[DIGESTS_OFFSET].digest_buf[0]);
-  u32 prep1 = hc_swap32_S (digests_buf[DIGESTS_OFFSET].digest_buf[1]);
-  u32 prep2 = hc_swap32_S (digests_buf[DIGESTS_OFFSET].digest_buf[2]);
+  u32 prep0 = hc_swap32_S (digests_buf[DIGESTS_OFFSET_HOST].digest_buf[0]);
+  u32 prep1 = hc_swap32_S (digests_buf[DIGESTS_OFFSET_HOST].digest_buf[1]);
+  u32 prep2 = hc_swap32_S (digests_buf[DIGESTS_OFFSET_HOST].digest_buf[2]);
 
   for (int pos = pw_len - 1; pos >= 4; pos--)
   {
@@ -550,7 +550,7 @@ KERNEL_FQ void m20510_sxx (KERN_ATTR_VECTOR ())
 
   u32 w0l = pws[gid].i[0];
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     const u32x w0r = words_buf_r[il_pos / VECT_SIZE];
 

@@ -6,17 +6,17 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_simd.cl"
-#include "inc_hash_md4.cl"
-#include "inc_hash_sha1.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_md4.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct dcc2_tmp
 {
@@ -28,7 +28,7 @@ typedef struct dcc2_tmp
 
 } dcc2_tmp_t;
 
-DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipad, u32x *opad, u32x *digest)
+DECLSPEC void hmac_sha1_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, PRIVATE_AS u32x *ipad, PRIVATE_AS u32x *opad, PRIVATE_AS u32x *digest)
 {
   digest[0] = ipad[0];
   digest[1] = ipad[1];
@@ -40,6 +40,7 @@ DECLSPEC void hmac_sha1_run_V (u32x *w0, u32x *w1, u32x *w2, u32x *w3, u32x *ipa
 
   w0[0] = digest[0];
   w0[1] = digest[1];
+
   w0[2] = digest[2];
   w0[3] = digest[3];
   w1[0] = digest[4];
@@ -72,7 +73,7 @@ KERNEL_FQ void m02100_init (KERN_ATTR_TMPS (dcc2_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   // dcc1
 
@@ -95,7 +96,7 @@ KERNEL_FQ void m02100_init (KERN_ATTR_TMPS (dcc2_tmp_t))
 
   md4_ctx2.len = 16;
 
-  md4_update_global_utf16le (&md4_ctx2, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  md4_update_global_utf16le (&md4_ctx2, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   md4_final (&md4_ctx2);
 
@@ -144,7 +145,7 @@ KERNEL_FQ void m02100_init (KERN_ATTR_TMPS (dcc2_tmp_t))
   tmps[gid].opad[3] = sha1_hmac_ctx.opad.h[3];
   tmps[gid].opad[4] = sha1_hmac_ctx.opad.h[4];
 
-  sha1_hmac_update_global_utf16le_swap (&sha1_hmac_ctx, salt_bufs[SALT_POS].salt_buf, salt_bufs[SALT_POS].salt_len);
+  sha1_hmac_update_global_utf16le_swap (&sha1_hmac_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
   w0[0] = 1;
   w0[1] = 0;
@@ -187,7 +188,7 @@ KERNEL_FQ void m02100_loop (KERN_ATTR_TMPS (dcc2_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if ((gid * VECT_SIZE) >= gid_max) return;
+  if ((gid * VECT_SIZE) >= GID_CNT) return;
 
   u32x ipad[5];
   u32x opad[5];
@@ -222,7 +223,7 @@ KERNEL_FQ void m02100_loop (KERN_ATTR_TMPS (dcc2_tmp_t))
   out[2] = packv (tmps, out, gid, 2);
   out[3] = packv (tmps, out, gid, 3);
 
-  for (u32 i = 0; i < loop_cnt; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     u32x w0[4];
     u32x w1[4];
@@ -274,7 +275,7 @@ KERNEL_FQ void m02100_comp (KERN_ATTR_TMPS (dcc2_tmp_t))
 
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   const u64 lid = get_local_id (0);
 

@@ -6,13 +6,13 @@
 //#define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp.h"
-#include "inc_rp.cl"
-#include "inc_scalar.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp.h)
+#include M2S(INCLUDE_PATH/inc_rp.cl)
+#include M2S(INCLUDE_PATH/inc_scalar.cl)
 #endif
 
 CONSTANT_VK u32a PE_CONST[256] =
@@ -44,7 +44,7 @@ KERNEL_FQ void m26200_mxx (KERN_ATTR_RULES ())
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -56,7 +56,7 @@ KERNEL_FQ void m26200_mxx (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos++)
   {
     pw_t tmp = PASTE_PW;
 
@@ -66,7 +66,7 @@ KERNEL_FQ void m26200_mxx (KERN_ATTR_RULES ())
 
     u8  scratch[16] = { 0 };
 
-    u8 *input = (u8 *) tmp.i;
+    PRIVATE_AS u8 *input = (PRIVATE_AS u8 *) tmp.i;
 
     for (u32 i = 0; i < 5; i++)
     {
@@ -117,7 +117,7 @@ KERNEL_FQ void m26200_mxx (KERN_ATTR_RULES ())
       }
     }
 
-    u32 *digest = (u32 *) target;
+    PRIVATE_AS u32 *digest = (PRIVATE_AS u32 *) target;
 
     const u32 r0 = digest[DGST_R0];
     const u32 r1 = digest[DGST_R1];
@@ -137,7 +137,7 @@ KERNEL_FQ void m26200_sxx (KERN_ATTR_RULES ())
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * digest
@@ -145,10 +145,10 @@ KERNEL_FQ void m26200_sxx (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
@@ -161,7 +161,7 @@ KERNEL_FQ void m26200_sxx (KERN_ATTR_RULES ())
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos++)
   {
     pw_t tmp = PASTE_PW;
 
@@ -171,7 +171,7 @@ KERNEL_FQ void m26200_sxx (KERN_ATTR_RULES ())
 
     u8  scratch[16] = { 0 };
 
-    u8 *input = (u8 *) tmp.i;
+    PRIVATE_AS u8 *input = (PRIVATE_AS u8 *) tmp.i;
 
     for (u32 i = 0; i < 5; i++)
     {
@@ -222,7 +222,7 @@ KERNEL_FQ void m26200_sxx (KERN_ATTR_RULES ())
       }
     }
 
-    u32 *digest = (u32 *) target;
+    PRIVATE_AS u32 *digest = (PRIVATE_AS u32 *) target;
 
     const u32 r0 = digest[DGST_R0];
     const u32 r1 = digest[DGST_R1];

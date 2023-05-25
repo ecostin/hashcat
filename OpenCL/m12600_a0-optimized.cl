@@ -6,15 +6,15 @@
 #define NEW_SIMD_CODE
 
 #ifdef KERNEL_STATIC
-#include "inc_vendor.h"
-#include "inc_types.h"
-#include "inc_platform.cl"
-#include "inc_common.cl"
-#include "inc_rp_optimized.h"
-#include "inc_rp_optimized.cl"
-#include "inc_simd.cl"
-#include "inc_hash_sha1.cl"
-#include "inc_hash_sha256.cl"
+#include M2S(INCLUDE_PATH/inc_vendor.h)
+#include M2S(INCLUDE_PATH/inc_types.h)
+#include M2S(INCLUDE_PATH/inc_platform.cl)
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.h)
+#include M2S(INCLUDE_PATH/inc_rp_optimized.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
+#include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #endif
 
 #if   VECT_SIZE == 1
@@ -56,7 +56,7 @@ KERNEL_FQ void m12600_m04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -82,20 +82,20 @@ KERNEL_FQ void m12600_m04 (KERN_ATTR_RULES ())
 
   u32 pc256[8];
 
-  pc256[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  pc256[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  pc256[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  pc256[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  pc256[4] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  pc256[5] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  pc256[6] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  pc256[7] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  pc256[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  pc256[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  pc256[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  pc256[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  pc256[4] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  pc256[5] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  pc256[6] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  pc256[7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -232,11 +232,11 @@ KERNEL_FQ void m12600_m04 (KERN_ATTR_RULES ())
     we_t = hc_rotl32 ((wb_t ^ w6_t ^ w0_t ^ we_t), 1u); SHA1_STEP (SHA1_F1, c, d, e, a, b, we_t);
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u); SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     /**
      * sha256
@@ -396,7 +396,7 @@ KERNEL_FQ void m12600_s04 (KERN_ATTR_RULES ())
 
   SYNC_THREADS ();
 
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
   /**
    * base
@@ -422,14 +422,14 @@ KERNEL_FQ void m12600_s04 (KERN_ATTR_RULES ())
 
   u32 pc256[8];
 
-  pc256[0] = salt_bufs[SALT_POS].salt_buf_pc[0];
-  pc256[1] = salt_bufs[SALT_POS].salt_buf_pc[1];
-  pc256[2] = salt_bufs[SALT_POS].salt_buf_pc[2];
-  pc256[3] = salt_bufs[SALT_POS].salt_buf_pc[3];
-  pc256[4] = salt_bufs[SALT_POS].salt_buf_pc[4];
-  pc256[5] = salt_bufs[SALT_POS].salt_buf_pc[5];
-  pc256[6] = salt_bufs[SALT_POS].salt_buf_pc[6];
-  pc256[7] = salt_bufs[SALT_POS].salt_buf_pc[7];
+  pc256[0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[0];
+  pc256[1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[1];
+  pc256[2] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2];
+  pc256[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[3];
+  pc256[4] = salt_bufs[SALT_POS_HOST].salt_buf_pc[4];
+  pc256[5] = salt_bufs[SALT_POS_HOST].salt_buf_pc[5];
+  pc256[6] = salt_bufs[SALT_POS_HOST].salt_buf_pc[6];
+  pc256[7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[7];
 
   /**
    * digest
@@ -437,17 +437,17 @@ KERNEL_FQ void m12600_s04 (KERN_ATTR_RULES ())
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
 
   /**
    * loop
    */
 
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     u32x w0[4] = { 0 };
     u32x w1[4] = { 0 };
@@ -584,11 +584,11 @@ KERNEL_FQ void m12600_s04 (KERN_ATTR_RULES ())
     we_t = hc_rotl32 ((wb_t ^ w6_t ^ w0_t ^ we_t), 1u); SHA1_STEP (SHA1_F1, c, d, e, a, b, we_t);
     wf_t = hc_rotl32 ((wc_t ^ w7_t ^ w1_t ^ wf_t), 1u); SHA1_STEP (SHA1_F1, b, c, d, e, a, wf_t);
 
-    a += SHA1M_A;
-    b += SHA1M_B;
-    c += SHA1M_C;
-    d += SHA1M_D;
-    e += SHA1M_E;
+    a += make_u32x (SHA1M_A);
+    b += make_u32x (SHA1M_B);
+    c += make_u32x (SHA1M_C);
+    d += make_u32x (SHA1M_D);
+    e += make_u32x (SHA1M_E);
 
     /**
      * sha256

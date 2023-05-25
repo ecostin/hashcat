@@ -18,11 +18,12 @@ static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 3;
 static const u32   DGST_SIZE      = DGST_SIZE_4_16;
 static const u32   HASH_CATEGORY  = HASH_CATEGORY_FDE;
-static const char *HASH_NAME      = "LUKS";
+static const char *HASH_NAME      = "LUKS v1 (legacy)";
 static const u64   KERN_TYPE      = 14611; // this gets overwritten later instead of in benchmark
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_SELF_TEST_DISABLE
                                   | OPTS_TYPE_BINARY_HASHFILE;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
@@ -144,22 +145,25 @@ typedef enum hc_luks_cipher_type
 
 typedef enum hc_luks_cipher_mode
 {
-  HC_LUKS_CIPHER_MODE_CBC_ESSIV = 1,
-  HC_LUKS_CIPHER_MODE_CBC_PLAIN = 2,
-  HC_LUKS_CIPHER_MODE_XTS_PLAIN = 3,
+  HC_LUKS_CIPHER_MODE_CBC_ESSIV_SHA256 = 1,
+  HC_LUKS_CIPHER_MODE_CBC_PLAIN        = 2,
+  HC_LUKS_CIPHER_MODE_CBC_PLAIN64      = 3,
+  HC_LUKS_CIPHER_MODE_XTS_PLAIN        = 4,
+  HC_LUKS_CIPHER_MODE_XTS_PLAIN64      = 5,
 
 } hc_luks_cipher_mode_t;
 
 typedef struct luks
 {
-  int hash_type;    // hc_luks_hash_type_t
-  int key_size;     // hc_luks_key_size_t
-  int cipher_type;  // hc_luks_cipher_type_t
-  int cipher_mode;  // hc_luks_cipher_mode_t
+  int hash_type;   // hc_luks_hash_type_t
+  int key_size;    // hc_luks_key_size_t
+  int cipher_type; // hc_luks_cipher_type_t
+  int cipher_mode; // hc_luks_cipher_mode_t
 
   u32 ct_buf[128];
 
-  u32 af_src_buf[((HC_LUKS_KEY_SIZE_512 / 8) * LUKS_STRIPES) / 4];
+  u32 af_buf[HC_LUKS_KEY_SIZE_512 / 8 * LUKS_STRIPES / 4];
+  u32 af_len;
 
 } luks_t;
 
@@ -183,9 +187,9 @@ void *module_benchmark_esalt (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
 {
   luks_t *luks = (luks_t *) hcmalloc (sizeof (luks_t));
 
-  luks->key_size      = HC_LUKS_KEY_SIZE_256;
-  luks->cipher_type   = HC_LUKS_CIPHER_TYPE_AES;
-  luks->cipher_mode   = HC_LUKS_CIPHER_MODE_XTS_PLAIN;
+  luks->key_size    = HC_LUKS_KEY_SIZE_256;
+  luks->cipher_type = HC_LUKS_CIPHER_TYPE_AES;
+  luks->cipher_mode = HC_LUKS_CIPHER_MODE_XTS_PLAIN;
 
   return luks;
 }
@@ -239,7 +243,10 @@ int module_hash_binary_parse (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
 
     if (parser_status != PARSER_OK)
     {
-      last_error = parser_status;
+      if (parser_status != PARSER_LUKS_KEY_DISABLED)
+      {
+        last_error = parser_status;
+      }
       continue;
     }
 
@@ -248,7 +255,14 @@ int module_hash_binary_parse (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
 
   if (hashes_cnt == 0)
   {
-    return last_error;
+    if (last_error != 0)
+    {
+      return last_error;
+    }
+    else
+    {
+      return PARSER_LUKS_KEY_DISABLED;
+    }
   }
   else
   {
@@ -431,7 +445,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (strcmp (hdr.cipherMode, "cbc-essiv:sha256") == 0)
   {
-    luks->cipher_mode = HC_LUKS_CIPHER_MODE_CBC_ESSIV;
+    luks->cipher_mode = HC_LUKS_CIPHER_MODE_CBC_ESSIV_SHA256;
   }
   else if (strcmp (hdr.cipherMode, "cbc-plain") == 0)
   {
@@ -439,7 +453,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   }
   else if (strcmp (hdr.cipherMode, "cbc-plain64") == 0)
   {
-    luks->cipher_mode = HC_LUKS_CIPHER_MODE_CBC_PLAIN;
+    luks->cipher_mode = HC_LUKS_CIPHER_MODE_CBC_PLAIN64;
   }
   else if (strcmp (hdr.cipherMode, "xts-plain") == 0)
   {
@@ -447,7 +461,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   }
   else if (strcmp (hdr.cipherMode, "xts-plain64") == 0)
   {
-    luks->cipher_mode = HC_LUKS_CIPHER_MODE_XTS_PLAIN;
+    luks->cipher_mode = HC_LUKS_CIPHER_MODE_XTS_PLAIN64;
   }
   else
   {
@@ -550,12 +564,12 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (rc_seek1 == -1)
   {
-      hc_fclose (&fp);
+    hc_fclose (&fp);
 
     return (PARSER_LUKS_FILE_SIZE);
   }
 
-  const size_t nread2 = hc_fread (luks->af_src_buf, keyBytes, stripes, &fp);
+  const size_t nread2 = hc_fread (luks->af_buf, keyBytes, stripes, &fp);
 
   if (nread2 != stripes)
   {
@@ -563,6 +577,8 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
     return (PARSER_LUKS_FILE_SIZE);
   }
+
+  luks->af_len = keyBytes * stripes;
 
   // finally, copy some encrypted payload data for entropy check
 
@@ -602,6 +618,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = module_benchmark_esalt;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = module_benchmark_salt;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -620,6 +637,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = module_hash_binary_count;
   module_ctx->module_hash_binary_parse        = module_hash_binary_parse;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

@@ -21,7 +21,8 @@ static const u32   HASH_CATEGORY  = HASH_CATEGORY_CRYPTOCURRENCY_WALLET;
 static const char *HASH_NAME      = "MultiBit Classic .wallet (scrypt)";
 static const u64   KERN_TYPE      = 27700;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE;
-static const u64   OPTS_TYPE      = OPTS_TYPE_PT_GENERATE_LE
+static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
+                                  | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_MP_MULTI_DISABLE
                                   | OPTS_TYPE_NATIVE_THREADS
                                   | OPTS_TYPE_LOOP_PREPARE
@@ -51,23 +52,6 @@ static const u64 SCRYPT_N = 16384;
 static const u64 SCRYPT_R = 8;
 static const u64 SCRYPT_P = 1;
 
-bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
-{
-  // AMD Radeon Pro W5700X Compute Engine; 1.2 (Apr 22 2021 21:54:44); 11.3.1; 20E241
-  if ((device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE) && (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU))
-  {
-    return true;
-  }
-
-  // amdgpu-pro-20.50-1234664-ubuntu-20.04 (legacy)
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == false))
-  {
-    return true;
-  }
-
-  return false;
-}
-
 u32 module_kernel_loops_min (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
   const u32 kernel_loops_min = 1024;
@@ -80,6 +64,13 @@ u32 module_kernel_loops_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_
   const u32 kernel_loops_max = 1024;
 
   return kernel_loops_max;
+}
+
+u32 module_kernel_threads_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  const u32 kernel_threads_max = 32;
+
+  return kernel_threads_max;
 }
 
 u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
@@ -264,7 +255,7 @@ char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAY
 
   char *jit_build_options = NULL;
 
-  hc_asprintf (&jit_build_options, "-DSCRYPT_N=%u -DSCRYPT_R=%u -DSCRYPT_P=%u -DSCRYPT_TMTO=%" PRIu64 " -DSCRYPT_TMP_ELEM=%" PRIu64,
+  hc_asprintf (&jit_build_options, "-D SCRYPT_N=%u -D SCRYPT_R=%u -D SCRYPT_P=%u -D SCRYPT_TMTO=%" PRIu64 " -D SCRYPT_TMP_ELEM=%" PRIu64,
     hashes->salts_buf[0].scrypt_N,
     hashes->salts_buf[0].scrypt_r,
     hashes->salts_buf[0].scrypt_p,
@@ -278,7 +269,9 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   u32 *digest = (u32 *) digest_buf;
 
-  token_t token;
+  hc_token_t token;
+
+  memset (&token, 0, sizeof (hc_token_t));
 
   token.token_cnt  = 7;
 
@@ -289,34 +282,31 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   token.attr[0]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_SIGNATURE;
 
-  token.len_min[1] = 1;
-  token.len_max[1] = 1;
   token.sep[1]     = '*';
-  token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[1]     = 1;
+  token.attr[1]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[2] = 5;
-  token.len_max[2] = 5;
   token.sep[2]     = '*';
+  token.len_min[2] = 1;
+  token.len_max[2] = 10;
   token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[3] = 1;
-  token.len_max[3] = 1;
   token.sep[3]     = '*';
+  token.len_min[3] = 1;
+  token.len_max[3] = 2;
   token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[4] = 1;
-  token.len_max[4] = 1;
   token.sep[4]     = '*';
-  token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[4]     = 1;
+  token.attr[4]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[5] = 16;
-  token.len_max[5] = 16;
   token.sep[5]     = '*';
-  token.attr[5]    = TOKEN_ATTR_VERIFY_LENGTH
+  token.len[5]     = 16;
+  token.attr[5]    = TOKEN_ATTR_FIXED_LENGTH
                    | TOKEN_ATTR_VERIFY_HEX;
 
   token.len[6]     = 64;
@@ -339,23 +329,17 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   const u32 scrypt_n = hc_strtoul ((const char *) scrypt_n_pos, NULL, 10);
 
-  if (scrypt_n != SCRYPT_N) return (PARSER_SALT_VALUE);
-
   const u8 *scrypt_r_pos = token.buf[3];
 
   const u32 scrypt_r = hc_strtoul ((const char *) scrypt_r_pos, NULL, 10);
-
-  if (scrypt_r != SCRYPT_R) return (PARSER_SALT_VALUE);
 
   const u8 *scrypt_p_pos = token.buf[4];
 
   const u32 scrypt_p = hc_strtoul ((const char *) scrypt_p_pos, NULL, 10);
 
-  if (scrypt_p != SCRYPT_P) return (PARSER_SALT_VALUE);
-
-  salt->scrypt_N = SCRYPT_N;
-  salt->scrypt_r = SCRYPT_R;
-  salt->scrypt_p = SCRYPT_P;
+  salt->scrypt_N = scrypt_n;
+  salt->scrypt_r = scrypt_r;
+  salt->scrypt_p = scrypt_p;
 
   salt->salt_iter    = salt->scrypt_N;
   salt->salt_repeats = salt->scrypt_p - 1;
@@ -400,12 +384,12 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
 int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const void *digest_buf, MAYBE_UNUSED const salt_t *salt, MAYBE_UNUSED const void *esalt_buf, MAYBE_UNUSED const void *hook_salt_buf, MAYBE_UNUSED const hashinfo_t *hash_info, char *line_buf, MAYBE_UNUSED const int line_size)
 {
-  const int line_len = snprintf (line_buf, line_size, "%s%u*%" PRIu64 "*%" PRIu64 "*%" PRIu64 "*%08x%08x*%08x%08x%08x%08x%08x%08x%08x%08x",
+  const int line_len = snprintf (line_buf, line_size, "%s%u*%u*%u*%u*%08x%08x*%08x%08x%08x%08x%08x%08x%08x%08x",
     SIGNATURE_MULTIBIT,
     3,
-    SCRYPT_N,
-    SCRYPT_R,
-    SCRYPT_P,
+    salt->scrypt_N,
+    salt->scrypt_r,
+    salt->scrypt_p,
     salt->salt_buf[0],
     salt->salt_buf[1],
     byte_swap_32 (salt->salt_buf[2]),
@@ -420,47 +404,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   return line_len;
 }
 
-/*
-
-Find the right -n value for your GPU:
-=====================================
-
-1. For example, to find the value for 27700, first create a valid hash for 27700 as follows:
-
-$ ./hashcat --example-hashes -m 27700 | grep Example.Hash | grep -v Format | cut -b 25- > tmp.hash.27700
-
-2. Now let it iterate through all -n values to a certain point. In this case, I'm using 200, but in general it's a value that is at least twice that of the multiprocessor. If you don't mind you can just leave it as it is, it just runs a little longer.
-
-$ export i=1; while [ $i -ne 201 ]; do echo $i; ./hashcat --quiet tmp.hash.27700 --keep-guessing --self-test-disable --markov-disable --restore-disable --outfile-autohex-disable --wordlist-autohex-disable --potfile-disable --logfile-disable --hwmon-disable --status --status-timer 1 --runtime 28 --machine-readable --optimized-kernel-enable --workload-profile 3 --hash-type 27700 --attack-mode 3 ?b?b?b?b?b?b?b --backend-devices 1 --force -n $i; i=$(($i+1)); done | tee x
-
-3. Determine the highest measured H/s speed. But don't just use the highest value. Instead, use the number that seems most stable, usually at the beginning.
-
-$ grep "$(printf 'STATUS\t3')" x | cut -f4 -d$'\t' | sort -n | tail
-
-4. To match the speed you have chosen to the correct value in the 'x' file, simply search for it in it. Then go up a little on the block where you found him. The value -n is the single value that begins before the block start. If you have multiple blocks at the same speed, choose the lowest value for -n
-
-*/
-
-const char *module_extra_tuningdb_block (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
-{
-  const char *extra_tuningdb_block =
-    "DEVICE_TYPE_CPU                                 *       27700   1       N       A\n"
-    "DEVICE_TYPE_GPU                                 *       27700   1       N       A\n"
-    "GeForce_GTX_980                                 *       27700   1      29       A\n"
-    "GeForce_GTX_1080                                *       27700   1      15       A\n"
-    "GeForce_RTX_2080_Ti                             *       27700   1      68       A\n"
-    "GeForce_RTX_3060_Ti                             *       27700   1      51       A\n"
-    "GeForce_RTX_3070                                *       27700   1      46       A\n"
-    "GeForce_RTX_3090                                *       27700   1      82       A\n"
-    "ALIAS_AMD_RX480                                 *       27700   1      15       A\n"
-    "ALIAS_AMD_Vega64                                *       27700   1      28       A\n"
-    "ALIAS_AMD_MI100                                 *       27700   1      79       A\n"
-    "ALIAS_AMD_RX6900XT                              *       27700   1      59       A\n"
-  ;
-
-  return extra_tuningdb_block;
-}
-
 void module_init (module_ctx_t *module_ctx)
 {
   module_ctx->module_context_size             = MODULE_CONTEXT_SIZE_CURRENT;
@@ -470,6 +413,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -483,11 +427,12 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_esalt_size               = MODULE_DEFAULT;
   module_ctx->module_extra_buffer_size        = module_extra_buffer_size;
   module_ctx->module_extra_tmp_size           = module_extra_tmp_size;
-  module_ctx->module_extra_tuningdb_block     = module_extra_tuningdb_block;
+  module_ctx->module_extra_tuningdb_block     = MODULE_DEFAULT;
   module_ctx->module_forced_outfile_format    = MODULE_DEFAULT;
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;
@@ -514,7 +459,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_kernel_accel_min         = MODULE_DEFAULT;
   module_ctx->module_kernel_loops_max         = module_kernel_loops_max;
   module_ctx->module_kernel_loops_min         = module_kernel_loops_min;
-  module_ctx->module_kernel_threads_max       = MODULE_DEFAULT;
+  module_ctx->module_kernel_threads_max       = module_kernel_threads_max;
   module_ctx->module_kernel_threads_min       = MODULE_DEFAULT;
   module_ctx->module_kern_type                = module_kern_type;
   module_ctx->module_kern_type_dynamic        = MODULE_DEFAULT;
@@ -535,6 +480,6 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_st_hash                  = module_st_hash;
   module_ctx->module_st_pass                  = module_st_pass;
   module_ctx->module_tmp_size                 = module_tmp_size;
-  module_ctx->module_unstable_warning         = module_unstable_warning;
+  module_ctx->module_unstable_warning         = MODULE_DEFAULT;
   module_ctx->module_warmup_disable           = module_warmup_disable;
 }
