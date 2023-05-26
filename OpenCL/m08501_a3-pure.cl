@@ -1,7 +1,12 @@
-#include "inc_racf_kdfaes.cl"
+/**
+ * Author......: Detack GmbH / part of https://www.detack.de/en/epas
+ * License.....: MIT
+ */
 
-#define COMPARE_S "inc_comp_single.cl"
-#define COMPARE_M "inc_comp_multi.cl"
+#include M2S(INCLUDE_PATH/inc_racf_kdfaes.cl)
+
+#define COMPARE_S M2S(INCLUDE_PATH/inc_comp_single.cl)
+#define COMPARE_M M2S(INCLUDE_PATH/inc_comp_multi.cl)
 
 typedef struct pbkdf2_sha256_tmp
 {
@@ -37,16 +42,16 @@ KERNEL_FQ void m08501_mxx (KERN_ATTR_VECTOR_ESALT (pbkdf2_sha256_t))
     #endif
   );
   
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
   
-  for (int i = 0; i < 2; i++) username[i] = salt_bufs[SALT_POS].salt_buf_pc[i];
-  for (int i = 0; i < 4; i++) salt_buf[i] = salt_bufs[SALT_POS].salt_buf_pc[2 + i];
+  for (int i = 0; i < 2; i++) username[i] = salt_bufs[SALT_POS_HOST].salt_buf_pc[i];
+  for (int i = 0; i < 4; i++) salt_buf[i] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2 + i];
   for (int i = 0; i < 4; i++) pw[i] = pws[gid].i[i];
 
   u32 pw_len = pws[gid].pw_len;
   const u32 pw0l = pw[0];
   
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw[0] = pw0l | words_buf_r[il_pos / VECT_SIZE];
     racf_kdfaes(username, salt_buf, pw, digest, s_SPtrans, s_skb
@@ -81,10 +86,10 @@ KERNEL_FQ void m08501_sxx (KERN_ATTR_VECTOR_ESALT (pbkdf2_sha256_t))
     #endif
   );
   
-  if (gid >= gid_max) return;
+  if (gid >= GID_CNT) return;
 
-  for (int i = 0; i < 2; i++) username[i] = salt_bufs[SALT_POS].salt_buf_pc[i];
-  for (int i = 0; i < 4; i++) salt_buf[i] = salt_bufs[SALT_POS].salt_buf_pc[2 + i];
+  for (int i = 0; i < 2; i++) username[i] = salt_bufs[SALT_POS_HOST].salt_buf_pc[i];
+  for (int i = 0; i < 4; i++) salt_buf[i] = salt_bufs[SALT_POS_HOST].salt_buf_pc[2 + i];
   for (int i = 0; i < 4; i++) pw[i] = pws[gid].i[i];
 
   u32 pw_len = pws[gid].pw_len;
@@ -92,13 +97,13 @@ KERNEL_FQ void m08501_sxx (KERN_ATTR_VECTOR_ESALT (pbkdf2_sha256_t))
 
   const u32 search[4] =
   {
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R0],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R1],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R2],
-    digests_buf[DIGESTS_OFFSET].digest_buf[DGST_R3]
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R1],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R2],
+    digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R3]
   };
   
-  for (u32 il_pos = 0; il_pos < il_cnt; il_pos += VECT_SIZE)
+  for (u32 il_pos = 0; il_pos < IL_CNT; il_pos += VECT_SIZE)
   {
     pw[0] = pw0l | words_buf_r[il_pos / VECT_SIZE];
     

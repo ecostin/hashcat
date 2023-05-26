@@ -45,31 +45,9 @@ const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 
 static const char *SIGNATURE_RACF_KDFAES = "$racfp$";
 
-char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
-{
-  char *jit_build_options = NULL;
-
-  if (device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE)
-  {
-    return jit_build_options;
-  }
-
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_INTEL_SDK) && (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU))
-  {
-    hc_asprintf (&jit_build_options, "-D _unroll");
-  }
-
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == false))
-  {
-    hc_asprintf (&jit_build_options, "-D _unroll");
-  }
-
-  return jit_build_options;
-}
-
 u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
-  const u32 pw_max = 128; // Underlaying DES max NEW: trimming done by rules, leave more keyspace available
+  const u32 pw_max = 128; // Underlying DES max NEW: trimming done by rules, leave more keyspace available
   return pw_max;
 }
 
@@ -162,6 +140,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_benchmark_esalt          = MODULE_DEFAULT;
   module_ctx->module_benchmark_hook_salt      = MODULE_DEFAULT;
   module_ctx->module_benchmark_mask           = MODULE_DEFAULT;
+  module_ctx->module_benchmark_charset        = MODULE_DEFAULT;
   module_ctx->module_benchmark_salt           = MODULE_DEFAULT;
   module_ctx->module_build_plain_postprocess  = MODULE_DEFAULT;
   module_ctx->module_deep_comp_kernel         = MODULE_DEFAULT;
@@ -180,6 +159,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;
@@ -200,7 +180,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hook23                   = MODULE_DEFAULT;
   module_ctx->module_hook_salt_size           = MODULE_DEFAULT;
   module_ctx->module_hook_size                = MODULE_DEFAULT;
-  module_ctx->module_jit_build_options        = module_jit_build_options;
+  module_ctx->module_jit_build_options        = MODULE_DEFAULT;
   module_ctx->module_jit_cache_disable        = MODULE_DEFAULT;
   module_ctx->module_kernel_accel_max         = MODULE_DEFAULT;
   module_ctx->module_kernel_accel_min         = MODULE_DEFAULT;
