@@ -3,10 +3,11 @@
 ## License.....: MIT
 ##
 
+LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath,/epas/utilities/epas-opencl/lib/system -Wl,-rpath,/epas/utilities/epas-opencl/lib/cuda -lcrypto
 SHARED                  ?= 0
 DEBUG                   := 0
-PRODUCTION              := 0
-PRODUCTION_VERSION      := v6.2.6
+PRODUCTION              := 1
+PRODUCTION_VERSION      := v6.2.6-epas
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1
 ENABLE_UNRAR            ?= 1
@@ -59,9 +60,9 @@ MODULE_INTERFACE_VERSION := 700
 ## Native compiler paths
 ##
 
-CC                      := gcc
-CXX                     := g++
-AR                      := ar
+CC                      := /usr/local/bin/gcc-8
+CXX                     := /usr/local/bin/g++
+AR                      := /usr/local/bin/ar
 FIND                    := find
 INSTALL                 := install
 RM                      := rm
@@ -646,11 +647,6 @@ endif
 endif
 
 obj/combined.NATIVE.a: $(NATIVE_OBJS)
-ifeq ($(UNAME),Darwin)
-ifeq ($(IS_APPLE_SILICON),1)
-	$(RM) -f obj/combined.NATIVE.a
-endif
-endif
 	$(AR) rcs $@ $^
 
 ifeq ($(UNAME),Darwin)
