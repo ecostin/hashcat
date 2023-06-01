@@ -113,10 +113,10 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (parse_rc == false) return (PARSER_SALT_LENGTH);
   salt->salt_len_pc = 10;
-  for (int i=0; i<salt->salt_len; i++) {
+  for (u32 i=0; i<salt->salt_len; i++) {
     salt_buf_pc_ptr[i] = salt_buf_ptr[i];
   }
-  for (int i=salt->salt_len; i<salt->salt_len_pc; i++) {
+  for (u32 i=salt->salt_len; i<salt->salt_len_pc; i++) {
     salt_buf_pc_ptr[i] = 0x20;
   }
   return (PARSER_OK);

@@ -6,7 +6,7 @@
 LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath,/epas/utilities/epas-opencl/lib/system -Wl,-rpath,/epas/utilities/epas-opencl/lib/cuda -lcrypto
 SHARED                  ?= 0
 DEBUG                   := 0
-PRODUCTION              := 1
+PRODUCTION              := 0
 PRODUCTION_VERSION      := v6.2.6-epas
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1

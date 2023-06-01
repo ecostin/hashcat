@@ -205,7 +205,7 @@ int module_build_plain_postprocess (MAYBE_UNUSED const hashconfig_t *hashconfig,
   n = strlen(salt);
   
   memset(txt,0x40,10);
-  for (i=0; i<n; i++) txt[i]=ascii_to_ebcdic[salt[i]];
+  for (i=0; i<n; i++) txt[i]=ascii_to_ebcdic[(u8)salt[i]];
   
   if (n > 8)
   {
@@ -221,7 +221,7 @@ int module_build_plain_postprocess (MAYBE_UNUSED const hashconfig_t *hashconfig,
   }
 
   hash+=16;
-  for(i=0;i<8;i++) sscanf(hash+2*i,"%2X",&xhash[i]);
+  for(i=0;i<8;i++) sscanf(hash+2*i,"%2hhX",&xhash[i]);
   
   for(p0 = 0; p0 < 255; p0++)
   {
