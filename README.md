@@ -4,8 +4,11 @@ This is a clone of hashcat, used for internal development purposes for the epas 
 Currently it adds fully functional support for the following hash types:
 
 Hash-Mode 5710 (Cisco-ISE Hashed Password (SHA256))
+
 Hash-Mode 8501 (IBM RACF KDFAES)
+
 Hash-Mode 8502 (IBM AS400 DES)
+
 Hash-Mode 8503 (IBM AS400 SHA1)
 
 The AS400 modes are not compatible with the extraction tools found on the net, if you want to experiment with them, please do proper extraction using the IBM APIs.
