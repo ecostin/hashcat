@@ -10,7 +10,6 @@
 #include "convert.h"
 #include "shared.h"
 #include "emu_inc_cipher_des.h"
-#include <openssl/des.h>
 
 static const u32   ATTACK_EXEC    = ATTACK_EXEC_INSIDE_KERNEL;
 static const u32   DGST_POS0      = 0;
@@ -70,31 +69,30 @@ const u8 ascii_to_ebcdic[] =
 
 void ibmdes(unsigned char *txt, unsigned char *key, unsigned char *out)
 {
-    unsigned long key1, key2;
     int j;
-    DES_key_schedule sched;
+    u32 key_des[2] = { 0 };
+    u32 data[2] = { 0 };
+    u32 dout[2] = { 0 };
+    u32 Kc[16] = { 0 };
+    u32 Kd[16] = { 0 };
     
-    key1=(key[0]<<24)|(key[1]<<16)|(key[2]<<8)|key[3];
-    key2=(key[4]<<24)|(key[5]<<16)|(key[6]<<8)|key[7];  
-    key1^=0x55555555;
-    key2^=0x55555555; 
-    if (key2&0x80000000) j=1;
-    key1<<=1;
-    key2<<=1;
-    if (j==1) key1|=1;  
-    key[0]=(key1&0xFF000000)>>24;
-    key[1]=(key1&0x00FF0000)>>16;
-    key[2]=(key1&0x0000FF00)>>8; 
-    key[3]=(key1&0x000000FF);
-    key[4]=(key2&0xFF000000)>>24;
-    key[5]=(key2&0x00FF0000)>>16;
-    key[6]=(key2&0x0000FF00)>>8;
-    key[7]=(key2&0x000000FF);    
+    key_des[0]=*(u32*)key;
+    key_des[1]=*(u32*)(key+4);
+    
+    key_des[0]^=0x55555555;
+    key_des[1]^=0x55555555; 
+    if (key_des[1]&0x80000000) j=1;
+    key_des[0]<<=1;
+    key_des[1]<<=1;
+    if (j==1) key_des[0]|=1;
+    
+    data[0]=*(u32*)txt;
+    data[1]=*(u32*)(txt+4);
+    
+    _des_crypt_keysetup (key_des[0], key_des[1], Kc, Kd, (u32 (*)[64]) c_skb);
+    _des_crypt_encrypt (dout, data, Kc, Kd, (u32 (*)[64]) c_SPtrans);
  
-    DES_set_odd_parity((DES_cblock*)key);
-    DES_set_key((DES_cblock*)key, &sched);
-    DES_ecb_encrypt((DES_cblock*)txt,(DES_cblock*)out, &sched, 1);
-    
+    memcpy(out,(unsigned char *)dout,8);
     return;
 }
 
