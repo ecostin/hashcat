@@ -1,3 +1,17 @@
+## *work copy for epas* ##
+
+This is a clone of hashcat, used for internal development purposes for the epas solution (www.epas.de), available under the MIT license.
+Currently it adds fully functional support for the following hash types:
+
+Hash-Mode 5710 (Cisco-ISE Hashed Password (SHA256))
+Hash-Mode 8501 (IBM RACF KDFAES)
+Hash-Mode 8502 (IBM AS400 DES)
+Hash-Mode 8503 (IBM AS400 SHA1)
+
+The AS400 modes are not compatible with the extraction tools found on the net, if you want to experiment with them, please do proper extraction using the IBM APIs.
+
+The additional hash modes will eventually be contributed to hashcat, once the code has been cleaned enough to match the quality expectations of the developers; for now, it just works :)
+
 ## *hashcat* ##
 
 **hashcat** is the world's fastest and most advanced password recovery utility, supporting five unique modes of attack for over 300 highly-optimized hashing algorithms. hashcat currently supports CPUs, GPUs, and other hardware accelerators on Linux, Windows, and macOS, and has facilities to help enable distributed password cracking.
