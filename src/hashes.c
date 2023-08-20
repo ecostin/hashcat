@@ -2211,7 +2211,6 @@ int hashes_init_stage3 (hashcat_ctx_t *hashcat_ctx)
   hashes->digests_done_zero = digests_done_zero;
   hashes->digests_done_pot  = digests_done_pot;
 
-  hashes->salts_cnt         = salts_cnt;
   hashes->salts_done        = salts_done;
 
   return 0;
@@ -2545,7 +2544,7 @@ int hashes_init_zerohash (hashcat_ctx_t *hashcat_ctx)
   hash_t *hashes_buf = hashes->hashes_buf;
   u32     hashes_cnt = hashes->hashes_cnt;
 
-  // no solution for these special hash types (for instane because they use hashfile in output etc)
+  // no solution for these special hash types (for instance because they use hashfile in output etc)
 
   hash_t hash_buf;
 
