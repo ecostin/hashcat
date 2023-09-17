@@ -2031,8 +2031,8 @@ int run_opencl_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devi
 
     cl_kernel kernel = device_param->opencl_kernel_bzero;
 
-    if (hc_clSetKernelArg (hashcat_ctx, kernel, 0, sizeof (cl_mem),   (void *) &buf)    == -1) return -1;
-    if (hc_clSetKernelArg (hashcat_ctx, kernel, 1, sizeof (cl_ulong), (void *) &num16d) == -1) return -1;
+    if (hc_clSetKernelArg (hashcat_ctx, kernel, 0, sizeof (cl_mem),   &buf)    == -1) return -1;
+    if (hc_clSetKernelArg (hashcat_ctx, kernel, 1, sizeof (cl_ulong), &num16d) == -1) return -1;
 
     const size_t global_work_size[3] = { num_elements,   1, 1 };
     const size_t local_work_size[3]  = { kernel_threads, 1, 1 };
@@ -15083,7 +15083,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       // size_pws_idx
 
-      size_pws_idx = (u64) (kernel_power_max + 1) * sizeof (pw_idx_t);
+      size_pws_idx = (kernel_power_max + 1) * sizeof (pw_idx_t);
 
       // size_tmps
 
@@ -16462,7 +16462,7 @@ int backend_session_update_mp_rl (hashcat_ctx_t *hashcat_ctx, const u32 css_cnt_
   return 0;
 }
 
-void *hook12_thread (void *p)
+HC_API_CALL void *hook12_thread (void *p)
 {
   hook_thread_param_t *hook_thread_param = (hook_thread_param_t *) p;
 
@@ -16486,7 +16486,7 @@ void *hook12_thread (void *p)
   return NULL;
 }
 
-void *hook23_thread (void *p)
+HC_API_CALL void *hook23_thread (void *p)
 {
   hook_thread_param_t *hook_thread_param = (hook_thread_param_t *) p;
 
