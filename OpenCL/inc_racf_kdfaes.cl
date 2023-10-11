@@ -95,7 +95,7 @@ DECLSPEC void racf_kdfaes_des(u32 *username, u32 *password, u32 *output, LOCAL_A
   COPY_8(precomputed_opad, output, 0, 0);                                                      \
   sha256_transform(sha256_ctx->w0, sha256_ctx->w1, sha256_ctx->w2, sha256_ctx->w3, output);
   
-DECLSPEC void sha256_init_h(u32 h[8])
+DECLSPEC void sha256_init_h(u32 *h)
 {
   h[0] = SHA256M_A; h[1] = SHA256M_B; h[2] = SHA256M_C; h[3] = SHA256M_D;
   h[4] = SHA256M_E; h[5] = SHA256M_F; h[6] = SHA256M_G; h[7] = SHA256M_H;
