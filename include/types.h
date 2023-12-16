@@ -621,7 +621,7 @@ typedef enum progress_mode
 
 typedef enum user_options_defaults
 {
-  ADVICE_DISABLE           = false,
+  ADVICE                   = true,
   ATTACK_MODE              = ATTACK_MODE_STRAIGHT,
   AUTODETECT               = false,
   BACKEND_DEVICES_VIRTUAL  = 1,
@@ -637,9 +637,10 @@ typedef enum user_options_defaults
   BRAIN_SESSION            = 0,
   #endif
   DEBUG_MODE               = 0,
-  DEPRECATED_CHECK_DISABLE = false,
+  DEPRECATED_CHECK         = true,
+  DYNAMIC_X                = false,
   FORCE                    = false,
-  HWMON_DISABLE            = false,
+  HWMON                    = true,
   #if defined (__APPLE__)
   HWMON_TEMP_ABORT         = 100,
   #else
@@ -663,11 +664,11 @@ typedef enum user_options_defaults
   KEYSPACE                 = false,
   LEFT                     = false,
   LIMIT                    = 0,
-  LOGFILE_DISABLE          = false,
+  LOGFILE                  = true,
   LOOPBACK                 = false,
   MACHINE_READABLE         = false,
   MARKOV_CLASSIC           = false,
-  MARKOV_DISABLE           = false,
+  MARKOV                   = true,
   MARKOV_INVERSE           = false,
   MARKOV_THRESHOLD         = 0,
   METAL_COMPILER_RUNTIME   = 120,
@@ -680,18 +681,18 @@ typedef enum user_options_defaults
   BACKEND_IGNORE_OPENCL    = false,
   BACKEND_INFO             = 0,
   BACKEND_VECTOR_WIDTH     = 0,
-  OPTIMIZED_KERNEL_ENABLE  = false,
-  MULTIPLY_ACCEL_DISABLE   = false,
+  OPTIMIZED_KERNEL         = false,
+  MULTIPLY_ACCEL           = true,
   OUTFILE_AUTOHEX          = true,
   OUTFILE_CHECK_TIMER      = 5,
   OUTFILE_FORMAT           = 3,
   OUTFILE_JSON             = false,
-  POTFILE_DISABLE          = false,
+  POTFILE                  = true,
   PROGRESS_ONLY            = false,
   QUIET                    = false,
   REMOVE                   = false,
   REMOVE_TIMER             = 60,
-  RESTORE_DISABLE          = false,
+  RESTORE_ENABLE           = true,
   RESTORE                  = false,
   RESTORE_TIMER            = 1,
   RP_GEN                   = 0,
@@ -701,7 +702,7 @@ typedef enum user_options_defaults
   RUNTIME                  = 0,
   SCRYPT_TMTO              = 0,
   SEGMENT_SIZE             = 33554432,
-  SELF_TEST_DISABLE        = false,
+  SELF_TEST                = true,
   SHOW                     = false,
   SKIP                     = 0,
   SLOW_CANDIDATES          = false,
@@ -757,6 +758,7 @@ typedef enum user_options_map
   IDX_DEBUG_FILE                = 0xff12,
   IDX_DEBUG_MODE                = 0xff13,
   IDX_DEPRECATED_CHECK_DISABLE  = 0xff14,
+  IDX_DYNAMIC_X                 = 0xff55,
   IDX_ENCODING_FROM             = 0xff15,
   IDX_ENCODING_TO               = 0xff16,
   IDX_HASH_INFO                 = 0xff17,
@@ -887,6 +889,13 @@ typedef void * hc_dynfunc_t;
  * structs
  */
 
+typedef struct dynamicx
+{
+  char *dynamicx_buf;
+  u32   dynamicx_len;
+
+} dynamicx_t;
+
 typedef struct user
 {
   char *user_name;
@@ -914,9 +923,10 @@ typedef struct split
 
 typedef struct hashinfo
 {
-  user_t  *user;
-  char    *orighash;
-  split_t *split;
+  dynamicx_t *dynamicx;
+  user_t     *user;
+  char       *orighash;
+  split_t    *split;
 
 } hashinfo_t;
 
@@ -2323,7 +2333,7 @@ typedef struct user_options
   bool         rule_buf_l_chgd;
   bool         rule_buf_r_chgd;
 
-  bool         advice_disable;
+  bool         advice;
   bool         benchmark;
   bool         benchmark_all;
   #ifdef WITH_BRAIN
@@ -2331,8 +2341,9 @@ typedef struct user_options
   bool         brain_server;
   #endif
   bool         force;
-  bool         deprecated_check_disable;
-  bool         hwmon_disable;
+  bool         deprecated_check;
+  bool         dynamic_x;
+  bool         hwmon;
   bool         hash_info;
   bool         hex_charset;
   bool         hex_salt;
@@ -2341,27 +2352,27 @@ typedef struct user_options
   bool         keep_guessing;
   bool         keyspace;
   bool         left;
-  bool         logfile_disable;
+  bool         logfile;
   bool         loopback;
   bool         machine_readable;
   bool         markov_classic;
-  bool         markov_disable;
+  bool         markov;
   bool         markov_inverse;
   bool         backend_ignore_cuda;
   bool         backend_ignore_hip;
   bool         backend_ignore_metal;
   bool         backend_ignore_opencl;
-  bool         optimized_kernel_enable;
-  bool         multiply_accel_disable;
+  bool         optimized_kernel;
+  bool         multiply_accel;
   bool         outfile_autohex;
   bool         outfile_json;
-  bool         potfile_disable;
+  bool         potfile;
   bool         progress_only;
   bool         quiet;
   bool         remove;
   bool         restore;
-  bool         restore_disable;
-  bool         self_test_disable;
+  bool         restore_enable;
+  bool         self_test;
   bool         show;
   bool         slow_candidates;
   bool         speed_only;

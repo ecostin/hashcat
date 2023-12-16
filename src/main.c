@@ -154,7 +154,7 @@ static void main_log_advice (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUS
 {
   const user_options_t *user_options = hashcat_ctx->user_options;
 
-  if (user_options->advice_disable == true) return;
+  if (user_options->advice == false) return;
 
   main_log (hashcat_ctx, stdout, LOGLEVEL_ADVICE);
 }
@@ -790,7 +790,7 @@ static void main_monitor_performance_hint (MAYBE_UNUSED hashcat_ctx_t *hashcat_c
   event_log_advice (hashcat_ctx, "Cracking performance lower than expected?");
   event_log_advice (hashcat_ctx, NULL);
 
-  if (user_options->optimized_kernel_enable == false)
+  if (user_options->optimized_kernel == false)
   {
     if ((hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL) == 0)
     {
