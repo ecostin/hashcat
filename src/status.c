@@ -35,6 +35,8 @@ static const char *const  ST_0013 = "Error";
 static const char *const  ST_0014 = "Aborted (Finish)";
 static const char *const  ST_0015 = "Running (Quit after attack requested)";
 static const char *const  ST_0016 = "Autodetect";
+static const char *const  ST_0017 = "Paused (Checkpoint Quit requested)";
+static const char *const  ST_0018 = "Paused (Quit after attack requested)";
 static const char *const  ST_9999 = "Unknown! Bug!";
 
 static const char UNITS[7] = { ' ', 'k', 'M', 'G', 'T', 'P', 'E' };
@@ -262,8 +264,6 @@ const char *status_get_status_string (const hashcat_ctx_t *hashcat_ctx)
 
   const int devices_status = status_ctx->devices_status;
 
-  // special case: running but checkpoint quit requested
-
   if (devices_status == STATUS_RUNNING)
   {
     if (status_ctx->checkpoint_shutdown == true)
@@ -274,6 +274,18 @@ const char *status_get_status_string (const hashcat_ctx_t *hashcat_ctx)
     if (status_ctx->finish_shutdown == true)
     {
       return ST_0015;
+    }
+  }
+  else if (devices_status == STATUS_PAUSED)
+  {
+    if (status_ctx->checkpoint_shutdown == true)
+    {
+      return ST_0017;
+    }
+
+    if (status_ctx->finish_shutdown == true)
+    {
+      return ST_0018;
     }
   }
 
@@ -394,6 +406,10 @@ int status_get_guess_mode (const hashcat_ctx_t *hashcat_ctx)
   if (user_options->custom_charset_2) has_mask_cs = true;
   if (user_options->custom_charset_3) has_mask_cs = true;
   if (user_options->custom_charset_4) has_mask_cs = true;
+  if (user_options->custom_charset_5) has_mask_cs = true;
+  if (user_options->custom_charset_6) has_mask_cs = true;
+  if (user_options->custom_charset_7) has_mask_cs = true;
+  if (user_options->custom_charset_8) has_mask_cs = true;
 
   if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
@@ -778,17 +794,25 @@ char *status_get_guess_charset (const hashcat_ctx_t *hashcat_ctx)
   const char *custom_charset_2 = user_options->custom_charset_2;
   const char *custom_charset_3 = user_options->custom_charset_3;
   const char *custom_charset_4 = user_options->custom_charset_4;
+  const char *custom_charset_5 = user_options->custom_charset_5;
+  const char *custom_charset_6 = user_options->custom_charset_6;
+  const char *custom_charset_7 = user_options->custom_charset_7;
+  const char *custom_charset_8 = user_options->custom_charset_8;
 
-  if ((custom_charset_1 != NULL) || (custom_charset_2 != NULL) || (custom_charset_3 != NULL) || (custom_charset_4 != NULL))
+  if ((custom_charset_1 != NULL) || (custom_charset_2 != NULL) || (custom_charset_3 != NULL) || (custom_charset_4 != NULL) || (custom_charset_5 != NULL) || (custom_charset_6 != NULL) || (custom_charset_7 != NULL) || (custom_charset_8 != NULL))
   {
     char *tmp_buf;
 
-    if (custom_charset_1 == NULL) custom_charset_1 = "Undefined";
-    if (custom_charset_2 == NULL) custom_charset_2 = "Undefined";
-    if (custom_charset_3 == NULL) custom_charset_3 = "Undefined";
-    if (custom_charset_4 == NULL) custom_charset_4 = "Undefined";
+    if (custom_charset_1 == NULL) custom_charset_1 = "N/A";
+    if (custom_charset_2 == NULL) custom_charset_2 = "N/A";
+    if (custom_charset_3 == NULL) custom_charset_3 = "N/A";
+    if (custom_charset_4 == NULL) custom_charset_4 = "N/A";
+    if (custom_charset_5 == NULL) custom_charset_5 = "N/A";
+    if (custom_charset_6 == NULL) custom_charset_6 = "N/A";
+    if (custom_charset_7 == NULL) custom_charset_7 = "N/A";
+    if (custom_charset_8 == NULL) custom_charset_8 = "N/A";
 
-    hc_asprintf (&tmp_buf, "-1 %s, -2 %s, -3 %s, -4 %s", custom_charset_1, custom_charset_2, custom_charset_3, custom_charset_4);
+    hc_asprintf (&tmp_buf, "-1 %s, -2 %s, -3 %s, -4 %s, -5 %s, -6 %s, -7 %s, -8 %s", custom_charset_1, custom_charset_2, custom_charset_3, custom_charset_4, custom_charset_5, custom_charset_6, custom_charset_7, custom_charset_8);
 
     return tmp_buf;
   }

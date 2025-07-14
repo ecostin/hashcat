@@ -57,6 +57,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - SHA3-384
 - SHA3-512
 - RIPEMD-160
+- RIPEMD-320
 - BLAKE2b-512
 - BLAKE2s-256
 - SM3
@@ -86,14 +87,17 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - md5($salt.md5($salt.$pass))
 - md5($salt.sha1($salt.$pass))
 - md5($salt.utf16le($pass))
+- md5($salt1.$pass.$salt2)
 - md5($salt1.sha1($salt2.$pass))
 - md5($salt1.strtoupper(md5($salt2.$pass)))
 - md5(md5($pass))
 - md5(md5($pass).md5($salt))
 - md5(md5($pass.$salt))
+- md5($salt.md5($pass).$salt)
 - md5(md5(md5($pass)))
 - md5(md5(md5($pass)).$salt)
 - md5(md5(md5($pass).$salt1).$salt2)
+- md5(md5(md5($pass.$salt1)).$salt2)
 - md5(sha1($pass))
 - md5(sha1($pass).$salt)
 - md5(sha1($pass).md5($pass).sha1($pass))
@@ -143,6 +147,8 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - HMAC-MD5 (key = $salt)
 - HMAC-RIPEMD160 (key = $pass)
 - HMAC-RIPEMD160 (key = $salt)
+- HMAC-RIPEMD320 (key = $pass)
+- HMAC-RIPEMD320 (key = $salt)
 - HMAC-SHA1 (key = $pass)
 - HMAC-SHA1 (key = $salt)
 - HMAC-SHA256 (key = $pass)
@@ -484,6 +490,7 @@ NVIDIA GPUs require "NVIDIA Driver" (440.64 or later) and "CUDA Toolkit" (9.0 or
 - RC4 40-bit DropN
 - RC4 72-bit DropN
 - RC4 104-bit DropN
+- Microsoft Online Account (PBKDF2-HMAC-SHA256 + AES256)
 
 ##
 ## Attack-Modes

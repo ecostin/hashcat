@@ -77,7 +77,7 @@ DECLSPEC u32 blake2s_rot08_S (const u32 a)
 
   return out.v32;
 
-  #elif (defined IS_AMD || defined IS_HIP) && HAS_VPERM == 1
+  #elif (defined IS_AMD || defined IS_HIP)
 
   vconv32_t in;
 
@@ -322,7 +322,7 @@ DECLSPEC void blake2s_update (PRIVATE_AS blake2s_ctx_t *ctx, PRIVATE_AS const u3
   u32 w2[4];
   u32 w3[4];
 
-  const int limit = (const int) len - 64; // int type needed, could be negative
+  const int limit = len - 64; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -376,7 +376,7 @@ DECLSPEC void blake2s_update_global (PRIVATE_AS blake2s_ctx_t *ctx, GLOBAL_AS co
   u32 w2[4];
   u32 w3[4];
 
-  const int limit = (const int) len - 64; // int type needed, could be negative
+  const int limit = len - 64; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -516,7 +516,7 @@ DECLSPEC void blake2s_update_global_swap (PRIVATE_AS blake2s_ctx_t *ctx, GLOBAL_
   u32 w2[4];
   u32 w3[4];
 
-  const int limit = (const int) len - 64; // int type needed, could be negative
+  const int limit = len - 64; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -597,12 +597,10 @@ DECLSPEC void blake2s_update_global_swap (PRIVATE_AS blake2s_ctx_t *ctx, GLOBAL_
   blake2s_update_64 (ctx, w0, w1, w2, w3, len - (u32) pos1);
 }
 
-
 DECLSPEC void blake2s_final (PRIVATE_AS blake2s_ctx_t *ctx)
 {
-  blake2s_transform (ctx->h, ctx->m, ctx->len, BLAKE2S_FINAL);
+  blake2s_transform (ctx->h, ctx->m, ctx->len, (u32) BLAKE2S_FINAL);
 }
-
 
 DECLSPEC void blake2s_hmac_init_64 (PRIVATE_AS blake2s_hmac_ctx_t *ctx, PRIVATE_AS const u32 *w0, PRIVATE_AS const u32 *w1, PRIVATE_AS const u32 *w2, PRIVATE_AS const u32 *w3)
 {
@@ -1158,7 +1156,7 @@ DECLSPEC void blake2s_update_vector (PRIVATE_AS blake2s_ctx_vector_t *ctx, PRIVA
   u32x w2[4];
   u32x w3[4];
 
-  const int limit = (const int) len - 64; // int type needed, could be negative
+  const int limit = len - 64; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -1207,7 +1205,7 @@ DECLSPEC void blake2s_update_vector (PRIVATE_AS blake2s_ctx_vector_t *ctx, PRIVA
 
 DECLSPEC void blake2s_final_vector (PRIVATE_AS blake2s_ctx_vector_t *ctx)
 {
-  blake2s_transform_vector (ctx->h, ctx->m, (u32x) ctx->len, BLAKE2S_FINAL);
+  blake2s_transform_vector (ctx->h, ctx->m, (u32x) ctx->len, (u32) BLAKE2S_FINAL);
 }
 
 DECLSPEC void blake2s_hmac_init_vector_64 (PRIVATE_AS blake2s_hmac_ctx_vector_t *ctx, PRIVATE_AS const u32x *w0, PRIVATE_AS const u32x *w1, PRIVATE_AS const u32x *w2, PRIVATE_AS const u32x *w3)

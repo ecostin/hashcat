@@ -381,7 +381,7 @@ HC_API_CALL void *thread_calc_stdin (void *p)
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipCtxPushCurrent (hashcat_ctx, device_param->hip_context) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
   }
 
   if (calc_stdin (hashcat_ctx, device_param) == -1)
@@ -394,11 +394,6 @@ HC_API_CALL void *thread_calc_stdin (void *p)
   if (device_param->is_cuda == true)
   {
     if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
-  }
-
-  if (device_param->is_hip == true)
-  {
-    if (hc_hipCtxPopCurrent (hashcat_ctx, &device_param->hip_context) == -1) return NULL;
   }
 
   if (bridge_ctx->enabled == true)
@@ -1685,7 +1680,7 @@ HC_API_CALL void *thread_calc (void *p)
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipCtxPushCurrent (hashcat_ctx, device_param->hip_context) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
   }
 
   if (calc (hashcat_ctx, device_param) == -1)
@@ -1698,11 +1693,6 @@ HC_API_CALL void *thread_calc (void *p)
   if (device_param->is_cuda == true)
   {
     if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
-  }
-
-  if (device_param->is_hip == true)
-  {
-    if (hc_hipCtxPopCurrent (hashcat_ctx, &device_param->hip_context) == -1) return NULL;
   }
 
   if (bridge_ctx->enabled == true)

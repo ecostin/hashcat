@@ -87,12 +87,12 @@ bool bridges_init (hashcat_ctx_t *hashcat_ctx)
   user_options_t  *user_options = hashcat_ctx->user_options;
   hashconfig_t    *hashconfig   = hashcat_ctx->hashconfig;
 
-  if (user_options->hash_info    == true) return true;
+  if (user_options->backend_info  > 0)    return true;
+  if (user_options->hash_info     > 0)    return true;
+  if (user_options->usage         > 0)    return true;
   if (user_options->left         == true) return true;
   if (user_options->show         == true) return true;
-  if (user_options->usage         > 0)    return true;
   if (user_options->version      == true) return true;
-  if (user_options->backend_info  > 0)    return true;
 
   // There is a problem here. At this point, hashconfig is not yet initialized.
   // This is because initializing hashconfig requires the module to be loaded,
@@ -113,7 +113,7 @@ bool bridges_init (hashcat_ctx_t *hashcat_ctx)
     hashconfig_destroy (hashcat_ctx);
 
     return true;
-  } 
+  }
 
   bridge_ctx->enabled = true;
 
@@ -181,8 +181,10 @@ bool bridges_init (hashcat_ctx_t *hashcat_ctx)
   CHECK_MANDATORY (bridge_ctx->get_unit_info);
   CHECK_MANDATORY (bridge_ctx->get_workitem_count);
 
-  if (hashconfig->bridge_type & BRIDGE_TYPE_LAUNCH_LOOP)  CHECK_MANDATORY (bridge_ctx->launch_loop);
-  if (hashconfig->bridge_type & BRIDGE_TYPE_LAUNCH_LOOP2) CHECK_MANDATORY (bridge_ctx->launch_loop2);
+  if (hashconfig->bridge_type & BRIDGE_TYPE_REPLACE_LOOP)  CHECK_MANDATORY (bridge_ctx->launch_loop);
+  if (hashconfig->bridge_type & BRIDGE_TYPE_REPLACE_LOOP2) CHECK_MANDATORY (bridge_ctx->launch_loop2);
+  if (hashconfig->bridge_type & BRIDGE_TYPE_LAUNCH_LOOP)   CHECK_MANDATORY (bridge_ctx->launch_loop);
+  if (hashconfig->bridge_type & BRIDGE_TYPE_LAUNCH_LOOP2)  CHECK_MANDATORY (bridge_ctx->launch_loop2);
 
   #undef CHECK_MANDATORY
 
@@ -239,12 +241,12 @@ bool bridges_salt_prepare (hashcat_ctx_t *hashcat_ctx)
   hashes_t        *hashes       = hashcat_ctx->hashes;
   user_options_t  *user_options = hashcat_ctx->user_options;
 
-  if (user_options->hash_info    == true) return true;
+  if (user_options->backend_info  > 0)    return true;
+  if (user_options->hash_info     > 0)    return true;
+  if (user_options->usage         > 0)    return true;
   if (user_options->left         == true) return true;
   if (user_options->show         == true) return true;
-  if (user_options->usage         > 0)    return true;
   if (user_options->version      == true) return true;
-  if (user_options->backend_info  > 0)    return true;
 
   if (bridge_ctx->enabled == false) return true;
 

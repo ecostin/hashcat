@@ -11,6 +11,7 @@
 #include "ext_metal.h"
 
 #include <sys/sysctl.h>
+#include <objc/message.h>
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Foundation/Foundation.h>
@@ -195,11 +196,14 @@ static int hc_mtlBuildOptionsToDict (void *hashcat_ctx, const char *build_option
   }
 
   // if set, add INCLUDE_PATH to hack Apple kernel build from source limitation on -I usage
+
   if (include_path != nil)
   {
     NSString *path_key = @"INCLUDE_PATH";
     NSString *path_value = [NSString stringWithCString: include_path encoding: NSUTF8StringEncoding];
+
     // Include path may contain spaces, escape them with a backslash
+
     path_value = [path_value stringByReplacingOccurrencesOfString:@" " withString:@"\\ "];
 
     [build_options_dict setObject:path_value forKey:path_key];
@@ -304,6 +308,13 @@ int hc_mtlDeviceGet (void *hashcat_ctx, mtl_device_id *metal_device, int ordinal
     event_log_error (hashcat_ctx, "metalDeviceGet(): invalid index");
 
     return -1;
+  }
+
+  // parallelize pipeline state object (PSO) compilation internally
+
+  if ([device respondsToSelector:@selector(setShouldMaximizeConcurrentCompilation:)])
+  {
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(device, @selector(setShouldMaximizeConcurrentCompilation:), YES);
   }
 
   *metal_device = device;
@@ -743,6 +754,7 @@ int hc_mtlCreateKernel (void *hashcat_ctx, mtl_device_id metal_device, mtl_libra
   dispatch_queue_t queue = dispatch_get_global_queue (DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 
   // if no user-defined runtime, set to METAL_COMPILER_RUNTIME
+
   long timeout = (user_options->metal_compiler_runtime > 0) ? user_options->metal_compiler_runtime : METAL_COMPILER_RUNTIME;
 
   dispatch_time_t when = dispatch_time (DISPATCH_TIME_NOW,NSEC_PER_SEC * timeout);
@@ -1314,10 +1326,21 @@ int hc_mtlSetCommandEncoderArg (void *hashcat_ctx, mtl_command_encoder metal_com
   return 0;
 }
 
-int hc_mtlEncodeComputeCommand (void *hashcat_ctx, mtl_command_encoder metal_command_encoder, mtl_command_buffer metal_command_buffer, size_t global_work_size, size_t local_work_size, double *ms)
+int hc_mtlEncodeComputeCommand (void *hashcat_ctx, mtl_command_encoder metal_command_encoder, mtl_command_buffer metal_command_buffer, const unsigned int work_dim, const size_t global_work_size[3], const size_t local_work_size[3], double *ms)
 {
-  MTLSize numThreadgroups = {local_work_size, 1, 1};
-  MTLSize threadsGroup = {global_work_size, 1, 1};
+  MTLSize threadsPerThreadgroup =
+  {
+    local_work_size[0],
+    local_work_size[1],
+    local_work_size[2]
+  };
+
+  MTLSize threadgroupsPerGrid =
+  {
+    (global_work_size[0] + threadsPerThreadgroup.width - 1) / threadsPerThreadgroup.width,
+    work_dim > 1 ? (global_work_size[1] + threadsPerThreadgroup.height - 1) / threadsPerThreadgroup.height : 1,
+    work_dim > 2 ? (global_work_size[2] + threadsPerThreadgroup.depth - 1) / threadsPerThreadgroup.depth : 1
+  };
 
   if (metal_command_encoder == nil)
   {
@@ -1333,7 +1356,7 @@ int hc_mtlEncodeComputeCommand (void *hashcat_ctx, mtl_command_encoder metal_com
     return -1;
   }
 
-  [metal_command_encoder dispatchThreadgroups: threadsGroup threadsPerThreadgroup: numThreadgroups];
+  [metal_command_encoder dispatchThreadgroups: threadgroupsPerGrid threadsPerThreadgroup: threadsPerThreadgroup];
 
   [metal_command_encoder endEncoding];
   [metal_command_buffer commit];
@@ -1377,17 +1400,22 @@ int hc_mtlCreateLibraryWithFile (void *hashcat_ctx, mtl_device_id metal_device, 
 
   if (k_string != nil)
   {
-    id <MTLLibrary> r = [metal_device newLibraryWithFile: k_string error: &error];
+    NSURL *libURL = [NSURL fileURLWithPath: k_string];
 
-    if (error != nil)
+    if (libURL != nil)
     {
-      event_log_error (hashcat_ctx, "%s(): failed to create metal library from metallib, %s", __func__, [[error localizedDescription] UTF8String]);
-      return -1;
+      id <MTLLibrary> r = [metal_device newLibraryWithURL: libURL error:&error];
+
+      if (error != nil)
+      {
+        event_log_error (hashcat_ctx, "%s(): failed to create metal library from metallib, %s", __func__, [[error localizedDescription] UTF8String]);
+        return -1;
+      }
+
+      *metal_library = r;
+
+      return 0;
     }
-
-    *metal_library = r;
-
-    return 0;
   }
 
   return -1;
@@ -1420,10 +1448,18 @@ int hc_mtlCreateLibraryWithSource (void *hashcat_ctx, mtl_device_id metal_device
       }
 
       compileOptions.preprocessorMacros = build_options_dict;
+
+      /*
+      compileOptions.optimizationLevel = MTLLibraryOptimizationLevelSize;
+      compileOptions.mathMode = MTLMathModeSafe;
+      // compileOptions.mathMode = MTLMathModeRelaxed;
+      // compileOptions.enableLogging = true;
+      // compileOptions.fastMathEnabled = false;
+      */
     }
 
     // todo: detect current os version and choose the right
-//    compileOptions.languageVersion = MTL_LANGUAGEVERSION_2_3;
+    // compileOptions.languageVersion = MTL_LANGUAGEVERSION_2_3;
 /*
     if (@available(macOS 12.0, *))
     {

@@ -24,8 +24,7 @@ static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
                                   | OPTI_TYPE_REGISTER_LIMIT;
 static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
                                   | OPTS_TYPE_PT_GENERATE_LE
-                                  | OPTS_TYPE_HASH_COPY
-                                  | OPTS_TYPE_MAXIMUM_THREADS;
+                                  | OPTS_TYPE_HASH_COPY;
 static const u32   SALT_TYPE      = SALT_TYPE_EMBEDDED;
 static const char *ST_PASS        = "hashcat";
 static const char *ST_HASH        = "$pdf$5*6*256*-1028*1*16*62137640825124540503886403748430*127*0391647179352257f7181236ba371e540c2dbb82fac1c462313eb58b772a54956213764082512454050388640374843000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000*127*00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000*32*0000000000000000000000000000000000000000000000000000000000000000*32*0000000000000000000000000000000000000000000000000000000000000000";
@@ -82,15 +81,39 @@ typedef struct pdf17l8_tmp
 static const char *SIGNATURE_PDF  = "$pdf$";
 static const int   ROUNDS_PDF17L8 = 64;
 
+u32 module_kernel_loops_min (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  u32 kernel_loops_min = KERNEL_LOOPS_MIN;
+
+  if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+  {
+    kernel_loops_min = 1;
+  }
+
+  return kernel_loops_min;
+}
+
+u32 module_kernel_loops_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  u32 kernel_loops_max = KERNEL_LOOPS_MAX;
+
+  if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+  {
+    kernel_loops_max = 1;
+  }
+
+  return kernel_loops_max;
+}
+
 bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
   if ((device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE) && (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU))
   {
-    if (device_param->is_metal == false)
+    if (device_param->is_metal == true)
     {
-      if (strncmp (device_param->device_name, "Apple M", 7) == 0)
+      if (strncmp (device_param->device_name, "Intel", 5) == 0)
       {
-        // AppleM1, OpenCL, MTLCompilerService, createKernel never-end with pure kernel and newComputePipelineState failed with optimized kernel
+        // Intel Iris Graphics, Metal Version 244.303: failed to create 'm10700_loop' pipeline, timeout reached (status 49)
         return true;
       }
     }
@@ -127,37 +150,49 @@ u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED con
   return pw_max;
 }
 
-u32 module_kernel_threads_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
-{
-  const u32 kernel_threads_max = 256;
-
-  return kernel_threads_max;
-}
-
 char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
+  const u32 shared_size_scratch = (32 + 64 + 16); // LOCAL_VK u32 s_sc[FIXED_LOCAL_SIZE][PWMAXSZ4 + BLMAXSZ4 + AESSZ4];
+  const u32 shared_size_aes     = (5 * 1024);     // LOCAL_VK u32 s_te0[256];
+
   char *jit_build_options = NULL;
 
-  if (device_param->is_metal == true)
+  if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
   {
-    hc_asprintf (&jit_build_options, "-D FORCE_DISABLE_SHM");
+    hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u", 1);
   }
-
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == false))
+  else
   {
-    // this is a workaround to avoid a Segmentation fault and self-test fails on AMD GPU PRO
+    u32 overhead = 0;
 
-    hc_asprintf (&jit_build_options, "-cl-opt-disable");
-  }
-
-  if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD) && (device_param->has_vperm == true))
-  {
-    if ((hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL) == 0)
+    if (device_param->opencl_device_vendor_id == VENDOR_ID_NV)
     {
-      // this is a workaround to avoid a compile time of over an hour (and then to not work) on ROCM in pure kernel mode
+      // note we need to use device_param->device_local_mem_size - 4 because opencl jit returns with:
+      // Entry function '...' uses too much shared data (0xc004 bytes, 0xc000 max)
+      // on my development system. no clue where the 4 bytes are spent.
+      // I did some research on this and it seems to be related with the datatype.
+      // For example, if i used u8 instead, there's only 1 byte wasted.
 
-      hc_asprintf (&jit_build_options, "-cl-opt-disable");
+      if (device_param->is_opencl == true)
+      {
+        overhead = 1;
+      }
     }
+
+    const u32 device_local_mem_size = MIN (device_param->device_local_mem_size, 48*1024);
+
+    u32 fixed_local_size = ((device_local_mem_size - overhead) - shared_size_aes) / shared_size_scratch;
+
+    if (user_options->kernel_threads_chgd == true)
+    {
+      fixed_local_size = user_options->kernel_threads;
+    }
+    else
+    {
+      if (fixed_local_size > device_param->kernel_preferred_wgs_multiple) fixed_local_size -= fixed_local_size % device_param->kernel_preferred_wgs_multiple;
+    }
+
+    hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u -D _unroll", fixed_local_size);
   }
 
   return jit_build_options;
@@ -391,9 +426,9 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_jit_cache_disable        = MODULE_DEFAULT;
   module_ctx->module_kernel_accel_max         = MODULE_DEFAULT;
   module_ctx->module_kernel_accel_min         = MODULE_DEFAULT;
-  module_ctx->module_kernel_loops_max         = MODULE_DEFAULT;
-  module_ctx->module_kernel_loops_min         = MODULE_DEFAULT;
-  module_ctx->module_kernel_threads_max       = module_kernel_threads_max;
+  module_ctx->module_kernel_loops_max         = module_kernel_loops_max;
+  module_ctx->module_kernel_loops_min         = module_kernel_loops_min;
+  module_ctx->module_kernel_threads_max       = MODULE_DEFAULT;
   module_ctx->module_kernel_threads_min       = MODULE_DEFAULT;
   module_ctx->module_kern_type                = module_kern_type;
   module_ctx->module_kern_type_dynamic        = MODULE_DEFAULT;

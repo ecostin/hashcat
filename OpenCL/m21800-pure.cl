@@ -96,7 +96,7 @@ DECLSPEC void hmac_sha512_run_V (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVA
   sha512_transform_vector (w0, w1, w2, w3, w4, w5, w6, w7, digest);
 }
 
-KERNEL_FQ void m21800_init (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
+KERNEL_FQ KERNEL_FA void m21800_init (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 {
   /**
    * base
@@ -193,7 +193,7 @@ KERNEL_FQ void m21800_init (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
   tmps[gid].out[7] = tmps[gid].dgst[7];
 }
 
-KERNEL_FQ void m21800_loop (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
+KERNEL_FQ KERNEL_FA void m21800_loop (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 {
   const u64 gid = get_global_id (0);
 
@@ -316,7 +316,7 @@ KERNEL_FQ void m21800_loop (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
   unpack64v (tmps, out, gid, 7, out[7]);
 }
 
-KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
+KERNEL_FQ KERNEL_FA void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 {
   const u64 gid = get_global_id  (0);
   const u64 lid = get_local_id   (0);
@@ -655,12 +655,10 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
 
       if ((entropy >= MIN_ENTROPY) && (entropy <= MAX_ENTROPY))
       {
-        if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
+        if (hc_atomic_inc (&hashes_shown[digest_cur]) == 0)
         {
-          mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
+          mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, digest_pos, digest_cur, gid, 0, 0, 0);
         }
-
-        return;
       }
     }
   }
@@ -676,11 +674,9 @@ KERNEL_FQ void m21800_comp (KERN_ATTR_TMPS_ESALT (electrum_tmp_t, electrum_t))
       ((tmp[0] == 0x7b) && (tmp[1] == 0x0d) && (tmp[2] == 0x0a) && (tmp[3] == 0x20) &&
        (tmp[4] == 0x20) && (tmp[5] == 0x20) && (tmp[6] == 0x20) && (tmp[7] == 0x22)))
   {
-    if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
+    if (hc_atomic_inc (&hashes_shown[digest_cur]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, digest_pos, digest_cur, gid, 0, 0, 0);
     }
-
-    return;
   }
 }

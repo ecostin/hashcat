@@ -196,12 +196,13 @@ static void main_outerloop_starting (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MA
 
   status_ctx->shutdown_outer = false;
 
-  if (user_options->hash_info    == true) return;
+  if (user_options->backend_info  > 0)    return;
+  if (user_options->hash_info     > 0)    return;
+
   if (user_options->keyspace     == true) return;
   if (user_options->stdout_flag  == true) return;
   if (user_options->speed_only   == true) return;
   if (user_options->identify     == true) return;
-  if (user_options->backend_info  > 0)    return;
 
   if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
   {
@@ -273,10 +274,11 @@ static void main_cracker_finished (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYB
   const user_options_t       *user_options       = hashcat_ctx->user_options;
   const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
 
-  if (user_options->hash_info    == true) return;
+  if (user_options->backend_info  > 0)    return;
+  if (user_options->hash_info     > 0)    return;
+
   if (user_options->keyspace     == true) return;
   if (user_options->stdout_flag  == true) return;
-  if (user_options->backend_info  > 0)    return;
 
   // if we had a prompt, clear it
 
@@ -356,7 +358,10 @@ static void main_cracker_hash_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, 
     if (outfile_ctx->filename == NULL) if (user_options->quiet == false) clear_prompt (hashcat_ctx);
   }
 
+  // color option for cracked hashes
+  if (user_options->color_cracked == true && is_stdout_terminal()) fputs("\033[0;36m", stdout);
   fwrite (buf, len,          1, stdout);
+  if (user_options->color_cracked == true && is_stdout_terminal()) fwrite("\033[0m", 4, 1, stdout);
   fwrite (EOL, strlen (EOL), 1, stdout);
 
   if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
@@ -482,6 +487,7 @@ static void main_potfile_all_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, M
   if (user_options->quiet == true) return;
 
   event_log_info (hashcat_ctx, "INFO: All hashes found as potfile and/or empty entries! Use --show to display them.");
+  event_log_info (hashcat_ctx, "For more information, see https://hashcat.net/faq/potfile");
   event_log_info (hashcat_ctx, NULL);
 }
 
@@ -647,7 +653,17 @@ static void main_backend_session_hostmem (MAYBE_UNUSED hashcat_ctx_t *hashcat_ct
 
   const u64 *hostmem = (const u64 *) buf;
 
-  event_log_info (hashcat_ctx, "Host memory required for this attack: %" PRIu64 " MB", *hostmem / (1024 * 1024));
+  u64 free_memory = 0;
+
+  if (get_free_memory (&free_memory) == false)
+  {
+    event_log_info (hashcat_ctx, "Host memory allocated for this attack: %" PRIu64 " MB", *hostmem / (1024 * 1024));
+  }
+  else
+  {
+    event_log_info (hashcat_ctx, "Host memory allocated for this attack: %" PRIu64 " MB (%" PRIu64 " MB free)", *hostmem / (1024 * 1024), free_memory / (1024 * 1024));
+  }
+
   event_log_info (hashcat_ctx, NULL);
 }
 
@@ -1012,7 +1028,7 @@ static void main_hashconfig_post (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE
 
   if (hashconfig->is_salted == true)
   {
-    if (hashconfig->opti_type & OPTI_TYPE_RAW_HASH)
+    if (hashconfig->opti_type & OPTI_TYPE_RAW_HASH || hashconfig->salt_type & SALT_TYPE_GENERIC)
     {
       event_log_info (hashcat_ctx, "Minimum salt length supported by kernel: %u", hashconfig->salt_min);
       event_log_info (hashcat_ctx, "Maximum salt length supported by kernel: %u", hashconfig->salt_max);
@@ -1173,6 +1189,42 @@ static void main_autotune_finished (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAY
   event_log_info_nn (hashcat_ctx, "Finished autotune");
 }
 
+static void main_backend_runtimes_init_pre (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Initializing backend runtimes. Please be patient...");
+}
+
+static void main_backend_runtimes_init_post (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Initialized backend runtimes");
+}
+
+static void main_backend_devices_init_pre (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Initializing backend devices. Please be patient...");
+}
+
+static void main_backend_devices_init_post (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
+{
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  if (user_options->quiet == true) return;
+
+  event_log_info_nn (hashcat_ctx, "Initialized backend devices");
+}
+
 static void main_bridges_init_pre (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
 {
   const user_options_t *user_options = hashcat_ctx->user_options;
@@ -1219,6 +1271,10 @@ static void event (const u32 id, hashcat_ctx_t *hashcat_ctx, const void *buf, co
     case EVENT_SELFTEST_STARTING:         main_selftest_starting         (hashcat_ctx, buf, len); break;
     case EVENT_AUTODETECT_FINISHED:       main_autodetect_finished       (hashcat_ctx, buf, len); break;
     case EVENT_AUTODETECT_STARTING:       main_autodetect_starting       (hashcat_ctx, buf, len); break;
+    case EVENT_BACKEND_RUNTIMES_INIT_POST:main_backend_runtimes_init_post(hashcat_ctx, buf, len); break;
+    case EVENT_BACKEND_RUNTIMES_INIT_PRE: main_backend_runtimes_init_pre (hashcat_ctx, buf, len); break;
+    case EVENT_BACKEND_DEVICES_INIT_POST: main_backend_devices_init_post (hashcat_ctx, buf, len); break;
+    case EVENT_BACKEND_DEVICES_INIT_PRE:  main_backend_devices_init_pre  (hashcat_ctx, buf, len); break;
     case EVENT_BITMAP_INIT_POST:          main_bitmap_init_post          (hashcat_ctx, buf, len); break;
     case EVENT_BITMAP_INIT_PRE:           main_bitmap_init_pre           (hashcat_ctx, buf, len); break;
     case EVENT_BITMAP_FINAL_OVERFLOW:     main_bitmap_final_overflow     (hashcat_ctx, buf, len); break;
@@ -1385,7 +1441,7 @@ int main (int argc, char **argv)
 
       rc_final = 0;
     }
-    else if (user_options->hash_info == true)
+    else if (user_options->hash_info > 0)
     {
       hash_info (hashcat_ctx);
 
