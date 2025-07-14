@@ -37,6 +37,14 @@ endif
 
 ifeq ($(DEBUG),1)
 $(info "## Detected Operating System : $(UNAME)")
+$(info "## Detected CC : $(CC)")
+$(info "## Detected CXX : $(CXX)")
+endif
+
+BUILD_MODE := native
+
+ifneq ($(filter binaries linux host_linux modules_linux bridges_linux win host_win modules_win bridges_win,$(MAKECMDGOALS)),)
+  BUILD_MODE := cross
 endif
 
 ##
@@ -77,8 +85,11 @@ AR                      := /usr/bin/ar
 SED                     := /usr/bin/sed
 SED_IN_PLACE            := -i ""
 DARWIN_VERSION          := $(shell uname -r | cut -d. -f1)
-IS_APPLE_SILICON        := $(shell lipo /bin/zsh -verify_arch arm64e && echo 1 || echo 0)
+IS_APPLE_SILICON        := $(shell [ "$$(sysctl -in hw.optional.arm64 2>/dev/null)" = "1" ] && echo 1 || echo 0)
 endif
+
+IS_AARCH64              := $(shell [ "$$(arch 2>/dev/null)" = "aarch64" ] && echo 1 || echo 0)
+IS_ARM                  := $(or $(filter 1,$(IS_APPLE_SILICON)),$(filter 1,$(IS_AARCH64)))
 
 ifneq (,$(filter $(UNAME),FreeBSD NetBSD))
 CC                      := cc
@@ -191,15 +202,17 @@ CFLAGS                  += -Wextra
 endif
 
 ## because LZMA SDK
-ifeq ($(CC),clang)
-#No longer supported in clang 10.0.0
-#CFLAGS                  += -Wno-enum-conversion
+ifneq (,$(findstring clang, $(CC)))
 CFLAGS                  += -Wno-typedef-redefinition
+else
+ifeq ($(CC),cc)
+CFLAGS                  += -Wno-typedef-redefinition
+endif
 endif
 
 ifeq ($(USE_SYSTEM_LZMA),0)
 CFLAGS_LZMA             += -D_7ZIP_ST
-ifneq ($(CC),clang)
+ifeq (,$(findstring clang, $(CC)))
 CFLAGS_LZMA             += -Wno-misleading-indentation
 endif
 endif
@@ -211,6 +224,9 @@ CFLAGS_ZLIB             += -Wno-implicit-function-declaration
 CFLAGS_ZLIB             += -Wno-unused-parameter
 CFLAGS_ZLIB             += -DIOAPI_NO_64
 CFLAGS_ZLIB             += -DUNZ_BUFSIZE=262144
+ifneq (,$(findstring clang, $(CC)))
+CFLAGS_ZLIB             += -Wno-deprecated-non-prototype -Wno-unknown-warning-option
+endif
 endif
 
 ## because UNRAR
@@ -223,6 +239,10 @@ ifneq ($(CC),clang)
 CFLAGS_UNRAR            += -Wno-class-memaccess
 CFLAGS_UNRAR            += -Wno-misleading-indentation
 CFLAGS_UNRAR            += -Wno-format-overflow
+else
+ifeq ($(IS_APPLE_SILICON),0)
+CFLAGS_UNRAR            += -Wno-nontrivial-memcall
+endif
 endif
 CFLAGS_UNRAR            += -Wno-missing-braces
 CFLAGS_UNRAR            += -Wno-unused-variable
@@ -345,7 +365,7 @@ LFLAGS_NATIVE           += -lpthread
 endif # NetBSD
 
 ifeq ($(UNAME),Darwin)
-export MACOSX_DEPLOYMENT_TARGET=10.15
+export MACOSX_DEPLOYMENT_TARGET=15.0
 CFLAGS_NATIVE           := $(CFLAGS)
 CFLAGS_NATIVE           += -DWITH_HWMON
 
@@ -363,8 +383,6 @@ LFLAGS_NATIVE           += -lpthread
 LFLAGS_NATIVE           += -liconv
 
 ifeq ($(IS_APPLE_SILICON),1)
-CFLAGS_NATIVE           += -DSSE2NEON_SUPPRESS_WARNINGS
-CFLAGS_NATIVE           += -I$(DEPS_SSE2NEON)
 CFLAGS_NATIVE           += -arch arm64
 CFLAGS_NATIVE           += -arch x86_64
 ifeq ($(SHARED),1)
@@ -374,6 +392,11 @@ endif
 endif
 
 endif # Darwin
+
+ifeq ($(IS_ARM),1)
+CFLAGS_NATIVE           += -DSSE2NEON_SUPPRESS_WARNINGS
+CFLAGS_NATIVE           += -I$(DEPS_SSE2NEON)
+endif
 
 ifeq ($(UNAME),CYGWIN)
 CFLAGS_NATIVE           := $(CFLAGS)
@@ -781,12 +804,9 @@ CXX_WIN                 := x86_64-w64-mingw32-g++
 AR_LINUX                := ar
 AR_WIN                  := x86_64-w64-mingw32-ar
 
-## To compile win-iconv with mingw clone from here: https://github.com/win-iconv/win-iconv
-##
-## Then patch the makefile with the patches from tools/win-iconv-64.diff and run make install
-##
-
+# See BUILD_WSL.md to make these
 WIN_ICONV               := /opt/win-iconv-64
+WIN_PYTHON              := /opt/win-python
 
 ##
 ## Compiler options
@@ -799,7 +819,6 @@ CFLAGS_CROSS_WIN        := $(CFLAGS)
 CFLAGS_CROSS_WIN        += -fPIC
 CFLAGS_CROSS_WIN        += -I$(WIN_ICONV)/include/
 CFLAGS_CROSS_WIN        += -DWITH_HWMON
-CFLAGS_CROSS_WIN        += -D__USE_MINGW_ANSI_STDIO=0
 
 LFLAGS_CROSS_LINUX      := $(LFLAGS)
 LFLAGS_CROSS_LINUX      += -lpthread
@@ -824,11 +843,11 @@ CFLAGS_LZMA_WIN         += -Wno-misleading-indentation
 
 CFLAGS_UNRAR_WIN        += -Wno-misleading-indentation
 CFLAGS_UNRAR_WIN        += -Wno-class-memaccess
+endif
 
-ifeq ($(IS_APPLE_SILICON),1)
+ifeq ($(IS_ARM),1)
 CFLAGS_CROSS_LINUX      += -DSSE2NEON_SUPPRESS_WARNINGS
 CFLAGS_CROSS_LINUX      += -I$(DEPS_SSE2NEON)
-endif
 endif
 
 ##
@@ -843,7 +862,7 @@ binaries: win
 host_win:   hashcat.exe
 
 .PHONY: win
-win:   host_win   modules_win
+win:   host_win   modules_win   bridges_win
 else
 .PHONY: binaries
 binaries: linux win

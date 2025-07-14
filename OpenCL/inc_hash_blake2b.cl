@@ -24,7 +24,7 @@ DECLSPEC u64 blake2b_rot16_S (const u64 a)
 
   return out.v64;
 
-  #elif (defined IS_AMD || defined IS_HIP) && HAS_VPERM == 1
+  #elif (defined IS_AMD || defined IS_HIP)
 
   vconv64_t in;
 
@@ -98,7 +98,7 @@ DECLSPEC u64 blake2b_rot24_S (const u64 a)
 
   return out.v64;
 
-  #elif (defined IS_AMD || defined IS_HIP) && HAS_VPERM == 1
+  #elif (defined IS_AMD || defined IS_HIP)
 
   vconv64_t in;
 
@@ -409,7 +409,7 @@ DECLSPEC void blake2b_update (PRIVATE_AS blake2b_ctx_t *ctx, PRIVATE_AS const u3
   u32 w6[4];
   u32 w7[4];
 
-  const int limit = (const int) len - 128; // int type needed, could be negative
+  const int limit = len - 128; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -499,7 +499,7 @@ DECLSPEC void blake2b_update_global (PRIVATE_AS blake2b_ctx_t *ctx, GLOBAL_AS co
   u32 w6[4];
   u32 w7[4];
 
-  const int limit = (const int) len - 128; // int type needed, could be negative
+  const int limit = len - 128; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -580,7 +580,7 @@ DECLSPEC void blake2b_update_global (PRIVATE_AS blake2b_ctx_t *ctx, GLOBAL_AS co
 
 DECLSPEC void blake2b_final (PRIVATE_AS blake2b_ctx_t *ctx)
 {
-  blake2b_transform (ctx->h, ctx->m, ctx->len, BLAKE2B_FINAL);
+  blake2b_transform (ctx->h, ctx->m, ctx->len, (u64) BLAKE2B_FINAL);
 }
 
 DECLSPEC void blake2b_transform_vector (PRIVATE_AS u64x *h, PRIVATE_AS const u64x *m, const u32x len, const u64 f0)
@@ -813,7 +813,7 @@ DECLSPEC void blake2b_update_vector (PRIVATE_AS blake2b_ctx_vector_t *ctx, PRIVA
   u32x w6[4];
   u32x w7[4];
 
-  const int limit = (const int) len - 128; // int type needed, could be negative
+  const int limit = len - 128; // int type needed, could be negative
 
   int pos1;
   int pos4;
@@ -894,5 +894,5 @@ DECLSPEC void blake2b_update_vector (PRIVATE_AS blake2b_ctx_vector_t *ctx, PRIVA
 
 DECLSPEC void blake2b_final_vector (PRIVATE_AS blake2b_ctx_vector_t *ctx)
 {
-  blake2b_transform_vector (ctx->h, ctx->m, (u32x) ctx->len, BLAKE2B_FINAL);
+  blake2b_transform_vector (ctx->h, ctx->m, (u32x) ctx->len, (u64) BLAKE2B_FINAL);
 }

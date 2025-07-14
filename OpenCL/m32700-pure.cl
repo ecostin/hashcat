@@ -41,7 +41,7 @@ CONSTANT_VK u32 newdes_rotor[256] =
   0x3a, 0x37, 0x03, 0xf4, 0x61, 0xc5, 0xee, 0xe3, 0x76, 0x31, 0x4f, 0xe6, 0xdf, 0xa5, 0x99, 0x3b,
 };
 
-DECLSPEC void new_des (u32 *block, u32 *newdes_key)
+DECLSPEC void new_des (PRIVATE_AS u32 *block, PRIVATE_AS u32 *newdes_key)
 {
   #define B0 (*(block+0))
   #define B1 (*(block+1))
@@ -71,7 +71,7 @@ DECLSPEC void new_des (u32 *block, u32 *newdes_key)
   B7 = B7 ^ newdes_rotor[B3 ^ *(newdes_key++)];
 }
 
-DECLSPEC void key_expansion (const u8 *sha1sum, u32 *result)
+DECLSPEC void key_expansion (PRIVATE_AS const u8 *sha1sum, PRIVATE_AS u32 *result)
 {
   for (int count = 0; count < 15; count++)
   {
@@ -120,7 +120,7 @@ DECLSPEC void sha1_final_32700 (PRIVATE_AS sha1_ctx_t *ctx)
   sha1_transform (ctx->w0, ctx->w1, ctx->w2, ctx->w3, ctx->h);
 }
 
-KERNEL_FQ void m32700_init (KERN_ATTR_TMPS (sha1_tmp_t))
+KERNEL_FQ KERNEL_FA void m32700_init (KERN_ATTR_TMPS (sha1_tmp_t))
 {
   const u64 gid = get_global_id (0);
 
@@ -143,7 +143,7 @@ KERNEL_FQ void m32700_init (KERN_ATTR_TMPS (sha1_tmp_t))
   // Crate a NewDES key
   u32 newdes_key32[60];
 
-  key_expansion ((const u8 *) ctx.h, newdes_key32);
+  key_expansion ((PRIVATE_AS const u8 *) ctx.h, newdes_key32);
 
   for (int i = 0; i < 60; i++)
   {
@@ -161,7 +161,7 @@ KERNEL_FQ void m32700_init (KERN_ATTR_TMPS (sha1_tmp_t))
   }
 }
 
-KERNEL_FQ void m32700_loop (KERN_ATTR_TMPS (sha1_tmp_t))
+KERNEL_FQ KERNEL_FA void m32700_loop (KERN_ATTR_TMPS (sha1_tmp_t))
 {
   const u64 gid = get_global_id (0);
 
@@ -182,7 +182,7 @@ KERNEL_FQ void m32700_loop (KERN_ATTR_TMPS (sha1_tmp_t))
   }
 
   // Run 1000 iterations of NewDES on the derived salt
-  for (int i = 0; i < LOOP_CNT; i++)
+  for (u32 i = 0; i < LOOP_CNT; i++)
   {
     new_des (salt32, newdes_key32);
   }
@@ -193,7 +193,7 @@ KERNEL_FQ void m32700_loop (KERN_ATTR_TMPS (sha1_tmp_t))
   }
 }
 
-KERNEL_FQ void m32700_comp (KERN_ATTR_TMPS (sha1_tmp_t))
+KERNEL_FQ KERNEL_FA void m32700_comp (KERN_ATTR_TMPS (sha1_tmp_t))
 {
   const u64 gid = get_global_id (0);
 

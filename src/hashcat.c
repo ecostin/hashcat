@@ -730,6 +730,12 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
   if (hashes_init_selftest (hashcat_ctx) == -1) return -1;
 
   /**
+   * load hashes, post automatisation
+   */
+
+  if (hashes_init_stage5 (hashcat_ctx) == -1) return -1;
+
+  /**
    * load hashes, benchmark
    */
 
@@ -789,7 +795,7 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
   {
     if ((mask_ctx->masks_cnt > 1) || (straight_ctx->dicts_cnt > 1))
     {
-      event_log_error (hashcat_ctx, "Use of --skip/--limit is not supported with --increment, mask files, or --stdout.");
+      event_log_error (hashcat_ctx, "Use of --skip/--limit is not supported with --increment, mask files, multiple dictionaries, or --stdout.");
 
       return -1;
     }
@@ -1254,7 +1260,7 @@ int hashcat_session_init (hashcat_ctx_t *hashcat_ctx, const char *install_folder
    * To help users a bit
    */
 
-  setup_environment_variables (hashcat_ctx->folder_config);
+  setup_environment_variables (hashcat_ctx->folder_config, hashcat_ctx->user_options);
 
   setup_umask ();
 
@@ -1333,13 +1339,21 @@ int hashcat_session_init (hashcat_ctx_t *hashcat_ctx, const char *install_folder
    * Init backend library loader
    */
 
+  EVENT (EVENT_BACKEND_RUNTIMES_INIT_PRE);
+
   if (backend_ctx_init (hashcat_ctx) == -1) return -1;
+
+  EVENT (EVENT_BACKEND_RUNTIMES_INIT_POST);
 
   /**
    * Init backend devices
    */
 
+  EVENT (EVENT_BACKEND_DEVICES_INIT_PRE);
+
   if (backend_ctx_devices_init (hashcat_ctx, comptime) == -1) return -1;
+
+  EVENT (EVENT_BACKEND_DEVICES_INIT_POST);
 
   /**
    * HM devices: init
@@ -1467,6 +1481,8 @@ bool autodetect_hashmode_test (hashcat_ctx_t *hashcat_ctx)
   if (hashlist_mode == HL_MODE_ARG)
   {
     char *input_buf = user_options_extra->hc_hash;
+
+    if (!input_buf) return false;
 
     size_t input_len = strlen (input_buf);
 

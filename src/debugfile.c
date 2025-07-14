@@ -76,6 +76,11 @@ void debugfile_write_append (hashcat_ctx_t *hashcat_ctx, const u8 *rule_buf, con
     if ((debug_mode == 3) || (debug_mode == 4) || (debug_mode == 5)) hc_fputc (':', &debugfile_ctx->fp);
   }
 
+  if (hc_lockfile (&debugfile_ctx->fp) == -1)
+  {
+    event_log_error (hashcat_ctx, "%s: Failed to lock file.", debugfile_ctx->filename);
+  }
+
   hc_fwrite (rule_buf, rule_len, 1, &debugfile_ctx->fp);
 
   if ((debug_mode == 4) || (debug_mode == 5))
@@ -104,6 +109,13 @@ void debugfile_write_append (hashcat_ctx_t *hashcat_ctx, const u8 *rule_buf, con
   }
 
   hc_fwrite (EOL, strlen (EOL), 1, &debugfile_ctx->fp);
+
+  hc_fflush (&debugfile_ctx->fp);
+
+  if (hc_unlockfile (&debugfile_ctx->fp))
+  {
+    event_log_error (hashcat_ctx, "%s: Failed to unlock file.", debugfile_ctx->filename);
+  }
 }
 
 int debugfile_init (hashcat_ctx_t *hashcat_ctx)
@@ -118,9 +130,9 @@ int debugfile_init (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->usage          > 0)    return 0;
   if (user_options->backend_info   > 0)    return 0;
+  if (user_options->hash_info      > 0)    return 0;
 
   if (user_options->benchmark     == true) return 0;
-  if (user_options->hash_info     == true) return 0;
   if (user_options->keyspace      == true) return 0;
   if (user_options->left          == true) return 0;
   if (user_options->show          == true) return 0;
@@ -150,15 +162,6 @@ int debugfile_init (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
-  if (hc_lockfile (&debugfile_ctx->fp) == -1)
-  {
-    hc_fclose (&debugfile_ctx->fp);
-
-    event_log_error (hashcat_ctx, "%s: %s", debugfile_ctx->filename, strerror (errno));
-
-    return -1;
-  }
-
   return 0;
 }
 
@@ -170,8 +173,6 @@ void debugfile_destroy (hashcat_ctx_t *hashcat_ctx)
 
   if (debugfile_ctx->filename)
   {
-    hc_unlockfile (&debugfile_ctx->fp);
-
     hc_fclose (&debugfile_ctx->fp);
   }
 

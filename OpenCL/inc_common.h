@@ -124,9 +124,10 @@
 
 #if defined IS_METAL
 #define KERN_ATTR_MAIN_PARAMS                       \
-  uint hc_gid [[ thread_position_in_grid ]],        \
-  uint hc_lid [[ thread_position_in_threadgroup ]], \
-  uint hc_lsz [[ threads_per_threadgroup ]]
+  uint3 hc_gid [[ thread_position_in_grid ]],        \
+  uint3 hc_lid [[ thread_position_in_threadgroup ]], \
+  uint3 hc_lsz [[ threads_per_threadgroup ]],        \
+  uint3 hc_bid [[ threadgroup_position_in_grid ]]
 #endif // IS_METAL
 
 /*
@@ -283,6 +284,11 @@ DECLSPEC u32  hc_bfe_S          (const u32  a, const u32  b, const u32  c);
 DECLSPEC u32x hc_lop_0x96       (const u32x a, const u32x b, const u32x c);
 DECLSPEC u32  hc_lop_0x96_S     (const u32  a, const u32  b, const u32  c);
 
+// arithmetic operations
+
+DECLSPEC u32  hc_umulhi (const u32 x, const u32 y);
+DECLSPEC u32  hc_umullo (const u32 x, const u32 y);
+
 // legacy common code
 
 DECLSPEC int ffz (const u32 v);
@@ -298,6 +304,8 @@ DECLSPEC void hc_enc_init (PRIVATE_AS hc_enc_t *hc_enc);
 DECLSPEC int hc_enc_has_next (PRIVATE_AS hc_enc_t *hc_enc, const int sz);
 DECLSPEC int hc_enc_next (PRIVATE_AS hc_enc_t *hc_enc, PRIVATE_AS const u32 *src_buf, const int src_len, const int src_sz, PRIVATE_AS u32 *dst_buf, const int dst_sz);
 DECLSPEC int hc_enc_next_global (PRIVATE_AS hc_enc_t *hc_enc, GLOBAL_AS const u32 *src_buf, const int src_len, const int src_sz, PRIVATE_AS u32 *dst_buf, const int dst_sz);
+DECLSPEC int hc_enc_validate_utf8 (PRIVATE_AS const u32 *src_buf, const int src_pos, const int extraBytesToRead);
+DECLSPEC int hc_enc_validate_utf8_global (GLOBAL_AS const u32 *src_buf, const int src_pos, const int extraBytesToRead);
 
 DECLSPEC int pkcs_padding_bs8 (PRIVATE_AS const u32 *data_buf, const int data_len);
 DECLSPEC int pkcs_padding_bs16 (PRIVATE_AS const u32 *data_buf, const int data_len);
@@ -353,6 +361,7 @@ DECLSPEC void append_0x01_2x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, const u
 DECLSPEC void append_0x06_2x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, const u32 offset);
 DECLSPEC void append_0x01_4x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 offset);
 DECLSPEC void append_0x2d_4x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 offset);
+DECLSPEC void append_0x3a_4x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, const u32 offset);
 DECLSPEC void append_0x80_1x4_S (PRIVATE_AS u32 *w0, const u32 offset);
 DECLSPEC void append_0x80_2x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, const u32 offset);
 DECLSPEC void append_0x80_3x4_S (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, const u32 offset);
@@ -380,5 +389,6 @@ DECLSPEC void append_0x06_2x4_VV (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, cons
 DECLSPEC void append_0x80_2x4_VV (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, const u32x offset);
 DECLSPEC void append_0x80_4x4_VV (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, const u32x offset);
 DECLSPEC void append_0x2d_4x4_VV (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, const u32x offset);
+DECLSPEC void append_0x3a_4x4_VV (PRIVATE_AS u32x *w0, PRIVATE_AS u32x *w1, PRIVATE_AS u32x *w2, PRIVATE_AS u32x *w3, const u32x offset);
 
 #endif // INC_COMMON_H

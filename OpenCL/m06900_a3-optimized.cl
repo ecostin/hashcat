@@ -1050,7 +1050,7 @@ DECLSPEC void m06900s (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
   }
 }
 
-KERNEL_FQ void m06900_m04 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_m04 (KERN_ATTR_BASIC ())
 {
   /**
    * base
@@ -1119,7 +1119,7 @@ KERNEL_FQ void m06900_m04 (KERN_ATTR_BASIC ())
   m06900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }
 
-KERNEL_FQ void m06900_m08 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_m08 (KERN_ATTR_BASIC ())
 {
   /**
    * base
@@ -1188,11 +1188,76 @@ KERNEL_FQ void m06900_m08 (KERN_ATTR_BASIC ())
   m06900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }
 
-KERNEL_FQ void m06900_m16 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_m16 (KERN_ATTR_BASIC ())
 {
+  /**
+   * base
+   */
+
+  const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
+
+  /**
+   * sbox
+   */
+
+  LOCAL_VK u32 s_tables[4][256];
+
+  for (u32 i = lid; i < 256; i += lsz)
+  {
+    s_tables[0][i] = c_tables[0][i];
+    s_tables[1][i] = c_tables[1][i];
+    s_tables[2][i] = c_tables[2][i];
+    s_tables[3][i] = c_tables[3][i];
+  }
+
+  SYNC_THREADS ();
+
+  if (gid >= GID_CNT) return;
+
+  /**
+   * modifier
+   */
+
+  u32 w0[4];
+
+  w0[0] = pws[gid].i[ 0];
+  w0[1] = pws[gid].i[ 1];
+  w0[2] = pws[gid].i[ 2];
+  w0[3] = pws[gid].i[ 3];
+
+  u32 w1[4];
+
+  w1[0] = pws[gid].i[ 4];
+  w1[1] = pws[gid].i[ 5];
+  w1[2] = pws[gid].i[ 6];
+  w1[3] = pws[gid].i[ 7];
+
+  u32 w2[4]; // no change here, because m06900m() doesn't support > 32, but we need a _m16 kernel because hashcat will call _m16 if pw_len >= 32
+
+  w2[0] = 0;
+  w2[1] = 0;
+  w2[2] = 0;
+  w2[3] = 0;
+
+  u32 w3[4];
+
+  w3[0] = 0;
+  w3[1] = 0;
+  w3[2] = 0;
+  w3[3] = 0;
+
+  const u32 pw_len = pws[gid].pw_len & 63;
+
+  /**
+   * main
+   */
+
+  m06900m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }
 
-KERNEL_FQ void m06900_s04 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_s04 (KERN_ATTR_BASIC ())
 {
   /**
    * base
@@ -1261,7 +1326,7 @@ KERNEL_FQ void m06900_s04 (KERN_ATTR_BASIC ())
   m06900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }
 
-KERNEL_FQ void m06900_s08 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_s08 (KERN_ATTR_BASIC ())
 {
   /**
    * base
@@ -1330,6 +1395,71 @@ KERNEL_FQ void m06900_s08 (KERN_ATTR_BASIC ())
   m06900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }
 
-KERNEL_FQ void m06900_s16 (KERN_ATTR_BASIC ())
+KERNEL_FQ KERNEL_FA void m06900_s16 (KERN_ATTR_BASIC ())
 {
+  /**
+   * base
+   */
+
+  const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
+
+  /**
+   * sbox
+   */
+
+  LOCAL_VK u32 s_tables[4][256];
+
+  for (u32 i = lid; i < 256; i += lsz)
+  {
+    s_tables[0][i] = c_tables[0][i];
+    s_tables[1][i] = c_tables[1][i];
+    s_tables[2][i] = c_tables[2][i];
+    s_tables[3][i] = c_tables[3][i];
+  }
+
+  SYNC_THREADS ();
+
+  if (gid >= GID_CNT) return;
+
+  /**
+   * modifier
+   */
+
+  u32 w0[4];
+
+  w0[0] = pws[gid].i[ 0];
+  w0[1] = pws[gid].i[ 1];
+  w0[2] = pws[gid].i[ 2];
+  w0[3] = pws[gid].i[ 3];
+
+  u32 w1[4];
+
+  w1[0] = pws[gid].i[ 4];
+  w1[1] = pws[gid].i[ 5];
+  w1[2] = pws[gid].i[ 6];
+  w1[3] = pws[gid].i[ 7];
+
+  u32 w2[4]; // no change here, because m06900s() doesn't support > 32, but we need a _s16 kernel because hashcat will call _s16 if pw_len >= 32
+
+  w2[0] = 0;
+  w2[1] = 0;
+  w2[2] = 0;
+  w2[3] = 0;
+
+  u32 w3[4];
+
+  w3[0] = 0;
+  w3[1] = 0;
+  w3[2] = 0;
+  w3[3] = 0;
+
+  const u32 pw_len = pws[gid].pw_len & 63;
+
+  /**
+   * main
+   */
+
+  m06900s (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, bfs_buf, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, s_tables);
 }

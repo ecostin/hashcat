@@ -410,6 +410,17 @@ size_t hc_fread (void *ptr, size_t size, size_t nmemb, HCFILE *fp)
   else if (fp->gfp)
   {
     n = gzfread (ptr, size, nmemb, fp->gfp);
+
+    // Double check to make sure that it successfully read 0 bytes instead of erroring
+    if (n == 0)
+    {
+      int errnum;
+      gzerror (fp->gfp, &errnum);
+      if (errnum != Z_OK)
+      {
+        return (size_t) -1;
+      }
+    }
   }
   else if (fp->ufp)
   {
@@ -579,7 +590,18 @@ int hc_fseek (HCFILE *fp, off_t offset, int whence)
   }
   else if (fp->xfp)
   {
-    /* TODO */
+    /* XZ files are compressed streams, seeking is limited */
+    if (offset == 0 && whence == SEEK_SET)
+    {
+      /* Rewind to beginning */
+      hc_rewind(fp);
+      r = 0;
+    }
+    else
+    {
+      /* Arbitrary seeking not supported for compressed XZ files */
+      r = -1;
+    }
   }
 
   return r;

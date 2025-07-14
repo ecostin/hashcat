@@ -21,9 +21,9 @@
 #endif
 
 #ifdef WITH_BRAIN
-static const char *const short_options = "hVvm:a:r:j:k:g:o:t:d:D:n:u:T:c:p:s:l:1:2:3:4:iIbw:OMSY:R:z";
+static const char *const short_options = "hHVvm:a:r:j:k:g:o:t:d:D:n:u:T:c:p:s:l:1:2:3:4:5:6:7:8:iIbw:OMSY:R:z";
 #else
-static const char *const short_options = "hVvm:a:r:j:k:g:o:t:d:D:n:u:T:c:p:s:l:1:2:3:4:iIbw:OMSY:R:";
+static const char *const short_options = "hHVvm:a:r:j:k:g:o:t:d:D:n:u:T:c:p:s:l:1:2:3:4:5:6:7:8:iIbw:OMSY:R:";
 #endif
 
 static char *const SEPARATOR = ":";
@@ -34,7 +34,8 @@ static const struct option long_options[] =
   {"attack-mode",               required_argument, NULL, IDX_ATTACK_MODE},
   {"backend-devices",           required_argument, NULL, IDX_BACKEND_DEVICES},
   {"backend-devices-virtmulti", required_argument, NULL, IDX_BACKEND_DEVICES_VIRTMULTI},
-  {"backend-devices-virthost",  required_argument, NULL, IDX_BACKEND_DEVICES_VIRTHOST},  
+  {"backend-devices-virthost",  required_argument, NULL, IDX_BACKEND_DEVICES_VIRTHOST},
+  {"backend-devices-keepfree",  required_argument, NULL, IDX_BACKEND_DEVICES_KEEPFREE},
   {"backend-ignore-cuda",       no_argument,       NULL, IDX_BACKEND_IGNORE_CUDA},
   {"backend-ignore-hip",        no_argument,       NULL, IDX_BACKEND_IGNORE_HIP},
   #if defined (__APPLE__)
@@ -58,6 +59,10 @@ static const struct option long_options[] =
   {"custom-charset2",           required_argument, NULL, IDX_CUSTOM_CHARSET_2},
   {"custom-charset3",           required_argument, NULL, IDX_CUSTOM_CHARSET_3},
   {"custom-charset4",           required_argument, NULL, IDX_CUSTOM_CHARSET_4},
+  {"custom-charset5",           required_argument, NULL, IDX_CUSTOM_CHARSET_5},
+  {"custom-charset6",           required_argument, NULL, IDX_CUSTOM_CHARSET_6},
+  {"custom-charset7",           required_argument, NULL, IDX_CUSTOM_CHARSET_7},
+  {"custom-charset8",           required_argument, NULL, IDX_CUSTOM_CHARSET_8},
   {"debug-file",                required_argument, NULL, IDX_DEBUG_FILE},
   {"debug-mode",                required_argument, NULL, IDX_DEBUG_MODE},
   {"deprecated-check-disable",  no_argument,       NULL, IDX_DEPRECATED_CHECK_DISABLE},
@@ -162,6 +167,7 @@ static const struct option long_options[] =
   {"brain-session",             required_argument, NULL, IDX_BRAIN_SESSION},
   {"brain-session-whitelist",   required_argument, NULL, IDX_BRAIN_SESSION_WHITELIST},
   #endif
+  {"color-cracked",             no_argument,       NULL, IDX_COLOR_CRACKED},
   {NULL,                        0,                 NULL, 0 }
 };
 
@@ -185,6 +191,7 @@ int user_options_init (hashcat_ctx_t *hashcat_ctx)
   user_options->backend_devices           = NULL;
   user_options->backend_devices_virtmulti = BACKEND_DEVICES_VIRTMULTI;
   user_options->backend_devices_virthost  = BACKEND_DEVICES_VIRTHOST;
+  user_options->backend_devices_keepfree  = BACKEND_DEVICES_KEEPFREE;
   user_options->backend_ignore_cuda       = BACKEND_IGNORE_CUDA;
   user_options->backend_ignore_hip        = BACKEND_IGNORE_HIP;
   #if defined (__APPLE__)
@@ -209,6 +216,7 @@ int user_options_init (hashcat_ctx_t *hashcat_ctx)
   user_options->brain_session             = BRAIN_SESSION;
   user_options->brain_session_whitelist   = NULL;
   #endif
+  user_options->color_cracked             = COLOR_CRACKED;
   user_options->bridge_parameter1         = NULL;
   user_options->bridge_parameter2         = NULL;
   user_options->bridge_parameter3         = NULL;
@@ -218,6 +226,10 @@ int user_options_init (hashcat_ctx_t *hashcat_ctx)
   user_options->custom_charset_2          = NULL;
   user_options->custom_charset_3          = NULL;
   user_options->custom_charset_4          = NULL;
+  user_options->custom_charset_5          = NULL;
+  user_options->custom_charset_6          = NULL;
+  user_options->custom_charset_7          = NULL;
+  user_options->custom_charset_8          = NULL;
   user_options->debug_file                = NULL;
   user_options->debug_mode                = DEBUG_MODE;
   user_options->deprecated_check          = DEPRECATED_CHECK;
@@ -324,6 +336,11 @@ void user_options_destroy (hashcat_ctx_t *hashcat_ctx)
 
   hcfree (user_options->rp_files);
 
+  if (user_options->backend_info > 0)
+  {
+    hcfree (user_options->opencl_device_types);
+  }
+
   //do not reset this, it might be used from main.c
   //memset (user_options, 0, sizeof (user_options_t));
 }
@@ -379,7 +396,8 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_INCREMENT_MAX:
       case IDX_HOOK_THREADS:
       case IDX_BACKEND_DEVICES_VIRTMULTI:
-      case IDX_BACKEND_DEVICES_VIRTHOST:      
+      case IDX_BACKEND_DEVICES_VIRTHOST:
+      case IDX_BACKEND_DEVICES_KEEPFREE:
       case IDX_BENCHMARK_MAX:
       case IDX_BENCHMARK_MIN:
       #ifdef WITH_BRAIN
@@ -434,7 +452,7 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_ENCODING_TO:               user_options->encoding_to               = optarg;                          break;
       case IDX_INDUCTION_DIR:             user_options->induction_dir             = optarg;                          break;
       case IDX_OUTFILE_CHECK_DIR:         user_options->outfile_check_dir         = optarg;                          break;
-      case IDX_HASH_INFO:                 user_options->hash_info                 = true;                            break;
+      case IDX_HASH_INFO:                 user_options->hash_info++;                                                 break;
       case IDX_FORCE:                     user_options->force                     = true;                            break;
       case IDX_SELF_TEST_DISABLE:         user_options->self_test                 = false;                           break;
       case IDX_SKIP:                      user_options->skip                      = hc_strtoull (optarg, NULL, 10);
@@ -461,7 +479,8 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_STATUS_TIMER:              user_options->status_timer              = hc_strtoul (optarg, NULL, 10);   break;
       case IDX_MACHINE_READABLE:          user_options->machine_readable          = true;                            break;
       case IDX_LOOPBACK:                  user_options->loopback                  = true;                            break;
-      case IDX_SESSION:                   user_options->session                   = optarg;                          break;
+      case IDX_SESSION:                   user_options->session                   = optarg;
+                                          user_options->session_chgd              = true;                            break;
       case IDX_HASH_MODE:                 user_options->hash_mode                 = hc_strtoul (optarg, NULL, 10);
                                           user_options->hash_mode_chgd            = true;                            break;
       case IDX_RUNTIME:                   user_options->runtime                   = hc_strtoul (optarg, NULL, 10);
@@ -512,6 +531,7 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_BACKEND_DEVICES:           user_options->backend_devices           = optarg;                          break;
       case IDX_BACKEND_DEVICES_VIRTMULTI: user_options->backend_devices_virtmulti = hc_strtoul (optarg, NULL, 10);   break;
       case IDX_BACKEND_DEVICES_VIRTHOST:  user_options->backend_devices_virthost  = hc_strtoul (optarg, NULL, 10);   break;
+      case IDX_BACKEND_DEVICES_KEEPFREE:  user_options->backend_devices_keepfree  = hc_strtoul (optarg, NULL, 10);   break;
       case IDX_BACKEND_VECTOR_WIDTH:      user_options->backend_vector_width      = hc_strtoul (optarg, NULL, 10);
                                           user_options->backend_vector_width_chgd = true;                            break;
       case IDX_OPENCL_DEVICE_TYPES:       user_options->opencl_device_types       = optarg;                          break;
@@ -559,6 +579,10 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_CUSTOM_CHARSET_2:          user_options->custom_charset_2          = optarg;                          break;
       case IDX_CUSTOM_CHARSET_3:          user_options->custom_charset_3          = optarg;                          break;
       case IDX_CUSTOM_CHARSET_4:          user_options->custom_charset_4          = optarg;                          break;
+      case IDX_CUSTOM_CHARSET_5:          user_options->custom_charset_5          = optarg;                          break;
+      case IDX_CUSTOM_CHARSET_6:          user_options->custom_charset_6          = optarg;                          break;
+      case IDX_CUSTOM_CHARSET_7:          user_options->custom_charset_7          = optarg;                          break;
+      case IDX_CUSTOM_CHARSET_8:          user_options->custom_charset_8          = optarg;                          break;
       case IDX_SLOW_CANDIDATES:           user_options->slow_candidates           = true;                            break;
       #ifdef WITH_BRAIN
       case IDX_BRAIN_CLIENT:              user_options->brain_client              = true;                            break;
@@ -575,6 +599,7 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_BRAIN_SESSION:             user_options->brain_session             = hc_strtoul (optarg, NULL, 16);   break;
       case IDX_BRAIN_SESSION_WHITELIST:   user_options->brain_session_whitelist   = optarg;                          break;
       #endif
+      case IDX_COLOR_CRACKED:             user_options->color_cracked             = true;                            break;
     }
   }
 
@@ -815,7 +840,14 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     event_log_error (hashcat_ctx, "Invalid --backend-devices-virthost value specified.");
 
     return -1;
-  }  
+  }
+
+  if (user_options->backend_devices_keepfree > 100)
+  {
+    event_log_error (hashcat_ctx, "Invalid --backend-devices-keepfree value specified.");
+
+    return -1;
+  }
 
   if (user_options->outfile_format == 0)
   {
@@ -979,6 +1011,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
+  if (user_options->bitmap_max > 31)
+  {
+    event_log_error (hashcat_ctx, "Invalid --bitmap-max value specified - must be lower than 32.");
+
+    return -1;
+  }
+
   if (user_options->rp_gen_func_min > user_options->rp_gen_func_max)
   {
     event_log_error (hashcat_ctx, "Invalid --rp-gen-func-min value specified.");
@@ -1034,7 +1073,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       return -1;
     }
 
-    if (user_options->kernel_loops > 1024)
+    if (user_options->kernel_loops > KERNEL_LOOPS_MAX)
     {
       event_log_error (hashcat_ctx, "Invalid kernel-loops specified.");
 
@@ -1086,11 +1125,25 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     }
   }
 
+  if (user_options->stdout_flag == true && user_options->slow_candidates == true)
+  {
+    event_log_error (hashcat_ctx, "Slow candidates (-S) is not allowed in stdout mode.");
+
+    return -1;
+  }
+
   if ((user_options->show == true) && ((user_options->username == true) || (user_options->dynamic_x == true)))
   {
     event_log_error (hashcat_ctx, "Mixing --show with --username or --dynamic-x can cause exponential delay in output.");
 
     return 0;
+  }
+
+  if (user_options->show == true && user_options->restore == true)
+  {
+    event_log_error (hashcat_ctx, "Mixing --show and --restore is not allowed.");
+
+    return -1;
   }
 
   if (user_options->show == true || user_options->left == true)
@@ -1248,6 +1301,11 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     }
   }
 
+  if (user_options->benchmark_all == true)
+  {
+    user_options->benchmark = true;
+  }
+
   if (user_options->benchmark == true)
   {
     // sanity checks based on automatically overwritten configuration variables by
@@ -1345,7 +1403,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       return -1;
     }
 
-    if (user_options->hash_info == true)
+    if (user_options->hash_info > 0)
     {
       event_log_error (hashcat_ctx, "Use of --hash-info is not allowed in benchmark mode.");
 
@@ -1373,6 +1431,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       return -1;
     }
 
+    if (user_options->backend_info > 0)
+    {
+      event_log_error (hashcat_ctx, "Use of --backend-info is not allowed in benchmark mode.");
+
+      return -1;
+    }
+
     if (user_options->spin_damp_chgd == true)
     {
       event_log_error (hashcat_ctx, "Can't change --spin-damp in benchmark mode.");
@@ -1383,7 +1448,11 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     if ((user_options->custom_charset_1 != NULL)
      || (user_options->custom_charset_2 != NULL)
      || (user_options->custom_charset_3 != NULL)
-     || (user_options->custom_charset_4 != NULL))
+     || (user_options->custom_charset_4 != NULL)
+     || (user_options->custom_charset_5 != NULL)
+     || (user_options->custom_charset_6 != NULL)
+     || (user_options->custom_charset_7 != NULL)
+     || (user_options->custom_charset_8 != NULL))
     {
       if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
       {
@@ -1530,6 +1599,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
+  if (user_options->hash_info > 2)
+  {
+    event_log_error (hashcat_ctx, "Invalid --hash-info/-H value, must have a value greater or equal to 0 and lower than 3.");
+
+    return -1;
+  }
+
   #ifdef WITH_BRAIN
   if ((user_options->brain_client == true) && (user_options->remove == true))
   {
@@ -1551,7 +1627,11 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
   if ((user_options->custom_charset_1 != NULL)
    || (user_options->custom_charset_2 != NULL)
    || (user_options->custom_charset_3 != NULL)
-   || (user_options->custom_charset_4 != NULL))
+   || (user_options->custom_charset_4 != NULL)
+   || (user_options->custom_charset_5 != NULL)
+   || (user_options->custom_charset_6 != NULL)
+   || (user_options->custom_charset_7 != NULL)
+   || (user_options->custom_charset_8 != NULL))
   {
     if (user_options->attack_mode == ATTACK_MODE_STRAIGHT)
     {
@@ -1624,7 +1704,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       show_error = false;
     }
   }
-  else if (user_options->hash_info == true)
+  else if (user_options->hash_info > 0)
   {
     if (user_options->hc_argc == 0)
     {
@@ -1822,7 +1902,7 @@ void user_options_session_auto (hashcat_ctx_t *hashcat_ctx)
       user_options->session = "benchmark";
     }
 
-    if (user_options->hash_info == true)
+    if (user_options->hash_info > 0)
     {
       user_options->session = "hash_info";
     }
@@ -1892,6 +1972,15 @@ void user_options_preprocess (hashcat_ctx_t *hashcat_ctx)
   }
   #endif
 
+  if (user_options->hwmon == false)
+  {
+    // some algorithm, such as SCRYPT, depend on accurate free memory values
+    // the only way to get them is through low-level APIs such as nvml via hwmon
+    // we have --backend-keep-free message now
+
+    //user_options->hwmon = true;
+  }
+
   if (user_options->stdout_flag)
   {
     user_options->hwmon               = false;
@@ -1910,13 +1999,13 @@ void user_options_preprocess (hashcat_ctx_t *hashcat_ctx)
     user_options->bitmap_max          = 1;
   }
 
-  if (user_options->hash_info        == true
-   || user_options->keyspace         == true
+  if (user_options->keyspace         == true
    || user_options->total_candidates == true
    || user_options->speed_only       == true
    || user_options->progress_only    == true
    || user_options->identify         == true
    || user_options->usage             > 0
+   || user_options->hash_info         > 0
    || user_options->backend_info      > 0)
   {
     user_options->hwmon               = false;
@@ -1968,7 +2057,7 @@ void user_options_preprocess (hashcat_ctx_t *hashcat_ctx)
     }
   }
 
-  if (user_options->hash_info == true)
+  if (user_options->hash_info > 0)
   {
     user_options->quiet = true;
   }
@@ -2092,7 +2181,7 @@ void user_options_preprocess (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->attack_mode == ATTACK_MODE_BF)
   {
-    if (user_options->hash_info == true)
+    if (user_options->hash_info > 0)
     {
 
     }
@@ -2216,7 +2305,7 @@ void user_options_info (hashcat_ctx_t *hashcat_ctx)
 
     if (user_options->backend_devices_virthost)
     {
-      event_log_info (hashcat_ctx, "* --backend-devices-virthost%u", user_options->backend_devices_virthost);
+      event_log_info (hashcat_ctx, "* --backend-devices-virthost=%u", user_options->backend_devices_virthost);
     }
 
     if (user_options->opencl_device_types)
@@ -2243,20 +2332,20 @@ void user_options_info (hashcat_ctx_t *hashcat_ctx)
     {
       event_log_info (hashcat_ctx, "* --kernel-accel=%u", user_options->kernel_accel);
     }
-    else if (user_options->kernel_loops_chgd == true)
+
+    if (user_options->kernel_loops_chgd == true)
     {
       event_log_info (hashcat_ctx, "* --kernel-loops=%u", user_options->kernel_loops);
     }
-    else if (user_options->kernel_threads_chgd == true)
+
+    if (user_options->kernel_threads_chgd == true)
     {
       event_log_info (hashcat_ctx, "* --kernel-threads=%u", user_options->kernel_threads);
     }
-    else
+
+    if (user_options->workload_profile_chgd == true)
     {
-      if (user_options->workload_profile_chgd == true)
-      {
-        event_log_info (hashcat_ctx, "* --workload-profile=%u", user_options->workload_profile);
-      }
+      event_log_info (hashcat_ctx, "* --workload-profile=%u", user_options->workload_profile);
     }
 
     event_log_info (hashcat_ctx, NULL);
@@ -2322,20 +2411,20 @@ void user_options_info (hashcat_ctx_t *hashcat_ctx)
     {
       event_log_info (hashcat_ctx, "# option: --kernel-accel=%u", user_options->kernel_accel);
     }
-    else if (user_options->kernel_loops_chgd == true)
+
+    if (user_options->kernel_loops_chgd == true)
     {
       event_log_info (hashcat_ctx, "# option: --kernel-loops=%u", user_options->kernel_loops);
     }
-    else if (user_options->kernel_threads_chgd == true)
+
+    if (user_options->kernel_threads_chgd == true)
     {
       event_log_info (hashcat_ctx, "# option: --kernel-threads=%u", user_options->kernel_threads);
     }
-    else
+    
+    if (user_options->workload_profile_chgd == true)
     {
-      if (user_options->workload_profile_chgd == true)
-      {
-        event_log_info (hashcat_ctx, "# option: --workload-profile=%u", user_options->workload_profile);
-      }
+      event_log_info (hashcat_ctx, "# option: --workload-profile=%u", user_options->workload_profile);
     }
   }
 }
@@ -2381,7 +2470,7 @@ void user_options_extra_init (hashcat_ctx_t *hashcat_ctx)
   {
 
   }
-  else if (user_options->hash_info == true)
+  else if (user_options->hash_info > 0)
   {
 
   }
@@ -3306,6 +3395,10 @@ void user_options_logger (hashcat_ctx_t *hashcat_ctx)
   logfile_top_string (user_options->custom_charset_2);
   logfile_top_string (user_options->custom_charset_3);
   logfile_top_string (user_options->custom_charset_4);
+  logfile_top_string (user_options->custom_charset_5);
+  logfile_top_string (user_options->custom_charset_6);
+  logfile_top_string (user_options->custom_charset_7);
+  logfile_top_string (user_options->custom_charset_8);
   logfile_top_string (user_options->debug_file);
   logfile_top_string (user_options->encoding_from);
   logfile_top_string (user_options->encoding_to);
@@ -3333,7 +3426,8 @@ void user_options_logger (hashcat_ctx_t *hashcat_ctx)
   logfile_top_uint64 (user_options->skip);
   logfile_top_uint   (user_options->attack_mode);
   logfile_top_uint   (user_options->backend_devices_virtmulti);
-  logfile_top_uint   (user_options->backend_devices_virthost);  
+  logfile_top_uint   (user_options->backend_devices_virthost);
+  logfile_top_uint   (user_options->backend_devices_keepfree);
   logfile_top_uint   (user_options->benchmark);
   logfile_top_uint   (user_options->benchmark_all);
   logfile_top_uint   (user_options->benchmark_max);

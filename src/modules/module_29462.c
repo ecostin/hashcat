@@ -23,7 +23,8 @@ static const u32   HASH_CATEGORY  = HASH_CATEGORY_FDE;
 static const char *HASH_NAME      = "VeraCrypt SHA256 + XTS 1024 bit + boot-mode";
 static const u64   KERN_TYPE      = 13752; // old kernel used here
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE
-                                  | OPTI_TYPE_SLOW_HASH_SIMD_LOOP;
+                                  | OPTI_TYPE_SLOW_HASH_SIMD_LOOP
+                                  | OPTI_TYPE_REGISTER_LIMIT;
 static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
                                   | OPTS_TYPE_PT_GENERATE_LE
                                   | OPTS_TYPE_LOOP_EXTENDED
@@ -96,14 +97,6 @@ bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
       if (strncmp (device_param->device_name, "Intel", 5) == 0)
       {
         // Intel Iris Graphics, Metal Version 244.303: failed to create 'm13752_loop' pipeline, timeout reached
-        return true;
-      }
-    }
-    else
-    {
-      if (device_param->opencl_device_vendor_id == VENDOR_ID_AMD)
-      {
-        // AMD Radeon Pro W5700X Compute Engine; 1.2 (Apr 22 2021 21:54:44); 11.3.1; 20E241
         return true;
       }
     }
