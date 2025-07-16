@@ -14,7 +14,7 @@
 #define MAYBE_UNUSED
 #endif
 
-#if defined(IS_METAL) && !defined(IS_APPLE_SILICON)
+#ifdef IS_METAL
 #define HC_INLINE_RP __attribute__ ((noinline))
 #else
 #define HC_INLINE_RP

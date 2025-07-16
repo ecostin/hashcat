@@ -25,23 +25,26 @@
 #define SALSA_CNT4 (SALSA_SZ / 4)
 #define SALSA_CNT44 ((SALSA_SZ / 4) / 4)
 
-//#define VIDX(bid4,lsz,lid,ySIZE,zSIZE,y,z) (((bid4) * (lsz) * (ySIZE) * (zSIZE)) + ((lid) * (ySIZE) * (zSIZE)) + ((y) * (zSIZE)) + (z))
+// should be safe, because in backend.c we use:
+//    u64 size_extra_buffer1 = 4096;
+//  size_extra_buffer1 += base_chunk_size;
+#define ALIGN_PTR_1k(p) ((GLOBAL_AS hc_uint4_t *) (((u64) (p) + 1023) & ~1023UL))
 
-#if defined IS_CUDA
+#if defined IS_INTEL_SDK
 
-DECLSPEC uint4 operator ^ (const uint4 a, const uint4 b)
+typedef struct
 {
-  uint4 r;
+  u32 x, y, z, w;
 
-  r.x = a.x ^ b.x;
-  r.y = a.y ^ b.y;
-  r.z = a.z ^ b.z;
-  r.w = a.w ^ b.w;
+} hc_uint4_t;
 
-  return r;
-}
+#else
+
+typedef uint4 hc_uint4_t;
 
 #endif
+
+DECLSPEC hc_uint4_t xor_uint4 (const hc_uint4_t a, const hc_uint4_t b);
 
 typedef struct
 {

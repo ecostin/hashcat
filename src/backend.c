@@ -305,6 +305,7 @@ int cuda_query_max_local_size_bytes (hashcat_ctx_t *hashcat_ctx, hc_device_param
 static int backend_ctx_find_alias_devices (hashcat_ctx_t *hashcat_ctx)
 {
   backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
+  user_options_t *user_options = hashcat_ctx->user_options;
 
   // first identify all aliases
 
@@ -372,7 +373,7 @@ static int backend_ctx_find_alias_devices (hashcat_ctx_t *hashcat_ctx)
 
       // show a warning for specifically listed devices if they are an alias
 
-      if (backend_ctx->backend_devices_filter[alias_device->device_id] == 1)
+      if (backend_ctx->backend_devices_filter[alias_device->device_id] == 1 && user_options->quiet == false)
       {
         event_log_warning (hashcat_ctx, "The device #%d specifically listed was skipped because it is an alias of device #%d", alias_device->device_id + 1, backend_device->device_id + 1);
         event_log_warning (hashcat_ctx, NULL);
@@ -9320,6 +9321,8 @@ static int get_hip_kernel_local_mem_size (hashcat_ctx_t *hashcat_ctx, hipFunctio
 
 static int get_opencl_kernel_wgs (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, cl_kernel kernel, u32 *result)
 {
+  user_options_t *user_options = hashcat_ctx->user_options;
+
   size_t work_group_size = 0;
 
   if (hc_clGetKernelWorkGroupInfo (hashcat_ctx, kernel, device_param->opencl_device, CL_KERNEL_WORK_GROUP_SIZE, sizeof (work_group_size), &work_group_size, NULL) == -1) return -1;
@@ -9337,8 +9340,10 @@ static int get_opencl_kernel_wgs (hashcat_ctx_t *hashcat_ctx, hc_device_param_t 
     if (kernel_threads < cwgs_total)
     {
       // Very likely some bug, because the runtime was unable to follow our requirement to run N threads guaranteed on this kernel
-
-      event_log_warning (hashcat_ctx, "* Device #%u: Runtime returned CL_KERNEL_WORK_GROUP_SIZE=%d, but CL_KERNEL_COMPILE_WORK_GROUP_SIZE=%d. Use -T%d if you run into problems.", device_param->device_id + 1, (int) kernel_threads, (int) cwgs_total, (int) kernel_threads);
+      if (user_options->machine_readable == false)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Runtime returned CL_KERNEL_WORK_GROUP_SIZE=%d, but CL_KERNEL_COMPILE_WORK_GROUP_SIZE=%d. Use -T%d if you run into problems.", device_param->device_id + 1, (int) kernel_threads, (int) cwgs_total, (int) kernel_threads);
+      }
     }
 
     kernel_threads = cwgs_total;
@@ -16420,7 +16425,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       if (size_total > device_param->device_available_mem) memory_limit_hit = 1;
 
-      const u64 size_host_extra = (512 * 1024 * 1024);
+      const u64 size_host_extra = (512 * 1024 * 1024) / backend_ctx->backend_devices_active;
 
       const u64 size_total_host
         = size_pws_comp

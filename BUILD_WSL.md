@@ -21,7 +21,7 @@ sudo make install
 cd ../
 wget https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-python-3.12.11-1-any.pkg.tar.zst
 sudo mkdir /opt/win-python
-sudo tar --zstd -xf mingw-w64-x86_64-python-3.12.10-1-any.pkg.tar.zst -C /opt/win-python
+sudo tar --zstd -xf mingw-w64-x86_64-python-3.12.11-1-any.pkg.tar.zst -C /opt/win-python
 ```
 
 ### Building ###

@@ -25,7 +25,7 @@
 // and therefore it's easier for hashcat to parallelize if this multiplier is low.
 // in the end, it's a trade-off.
 
-#define N_ACCEL 8
+#define N_ACCEL 32
 
 typedef struct
 {

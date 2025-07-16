@@ -74,7 +74,6 @@ cpanm Authen::Passphrase::LANManager   \
       Data::Types                      \
       Digest::CMAC                     \
       Digest::CRC                      \
-      Digest::GOST                     \
       Digest::HMAC                     \
       Digest::HMAC_MD5                 \
       Digest::Keccak                   \
@@ -101,6 +100,9 @@ cpanm Authen::Passphrase::LANManager   \
 ERRORS=$((ERRORS+$?))
 
 cpanm https://github.com/matrix/p5-Digest-BLAKE2.git
+ERRORS=$((ERRORS+$?))
+
+cpanm https://github.com/matrix/digest-gost.git
 ERRORS=$((ERRORS+$?))
 
 # checks for pyenv
@@ -160,6 +162,9 @@ else
   ERRORS=$((ERRORS+$?))
 
   pip3 install cryptography
+  ERRORS=$((ERRORS+$?))
+
+  pip3 install setuptools
   ERRORS=$((ERRORS+$?))
 
 fi

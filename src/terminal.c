@@ -716,7 +716,9 @@ void hash_info_single_json (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *us
       printf ("\"deprecated_notice\": \"%s\", ", "N/A");
     }
 
-    const char *t_pw_desc = (hashconfig->opts_type & OPTS_TYPE_PT_HEX) ? "HEX" : "plain";
+    char *t_pw_desc = "plain";
+    if (hashconfig->opts_type & OPTS_TYPE_PT_HEX) t_pw_desc = "HEX";
+    else if (hashconfig->opts_type & OPTS_TYPE_PT_BASE58) t_pw_desc = "BASE58";
 
     u32 t_pw_min = hashconfig->pw_min;
     u32 t_pw_max = hashconfig->pw_max;
@@ -943,7 +945,7 @@ void hash_info_single (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *user_op
 
     event_log_info (hashcat_ctx, "  Deprecated..........: %s", (module_ctx->module_deprecated_notice != MODULE_DEFAULT) ? "Yes" : "No");
 
-    char *t_deprecated_notice = "N/A\0";
+    char *t_deprecated_notice = "N/A";
 
     if (module_ctx->module_deprecated_notice != MODULE_DEFAULT)
     {
@@ -952,7 +954,9 @@ void hash_info_single (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *user_op
 
     event_log_info (hashcat_ctx, "  Deprecated.Notice...: %s", t_deprecated_notice);
 
-    const char *t_pw_desc = (hashconfig->opts_type & OPTS_TYPE_PT_HEX) ? "HEX\0" : "plain\0";
+    char *t_pw_desc = "plain";
+    if (hashconfig->opts_type & OPTS_TYPE_PT_HEX) t_pw_desc = "HEX";
+    else if (hashconfig->opts_type & OPTS_TYPE_PT_BASE58) t_pw_desc = "BASE58";
 
     u32 t_pw_min = hashconfig->pw_min;
     u32 t_pw_max = hashconfig->pw_max;
@@ -974,7 +978,7 @@ void hash_info_single (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *user_op
     {
       u32 t = hashconfig->salt_type;
 
-      const char *t_salt_desc = (t == SALT_TYPE_EMBEDDED) ? "Embedded\0" : (t == SALT_TYPE_GENERIC) ? "Generic\0" : "Virtual\0";
+      const char *t_salt_desc = (t == SALT_TYPE_EMBEDDED) ? "Embedded" : (t == SALT_TYPE_GENERIC) ? "Generic" : "Virtual";
 
       event_log_info (hashcat_ctx, "  Salt.Type...........: %s", t_salt_desc);
 

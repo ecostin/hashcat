@@ -54,6 +54,7 @@
 - Added hash-mode: HMAC-RIPEMD160 (key = $salt)
 - Added hash-mode: md5($salt1.$pass.$salt2)
 - Added hash-mode: md5($salt1.sha1($salt2.$pass))
+- Added hash-mode: md5(sha1(md5($pass)))
 - Added hash-mode: md5(md5($pass.$salt))
 - Added hash-mode: md5(md5($salt).md5(md5($pass)))
 - Added hash-mode: Domain Cached Credentials 2 (DCC2), MS Cache 2, (NT)
@@ -98,6 +99,7 @@
 - Fixed bug in 23800/unrar with Apple Silicon
 - Fixed bug in 26900 module_hash_encode
 - Fixed bug in 29600 module OPTS_TYPE setting
+- Fixed bug in 32600 by adding missing module_jit_build_options
 - Fixed bug in grep out-of-memory workaround on Unit Test
 - Fixed bug in input_tokenizer when TOKEN_ATTR_FIXED_LENGTH is used and refactor modules
 - Fixed bug in --stdout that caused certain rules to malfunction
@@ -113,6 +115,7 @@
 - Fixed clang identification in src/Makefile
 - Fixed build failure for almost all hash modes that make use of hc_swap64 and/or hc_swap64_S with Apple Metal / Apple Silicon
 - Fixed debug mode 5 by adding the missing colon between original-word and finding-rule
+- Fixed perl deprecation warnings on test module for 30906
 - Fixed display problem of the "Optimizers applied" list for algorithms using OPTI_TYPE_SLOW_HASH_SIMD_INIT2 and/or OPTI_TYPE_SLOW_HASH_SIMD_LOOP2
 - Fixed incompatible pointer types (salt1 and salt2 buf) in 3730 a3 kernel
 - Fixed incorrect plaintext check for 25400 and 26610. Increased plaintext check to 32 bytes to prevent false positives.
@@ -166,6 +169,7 @@
 - Unit tests: Updated install_modules.sh with Crypt::Argon2
 - Unit tests: Updated install_modules.sh with Crypt::Passwd::XS, to test suite works also on Apple (ex: 1800)
 - Unit tests: Updated install_modules.sh to use an external module for Digest::BLAKE2, due to maintenance being discontinued
+- Unit tests: Updated install_modules.sh to use an external module for Digest::GOST, due to maintenance being discontinued
 - Unit tests: Updated install_modules.sh to use an external package for pygost, due to not available anymore
 - Unit tests: Updated install_modules.sh to use cpanm instead of cpan
 - Unit tests: Updated install_modules.sh to remove php and Crypt::GCrypt (updated relative test modules)
@@ -180,7 +184,9 @@
 - Metal Backend: disable Metal devices only if at least one OpenCL device is active
 - Metal Backend: improved compute workloads calculation
 - Metal Backend: parallelize pipeline state object (PSO) compilation internally
+- Modules: Added OPTS_TYPE_PT_BASE58 in 28501 28502 28503 28504 28505 28506 30901 30902 30903 30904 30905 30906
 - Modules: Check UnpackSize to raise false positive with hc_decompress_rar
+- Types: Added OPTS_TYPE_PT_BASE58 and removed OPTS_TYPE_MAXIMUM_ACCEL in opts_type
 - User Options: added --metal-compiler-runtime option
 - User Options: limit --bitmap-max value to 31
 - User Options: assigned -H to --hash-info
@@ -840,6 +846,7 @@
 - Added hash-mode: BitShares v0.x
 - Added hash-mode: Blockchain, My Wallet, Second Password (SHA256)
 - Added hash-mode: Citrix NetScaler (SHA512)
+- Added hash-mode: Citrix NetScaler (PBKDF2-HMAC-SHA256)
 - Added hash-mode: DiskCryptor
 - Added hash-mode: Electrum Wallet (Salt-Type 3-5)
 - Added hash-mode: Huawei Router sha1(md5($pass).$salt)

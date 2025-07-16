@@ -9,6 +9,18 @@
 #include "inc_common.h"
 #include "inc_hash_scrypt.h"
 
+DECLSPEC hc_uint4_t xor_uint4 (const hc_uint4_t a, const hc_uint4_t b)
+{
+  hc_uint4_t r;
+
+  r.x = a.x ^ b.x;
+  r.y = a.y ^ b.y;
+  r.z = a.z ^ b.z;
+  r.w = a.w ^ b.w;
+
+  return r;
+}
+
 #if SCRYPT_R > 1
 DECLSPEC void scrypt_shuffle (PRIVATE_AS u32 *TI)
 {
@@ -144,27 +156,27 @@ DECLSPEC void scrypt_smix_init (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, GLOBAL_AS v
   const u32 xd4 = bid / 4;
   const u32 xm4 = bid & 3;
 
-  PRIVATE_AS uint4 *X4 = (PRIVATE_AS uint4 *) X;
+  PRIVATE_AS hc_uint4_t *X4 = (PRIVATE_AS hc_uint4_t *) X;
 
-  GLOBAL_AS uint4 *V;
+  GLOBAL_AS hc_uint4_t *V;
 
   switch (xm4)
   {
-    case 0: V = (GLOBAL_AS uint4 *) V0; break;
-    case 1: V = (GLOBAL_AS uint4 *) V1; break;
-    case 2: V = (GLOBAL_AS uint4 *) V2; break;
-    case 3: V = (GLOBAL_AS uint4 *) V3; break;
+    case 0: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V0); break;
+    case 1: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V1); break;
+    case 2: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V2); break;
+    case 3: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V3); break;
   }
 
-  GLOBAL_AS uint4 *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);
+  GLOBAL_AS hc_uint4_t *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);
 
   for (u32 i = 0; i < STATE_CNT4; i++) X[i] = P[i];
 
   for (u32 y = 0; y < ySIZE; y++)
   {
-    GLOBAL_AS uint4 *Vxx = Vx + (y * zSIZE);
+    GLOBAL_AS hc_uint4_t *Vxx = Vx + (y * zSIZE);
 
-    for (u32 z = 0; z < zSIZE; z++) *Vxx++ = X4[z];
+    for (u32 z = 0; z < zSIZE; z++) Vxx[z] = X4[z];
 
     for (u32 i = 0; i < (1 << SCRYPT_TMTO); i++)
     {
@@ -187,20 +199,20 @@ DECLSPEC void scrypt_smix_loop (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, PRIVATE_AS 
   const u32 xd4 = bid / 4;
   const u32 xm4 = bid & 3;
 
-  PRIVATE_AS uint4 *X4 = (PRIVATE_AS uint4 *) X;
-  PRIVATE_AS uint4 *T4 = (PRIVATE_AS uint4 *) T;
+  PRIVATE_AS hc_uint4_t *X4 = (PRIVATE_AS hc_uint4_t *) X;
+  PRIVATE_AS hc_uint4_t *T4 = (PRIVATE_AS hc_uint4_t *) T;
 
-  GLOBAL_AS uint4 *V;
+  GLOBAL_AS hc_uint4_t *V;
 
   switch (xm4)
   {
-    case 0: V = (GLOBAL_AS uint4 *) V0; break;
-    case 1: V = (GLOBAL_AS uint4 *) V1; break;
-    case 2: V = (GLOBAL_AS uint4 *) V2; break;
-    case 3: V = (GLOBAL_AS uint4 *) V3; break;
+    case 0: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V0); break;
+    case 1: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V1); break;
+    case 2: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V2); break;
+    case 3: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V3); break;
   }
 
-  GLOBAL_AS uint4 *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);
+  GLOBAL_AS hc_uint4_t *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);
 
   for (u32 i = 0; i < STATE_CNT4; i++) X[i] = P[i];
 
@@ -216,7 +228,7 @@ DECLSPEC void scrypt_smix_loop (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, PRIVATE_AS 
 
     const u32 km = k - (y << SCRYPT_TMTO);
 
-    GLOBAL_AS uint4 *Vxx = Vx + (y * zSIZE);
+    GLOBAL_AS hc_uint4_t *Vxx = Vx + (y * zSIZE);
 
     for (u32 z = 0; z < zSIZE; z++) T4[z] = *Vxx++;
 
@@ -229,7 +241,7 @@ DECLSPEC void scrypt_smix_loop (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, PRIVATE_AS 
       #endif
     }
 
-    for (u32 z = 0; z < zSIZE; z++) X4[z] = X4[z] ^ T4[z];
+    for (u32 z = 0; z < zSIZE; z++) X4[z] = xor_uint4 (X4[z], T4[z]);
 
     salsa_r (X);
 

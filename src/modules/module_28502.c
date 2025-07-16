@@ -24,6 +24,7 @@ static const char *HASH_NAME         = "Bitcoin WIF private key (P2PKH), uncompr
 static const u64   KERN_TYPE         = 28502;
 static const u32   OPTI_TYPE         = OPTI_TYPE_NOT_SALTED;
 static const u64   OPTS_TYPE         = OPTS_TYPE_STOCK_MODULE
+                                     | OPTS_TYPE_PT_BASE58
                                      | OPTS_TYPE_PT_GENERATE_LE;
 static const u32   SALT_TYPE         = SALT_TYPE_NONE;
 static const char *ST_PASS           = "5KcL859EUnBDtVG76134U6DZWnVmpE996emJnWmTLRW2hashcat";

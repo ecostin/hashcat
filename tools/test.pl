@@ -94,6 +94,11 @@ sub edge_format
     $word = random_numeric_string ($word_len) // "";
     $salt = random_numeric_string ($salt_len) // "";
 
+    if (exists &{module_get_random_password}) # if hash mode requires special format of passwords
+    {
+      $word = module_get_random_password ($word);
+    }
+
     $hash = module_generate_hash ($word, $salt);
 
     $cond = 1;

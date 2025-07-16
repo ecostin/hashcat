@@ -71,8 +71,16 @@ const char *argon2_module_extra_tuningdb_block (MAYBE_UNUSED const hashconfig_t 
   }
   else
   {
-    kernel_accel_new = kernel_accel_max;
+    if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
+    {
+      kernel_accel_new = MIN (device_processors, kernel_accel_max);
+    }
+    else
+    {
+      kernel_accel_new = kernel_accel_max;
+    }
   }
+
 
   char *new_device_name = hcstrdup (device_param->device_name);
 
