@@ -2,6 +2,7 @@
 SCRYPT_JANE := deps/scrypt-jane-master
 SCRYPT_JANE_CFLAGS := -I$(SCRYPT_JANE)/ -DSCRYPT_SHA256 -DSCRYPT_SALSA -DSCRYPT_CHOOSE_COMPILETIME -Wno-unused-function -Wno-unused-but-set-variable
 
+ifeq ($(MAINTAINER_MODE),0)
 ifeq ($(BUILD_MODE),cross)
 SCRYPT_JANE_CFLAGS += -mavx2
 else
@@ -11,6 +12,7 @@ SCRYPT_JANE_CFLAGS += -mavx2
 endif
 else
 SCRYPT_JANE_CFLAGS += -march=native
+endif
 endif
 endif
 

@@ -58,17 +58,8 @@ u32 module_kernel_threads_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYB
 
 bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
-  // Intel(R) Xeon(R) W-3223 CPU @ 3.50GHz; OpenCL C 1.2; 11.3.1; 20E241
-  if ((device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE || device_param->opencl_platform_vendor_id == VENDOR_ID_INTEL_SDK) && (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU))
+  if (device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE && device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
   {
-    if (strncmp (device_param->device_name, "AMD EPYC", 8) == 0)
-    {
-      // works on: AMD EPYC 7642 48-Core Processor, OpenCL 2.1 (Build 0)
-      return false;
-    }
-
-    // fail also on Apple Intel
-
     // skip by default for now
     return true;
   }

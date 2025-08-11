@@ -2,6 +2,7 @@
 ARGON2_REFERENCE := deps/phc-winner-argon2-20190702
 ARGON2_REFERENCE_CFLAGS := -I$(ARGON2_REFERENCE)/_hashcat/
 
+ifeq ($(MAINTAINER_MODE),0)
 ifeq ($(BUILD_MODE),cross)
 ARGON2_REFERENCE_CFLAGS += -mavx2
 else
@@ -11,6 +12,7 @@ ARGON2_REFERENCE_CFLAGS += -mavx2
 endif
 else
 ARGON2_REFERENCE_CFLAGS += -march=native
+endif
 endif
 endif
 

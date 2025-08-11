@@ -120,7 +120,7 @@ DECLSPEC void blake2b_update_8 (PRIVATE_AS blake2b_ctx_t *ctx, const u32 w0, con
   ctx->len += len;
 }
 
-DECLSPEC void argon2_initial_hash (GLOBAL_AS const pw_t *pw, GLOBAL_AS const salt_t *salt, PRIVATE_AS const argon2_options_t *options, PRIVATE_AS u64 *blockhash)
+DECLSPEC void argon2_initial_hash (PRIVATE_AS const u32 *pw_buf, const int pw_len, PRIVATE_AS const u32 *salt_buf, const int salt_len, PRIVATE_AS const argon2_options_t *options, PRIVATE_AS u64 *blockhash)
 {
   blake2b_ctx_t ctx;
   blake2b_init (&ctx);
@@ -130,22 +130,18 @@ DECLSPEC void argon2_initial_hash (GLOBAL_AS const pw_t *pw, GLOBAL_AS const sal
   ctx.m[2] = hl32_to_64 (options->type,       options->version);
   ctx.len  = 24;
 
-  const u32 pw_len = pw->pw_len;
-
   blake2b_update_8 (&ctx, pw_len, 0, 4);
 
   for (u32 i = 0, idx = 0; i < pw_len; i += 8, idx += 2)
   {
-    blake2b_update_8 (&ctx, pw->i[idx + 0], pw->i[idx + 1], MIN((pw_len - i), 8));
+    blake2b_update_8 (&ctx, pw_buf[idx + 0], pw_buf[idx + 1], MIN((pw_len - i), 8));
   }
-
-  const u32 salt_len = salt->salt_len;
 
   blake2b_update_8 (&ctx, salt_len, 0, 4);
 
   for (u32 i = 0, idx = 0; i < salt_len; i += 8, idx += 2)
   {
-    blake2b_update_8 (&ctx, salt->salt_buf[idx + 0], salt->salt_buf[idx + 1], MIN((salt_len - i), 8));
+    blake2b_update_8 (&ctx, salt_buf[idx + 0], salt_buf[idx + 1], MIN((salt_len - i), 8));
   }
 
   blake2b_update_8 (&ctx, 0, 0, 8); // secret (K) and associated data (X)
@@ -154,12 +150,11 @@ DECLSPEC void argon2_initial_hash (GLOBAL_AS const pw_t *pw, GLOBAL_AS const sal
   for (u32 idx = 0; idx < 8; idx++) blockhash[idx] = ctx.h[idx];
 }
 
-DECLSPEC void argon2_init (GLOBAL_AS const pw_t *pw, GLOBAL_AS const salt_t *salt,
-                           PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
+DECLSPEC void argon2_init_main (PRIVATE_AS const u32 *pw_buf, const int pw_len, PRIVATE_AS const u32 *salt_buf, const int salt_len, PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
 {
   u64 blockhash[16] = { 0 };
 
-  argon2_initial_hash (pw, salt, options, blockhash);
+  argon2_initial_hash (pw_buf, pw_len, salt_buf, salt_len, options, blockhash);
 
   // Generate the first two blocks of each lane
   for (u32 lane = 0; lane < options->parallelism; lane++)
@@ -511,4 +506,60 @@ DECLSPEC GLOBAL_AS argon2_block_t *get_argon2_block (PRIVATE_AS const argon2_opt
   #else
   return (GLOBAL_AS argon2_block_t *) buf32 + (options->memory_block_count * idx);
   #endif
+}
+
+DECLSPEC void argon2_init_pp (PRIVATE_AS const pw_t *pw, PRIVATE_AS const salt_t *salt, PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
+{
+  argon2_init_main (pw->i, pw->pw_len, salt->salt_buf, salt->salt_len, options, out);
+}
+
+DECLSPEC void argon2_init_pg (PRIVATE_AS const pw_t *pw, GLOBAL_AS  const salt_t *salt, PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
+{
+  const u32 salt_len = salt->salt_len;
+
+  u32 salt_buf[64] = { 0 };
+
+  for (u32 i = 0, idx = 0; i < salt_len; i += 4, idx += 1)
+  {
+    salt_buf[idx] = salt->salt_buf[idx];
+  }
+
+  argon2_init_main (pw->i, pw->pw_len, salt_buf, salt_len, options, out);
+}
+
+DECLSPEC void argon2_init_gp (GLOBAL_AS const pw_t *pw, PRIVATE_AS const salt_t *salt, PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
+{
+  const u32 pw_len = pw->pw_len;
+
+  u32 pw_buf[64] = { 0 };
+
+  for (u32 i = 0, idx = 0; i < pw_len; i += 4, idx += 1)
+  {
+    pw_buf[idx] = pw->i[idx];
+  }
+
+  argon2_init_main (pw_buf, pw_len, salt->salt_buf, salt->salt_len, options, out);
+}
+
+DECLSPEC void argon2_init_gg (GLOBAL_AS const pw_t *pw, GLOBAL_AS  const salt_t *salt, PRIVATE_AS const argon2_options_t *options, GLOBAL_AS argon2_block_t *out)
+{
+  const u32 pw_len = pw->pw_len;
+
+  u32 pw_buf[64] = { 0 };
+
+  for (u32 i = 0, idx = 0; i < pw_len; i += 4, idx += 1)
+  {
+    pw_buf[idx] = pw->i[idx];
+  }
+
+  const u32 salt_len = salt->salt_len;
+
+  u32 salt_buf[64] = { 0 };
+
+  for (u32 i = 0, idx = 0; i < salt_len; i += 4, idx += 1)
+  {
+    salt_buf[idx] = salt->salt_buf[idx];
+  }
+
+  argon2_init_main (pw_buf, pw_len, salt_buf, salt_len, options, out);
 }

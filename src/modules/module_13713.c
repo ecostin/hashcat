@@ -208,56 +208,6 @@ int module_hash_binary_parse (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE
 
   hcfree (in);
 
-  // keyfiles
-
-  vc_t *vc = (vc_t *) hash->esalt;
-
-  if (user_options->veracrypt_keyfiles)
-  {
-    char *keyfiles = hcstrdup (user_options->veracrypt_keyfiles);
-
-    char *saveptr = NULL;
-
-    char *keyfile = strtok_r (keyfiles, ",", &saveptr);
-
-    while (keyfile)
-    {
-      if (hc_path_read (keyfile))
-      {
-        cpu_crc32 (keyfile, (u8 *) vc->keyfile_buf16,  64);
-        cpu_crc32 (keyfile, (u8 *) vc->keyfile_buf32, 128);
-      }
-
-      keyfile = strtok_r ((char *) NULL, ",", &saveptr);
-    }
-
-    hcfree (keyfiles);
-
-    vc->keyfile_enabled = 1;
-  }
-
-  // keyboard layout mapping
-
-  if (user_options->keyboard_layout_mapping)
-  {
-    if (hc_path_read (user_options->keyboard_layout_mapping))
-    {
-      initialize_keyboard_layout_mapping (user_options->keyboard_layout_mapping, vc->keyboard_layout_mapping_buf, &vc->keyboard_layout_mapping_cnt);
-    }
-  }
-
-  // veracrypt PIM
-
-  salt_t *salt = hash->salt;
-
-  if ((user_options->veracrypt_pim_start_chgd == true) && (user_options->veracrypt_pim_stop_chgd == true))
-  {
-    vc->pim_start = 15 + user_options->veracrypt_pim_start;
-    vc->pim_stop  = 15 + user_options->veracrypt_pim_stop;
-
-    salt->salt_iter = vc->pim_stop * 1000 - 1;
-  }
-
   return 1;
 }
 
@@ -304,6 +254,59 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   return (PARSER_OK);
 }
 
+int module_hash_decode_postprocess (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED void *digest_buf, MAYBE_UNUSED salt_t *salt, MAYBE_UNUSED void *esalt_buf, MAYBE_UNUSED void *hook_salt_buf, MAYBE_UNUSED hashinfo_t *hash_info, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
+{
+  vc_t *vc = (vc_t *) esalt_buf;
+
+  // keyfiles
+
+  if (user_options->veracrypt_keyfiles)
+  {
+    char *keyfiles = hcstrdup (user_options->veracrypt_keyfiles);
+
+    char *saveptr = NULL;
+
+    char *keyfile = strtok_r (keyfiles, ",", &saveptr);
+
+    while (keyfile)
+    {
+      if (hc_path_read (keyfile))
+      {
+        cpu_crc32 (keyfile, (u8 *) vc->keyfile_buf16,  64);
+        cpu_crc32 (keyfile, (u8 *) vc->keyfile_buf32, 128);
+      }
+
+      keyfile = strtok_r ((char *) NULL, ",", &saveptr);
+    }
+
+    hcfree (keyfiles);
+
+    vc->keyfile_enabled = 1;
+  }
+
+  // keyboard layout mapping
+
+  if (user_options->keyboard_layout_mapping)
+  {
+    if (hc_path_read (user_options->keyboard_layout_mapping))
+    {
+      initialize_keyboard_layout_mapping (user_options->keyboard_layout_mapping, vc->keyboard_layout_mapping_buf, &vc->keyboard_layout_mapping_cnt);
+    }
+  }
+
+  // veracrypt PIM
+
+  if ((user_options->veracrypt_pim_start_chgd == true) && (user_options->veracrypt_pim_stop_chgd == true))
+  {
+    vc->pim_start = 15 + user_options->veracrypt_pim_start;
+    vc->pim_stop  = 15 + user_options->veracrypt_pim_stop;
+
+    salt->salt_iter = vc->pim_stop * 1000 - 1;
+  }
+
+  return (PARSER_OK);
+}
+
 void module_init (module_ctx_t *module_ctx)
 {
   module_ctx->module_context_size             = MODULE_CONTEXT_SIZE_CURRENT;
@@ -334,7 +337,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hash_binary_count        = MODULE_DEFAULT;
   module_ctx->module_hash_binary_parse        = module_hash_binary_parse;
   module_ctx->module_hash_binary_save         = MODULE_DEFAULT;
-  module_ctx->module_hash_decode_postprocess  = MODULE_DEFAULT;
+  module_ctx->module_hash_decode_postprocess  = module_hash_decode_postprocess;
   module_ctx->module_hash_decode_potfile      = MODULE_DEFAULT;
   module_ctx->module_hash_decode_zero_hash    = MODULE_DEFAULT;
   module_ctx->module_hash_decode              = module_hash_decode;

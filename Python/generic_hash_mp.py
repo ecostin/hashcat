@@ -24,7 +24,7 @@ def calc_hash(password: bytes, salt: dict) -> str:
 
 def extract_esalts(esalts_buf):
   esalts=[]
-  for hash_buf, hash_len, salt_buf, salt_len in struct.iter_unpack("65536s I 65536s I", esalts_buf):
+  for hash_buf, hash_len, salt_buf, salt_len in struct.iter_unpack("1024s I 1024s I", esalts_buf):
     hash_buf = hash_buf[0:hash_len]
     salt_buf = salt_buf[0:salt_len]
     esalts.append({ "hash_buf": hash_buf, "salt_buf": salt_buf })
@@ -48,10 +48,10 @@ def term(ctx):
 
 if __name__ == '__main__':
   ctx = {
-    "salts_buf": bytes(568),
-    "esalts_buf": bytes(131080),
-    "st_salts_buf": bytes(568),
-    "st_esalts_buf": bytes(131080),
+    "salts_buf": bytes(572),
+    "esalts_buf": bytes(2056),
+    "st_salts_buf": bytes(572),
+    "st_esalts_buf": bytes(2056),
     "parallelism": 4
   }
   init(ctx)

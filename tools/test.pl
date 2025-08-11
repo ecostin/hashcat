@@ -12,7 +12,6 @@ use Data::Types qw (is_count is_whole);
 use File::Basename;
 use FindBin;
 use List::Util 'shuffle';
-use Text::Iconv;
 use Digest::MD4 qw (md4_hex);
 
 # allows require by filename
@@ -475,9 +474,9 @@ sub single
     {
       if ($MODE == 31600 || $MODE == 31500)
       {
-        my $converter = Text::Iconv->new('utf8', 'UTF-16LE');
+        my $utf16le = encode("UTF-16LE", decode("utf-8", $word));
 
-        $word = md4_hex ($converter->convert ($word));
+        $word = md4_hex ($utf16le);
       }
 
       my $hash = module_generate_hash ($word, $salt);

@@ -149,5 +149,3 @@ uint GetNumberOfThreads()
   return NumCPU;
 }
 
-
-

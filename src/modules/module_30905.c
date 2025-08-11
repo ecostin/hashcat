@@ -33,7 +33,6 @@ static const char *BENCHMARK_MASK    = "?h?h?h?h?h?h?h8d85f37aafc05a8accd1f1cd5e
 static const u32   PUBKEY_MAXLEN     = 64; // our max is actually always 25 (21 + 4)
 static const u32   RAW_LEN           = 64;
 
-
 u32         module_attack_exec       (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ATTACK_EXEC;     }
 u32         module_dgst_pos0         (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return DGST_POS0;       }
 u32         module_dgst_pos1         (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return DGST_POS1;       }
@@ -133,7 +132,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   // if (b58check64 (npubkey,     pubkey_len) == false) return (PARSER_HASH_ENCODING);
 
   if (b58check_25 (npubkey) == false) return (PARSER_HASH_ENCODING);
-
 
   for (u32 i = 0; i < 20; i++) // DGST_SIZE
   {

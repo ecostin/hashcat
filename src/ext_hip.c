@@ -111,6 +111,24 @@ int hip_init (void *hashcat_ctx)
       } \
     } while (0)
 
+  #define HC_LOAD_FUNC_HIP_FALLBACK(ptr,name,hipname,hipname2,type,libname,noerr) \
+    do { \
+      ptr->name = (type) hc_dlsym ((ptr)->lib, #hipname); \
+      if (!(ptr)->name) ptr->name = (type) hc_dlsym ((ptr)->lib, #hipname2); \
+      if ((noerr) != -1) { \
+        if (!(ptr)->name) { \
+          if ((noerr) == 1) { \
+            event_log_error (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
+            return -1; \
+          } \
+          if ((noerr) != 1) { \
+            event_log_warning (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
+            return 0; \
+          } \
+        } \
+      } \
+    } while (0)
+
   // finding the right symbol is a PITA, because of the _v2 suffix
   // a good reference is cuda.h itself
   // this needs to be verified for each new cuda release
@@ -162,7 +180,7 @@ int hip_init (void *hashcat_ctx)
   HC_LOAD_FUNC_HIP (hip, hipStreamCreateWithFlags,  hipStreamCreateWithFlags,     HIP_HIPSTREAMCREATEWITHFLAGS,   HIP, 1);
   HC_LOAD_FUNC_HIP (hip, hipStreamDestroy,          hipStreamDestroy,             HIP_HIPSTREAMDESTROY,           HIP, 1);
   HC_LOAD_FUNC_HIP (hip, hipStreamSynchronize,      hipStreamSynchronize,         HIP_HIPSTREAMSYNCHRONIZE,       HIP, 1);
-  HC_LOAD_FUNC_HIP (hip, hipGetDeviceProperties,    hipGetDevicePropertiesR0600,  HIP_HIPGETDEVICEPROPERTIES,     HIP, 1);
+  HC_LOAD_FUNC_HIP_FALLBACK (hip, hipGetDeviceProperties,    hipGetDevicePropertiesR0600,  hipGetDeviceProperties, HIP_HIPGETDEVICEPROPERTIES,     HIP, 1);
   HC_LOAD_FUNC_HIP (hip, hipModuleOccupancyMaxActiveBlocksPerMultiprocessor, hipModuleOccupancyMaxActiveBlocksPerMultiprocessor, HIP_HIPMODULEOCCUPANCYMAXACTIVEBLOCKSPERMULTIPROCESSOR, HIP, 1);
 
   return 0;
@@ -185,6 +203,58 @@ void hip_close (void *hashcat_ctx)
 
     backend_ctx->hip = NULL;
   }
+}
+
+int hc_hipEventDestroyPtr (void *hashcat_ctx, hipEvent_t *hEvent)
+{
+  int rc = -1;
+
+  if (hEvent == NULL || *hEvent == NULL) return rc;
+
+  rc = hc_hipEventDestroy (hashcat_ctx, *hEvent);
+
+  *hEvent = NULL;
+
+  return rc;
+}
+
+int hc_hipMemFreePtr (void *hashcat_ctx, hipDeviceptr_t *dptr)
+{
+  int rc = -1;
+
+  if (dptr == NULL || *dptr == NULL) return rc;
+
+  rc = hc_hipMemFree (hashcat_ctx, *dptr);
+
+  *dptr = 0;
+
+  return rc;
+}
+
+int hc_hipModuleUnloadPtr (void *hashcat_ctx, hipModule_t *hmod)
+{
+  int rc = -1;
+
+  if (hmod == NULL || *hmod == NULL) return rc;
+
+  rc = hc_hipModuleUnload (hashcat_ctx, *hmod);
+
+  *hmod = NULL;
+
+  return rc;
+}
+
+int hc_hipStreamDestroyPtr (void *hashcat_ctx, hipStream_t *hStream)
+{
+  int rc = -1;
+
+  if (hStream == NULL || *hStream == NULL) return rc;
+
+  rc = hc_hipStreamDestroy (hashcat_ctx, *hStream);
+
+  *hStream = NULL;
+
+  return rc;
 }
 
 int hc_hipCtxCreate (void *hashcat_ctx, hipCtx_t *pctx, unsigned int flags, hipDevice_t dev)

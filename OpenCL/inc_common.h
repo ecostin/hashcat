@@ -196,6 +196,11 @@
 #define KERN_ATTR_FUNC_VECTOR()                _KERN_ATTR_VECTOR(), KERN_ATTR_FUNC_PARAMS
 #define KERN_ATTR_FUNC_VECTOR_ESALT(e)         _KERN_ATTR_VECTOR_ESALT(e), KERN_ATTR_FUNC_PARAMS
 
+// basic functions
+
+DECLSPEC u32 u16_bin_to_u32_hex_lsn (const u32 v);
+DECLSPEC u32 u16_bin_to_u32_hex_msn (const u32 v);
+
 // union based packing
 
 DECLSPEC u8 v8a_from_v32_S (const u32 v32);

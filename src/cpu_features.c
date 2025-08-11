@@ -7,7 +7,7 @@
 #include "types.h"
 #include "cpu_features.h"
 
-#if defined(__aarch64__) || defined(__arm64__)
+#if defined (__aarch64__) || defined (__arm64__)
 
 int cpu_supports_sse2 ()     { return 1; }
 int cpu_supports_ssse3 ()    { return 0; }

@@ -2,6 +2,7 @@
 SCRYPT_YESCRYPT := deps/yescrypt-master
 SCRYPT_YESCRYPT_CFLAGS := -I$(SCRYPT_YESCRYPT)/ -DSKIP_MEMZERO -Wno-cpp -Wno-type-limits
 
+ifeq ($(MAINTAINER_MODE),0)
 ifeq ($(BUILD_MODE),cross)
 SCRYPT_YESCRYPT_CFLAGS += -mavx2
 else
@@ -11,6 +12,7 @@ SCRYPT_YESCRYPT_CFLAGS += -mavx2
 endif
 else
 SCRYPT_YESCRYPT_CFLAGS += -march=native
+endif
 endif
 endif
 

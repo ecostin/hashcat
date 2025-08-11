@@ -17,9 +17,9 @@
 
 typedef struct electrum_wallet
 {
-  u32 salt_type;
   u32 iv[4];
   u32 encrypted[4];
+  u32 salt_type;
 
 } electrum_wallet_t;
 

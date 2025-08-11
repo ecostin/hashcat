@@ -172,7 +172,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   tmp[6] = byte_swap_64 (tmp[6]);
   tmp[7] = byte_swap_64 (tmp[7]);
 
-
   u8 *out_buf = (u8 *) line_buf;
 
   u64_to_hex (tmp[0], out_buf +    0);

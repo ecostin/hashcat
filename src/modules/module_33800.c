@@ -1,22 +1,22 @@
 /**
  * based on mode 3200
- * 
- * 
+ *
+ *
  * related tickets/issues
- * 
+ *
  * https://github.com/hashcat/hashcat/issues/73
- * support to recover Woltlab Burning Board 4.x hashes #73 
+ * support to recover Woltlab Burning Board 4.x hashes #73
  * (closed without implementation)
- * 
+ *
  * https://github.com/hashcat/hashcat/issues/2788
- * Bcrypt(Bcrypt($Pass)) Kernel Support #2788 
- * 
- * 
+ * Bcrypt(Bcrypt($Pass)) Kernel Support #2788
+ *
+ *
  * john the ripper
- * 
+ *
  * https://github.com/openwall/john/issues/2413
- * Add support for Woltlab Burning Board 4.x hashes #2413 
- * 
+ * Add support for Woltlab Burning Board 4.x hashes #2413
+ *
  */
 
 #include "common.h"
@@ -33,7 +33,7 @@ static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 3;
 static const u32   DGST_SIZE      = DGST_SIZE_4_6;
 static const u32   HASH_CATEGORY  = HASH_CATEGORY_FORUM_SOFTWARE;
-static const char *HASH_NAME      = "WBB4 (Woltlab Burning Board) Plugin [bcrypt(bcrypt($pass))]";
+static const char *HASH_NAME      = "WBB4 (Woltlab Burning Board) [bcrypt(bcrypt($pass))]";
 static const u64   KERN_TYPE      = 33800;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE;
 static const u64   OPTS_TYPE      = OPTS_TYPE_STOCK_MODULE
@@ -60,11 +60,6 @@ u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 
-static const char *SIGNATURE_BCRYPT1 = "$2a$";
-static const char *SIGNATURE_BCRYPT2 = "$2b$";
-static const char *SIGNATURE_BCRYPT3 = "$2x$";
-static const char *SIGNATURE_BCRYPT4 = "$2y$";
-
 typedef struct bcrypt_tmp
 {
   u32 E[18];
@@ -75,119 +70,21 @@ typedef struct bcrypt_tmp
   u32 S1[256];
   u32 S2[256];
   u32 S3[256];
-  
+
 } bcrypt_tmp_t;
 
-u32 module_pw_max (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
-{
-  const u32 pw_max = 72; // Underlaying Blowfish max
+#include "blowfish_common.c"
 
-  return pw_max;
-}
+static const char *SIGNATURE_BCRYPT1 = "$2a$";
+static const char *SIGNATURE_BCRYPT2 = "$2b$";
+static const char *SIGNATURE_BCRYPT3 = "$2x$";
+static const char *SIGNATURE_BCRYPT4 = "$2y$";
 
 u64 module_tmp_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
   const u64 tmp_size = (const u64) sizeof (bcrypt_tmp_t);
 
   return tmp_size;
-}
-
-bool module_jit_cache_disable (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
-{
-  return true;
-}
-
-char *module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
-{
-  char *jit_build_options = NULL;
-
-  // this mode heavily depends on the available shared memory size
-  // note the kernel need to have some special code changes in order to make use to use post-48k memory region
-  // we need to set some macros
-
-  bool use_dynamic = false;
-
-  if (device_param->is_cuda == true)
-  {
-    use_dynamic = true;
-  }
-
-  // this uses some nice feedback effect.
-  // based on the device_local_mem_size the reqd_work_group_size in the kernel is set to some value
-  // which is then is read from the opencl host in the kernel_preferred_wgs_multiple1/2/3 result.
-  // therefore we do not need to set module_kernel_threads_min/max except for CPU, where the threads are set to fixed 1.
-
-  if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
-  {
-    hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u", 1);
-  }
-  else
-  {
-    u32 overhead = 0;
-
-    if (device_param->opencl_device_vendor_id == VENDOR_ID_NV)
-    {
-      // note we need to use device_param->device_local_mem_size - 4 because opencl jit returns with:
-      // Entry function '...' uses too much shared data (0xc004 bytes, 0xc000 max)
-      // on my development system. no clue where the 4 bytes are spent.
-      // I did some research on this and it seems to be related with the datatype.
-      // For example, if i used u8 instead, there's only 1 byte wasted.
-
-      if (device_param->is_opencl == true)
-      {
-        overhead = 1;
-      }
-    }
-
-    if (user_options->kernel_threads_chgd == true)
-    {
-      u32 fixed_local_size = user_options->kernel_threads;
-
-      if (use_dynamic == true)
-      {
-        if ((fixed_local_size * 4096) > device_param->kernel_dynamic_local_mem_size_memset)
-        {
-          // otherwise out-of-bound reads
-
-          fixed_local_size = device_param->kernel_dynamic_local_mem_size_memset / 4096;
-        }
-
-        hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u -D DYNAMIC_LOCAL", fixed_local_size);
-      }
-      else
-      {
-        if ((fixed_local_size * 4096) > (device_param->device_local_mem_size - overhead))
-        {
-          // otherwise out-of-bound reads
-
-          fixed_local_size = (device_param->device_local_mem_size - overhead) / 4096;
-        }
-
-        hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u", fixed_local_size);
-      }
-    }
-    else
-    {
-      if (use_dynamic == true)
-      {
-        // using kernel_dynamic_local_mem_size_memset is a bit hackish.
-        // we had to brute-force this value out of an already loaded CUDA function.
-        // there's no official way to query for this value.
-
-        const u32 fixed_local_size = device_param->kernel_dynamic_local_mem_size_memset / 4096;
-        
-        hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u -D DYNAMIC_LOCAL", fixed_local_size);
-      }
-      else
-      {
-        const u32 fixed_local_size = (device_param->device_local_mem_size - overhead) / 4096;
-
-        hc_asprintf (&jit_build_options, "-D FIXED_LOCAL_SIZE=%u", fixed_local_size);
-      }
-    }
-  }
-  
-  return jit_build_options;
 }
 
 int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED void *digest_buf, MAYBE_UNUSED salt_t *salt, MAYBE_UNUSED void *esalt_buf, MAYBE_UNUSED void *hook_salt_buf, MAYBE_UNUSED hashinfo_t *hash_info, const char *line_buf, MAYBE_UNUSED const int line_len)
@@ -262,7 +159,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   base64_decode (bf64_to_int, (const u8 *) hash_pos, hash_len, tmp_buf);
 
   memcpy (digest, tmp_buf, 24);
-  
+
   digest[0] = byte_swap_32 (digest[0]);
   digest[1] = byte_swap_32 (digest[1]);
   digest[2] = byte_swap_32 (digest[2]);
@@ -356,8 +253,8 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_hook23                   = MODULE_DEFAULT;
   module_ctx->module_hook_salt_size           = MODULE_DEFAULT;
   module_ctx->module_hook_size                = MODULE_DEFAULT;
-  module_ctx->module_jit_build_options        = module_jit_build_options;
-  module_ctx->module_jit_cache_disable        = module_jit_cache_disable;
+  module_ctx->module_jit_build_options        = blowfish_module_jit_build_options;
+  module_ctx->module_jit_cache_disable        = blowfish_module_jit_cache_disable;
   module_ctx->module_kernel_accel_max         = MODULE_DEFAULT;
   module_ctx->module_kernel_accel_min         = MODULE_DEFAULT;
   module_ctx->module_kernel_loops_max         = MODULE_DEFAULT;
@@ -374,7 +271,7 @@ void module_init (module_ctx_t *module_ctx)
   module_ctx->module_potfile_disable          = MODULE_DEFAULT;
   module_ctx->module_potfile_keep_all_hashes  = MODULE_DEFAULT;
   module_ctx->module_pwdump_column            = MODULE_DEFAULT;
-  module_ctx->module_pw_max                   = module_pw_max;
+  module_ctx->module_pw_max                   = blowfish_module_pw_max;
   module_ctx->module_pw_min                   = MODULE_DEFAULT;
   module_ctx->module_salt_max                 = MODULE_DEFAULT;
   module_ctx->module_salt_min                 = MODULE_DEFAULT;

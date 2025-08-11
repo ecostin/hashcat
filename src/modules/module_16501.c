@@ -149,7 +149,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   mojolicious->salt_len = esalt_len;
 
-
   // salt
   
   // Create a hash of the esalt because esalt buffer can change somewhere behind salt->salt_buf size
@@ -183,7 +182,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   salt->salt_len = 16;
 
-
   const u8 *hash_pos = token.buf[4];
   u32 *digest = (u32 *) digest_buf;
 
@@ -195,7 +193,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   digest[5] = hex_to_u32 (hash_pos + 40);
   digest[6] = hex_to_u32 (hash_pos + 48);
   digest[7] = hex_to_u32 (hash_pos + 56);
-
 
   digest[0] = byte_swap_32 (digest[0]);
   digest[1] = byte_swap_32 (digest[1]);
@@ -218,7 +215,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   char ptr_plain[128];
 
-
   u32 tmp[8];
 
   tmp[0] = byte_swap_32 (digest32[0]);
@@ -229,7 +225,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   tmp[5] = byte_swap_32 (digest32[5]);
   tmp[6] = byte_swap_32 (digest32[6]);
   tmp[7] = byte_swap_32 (digest32[7]);
-
 
   u8 *out_buf = (u8 *) ptr_plain;
 
@@ -245,7 +240,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   u32_to_hex (tmp[7], out_buf + out_len); out_len += 8;
 
   out_buf[64]=0;
-
 
   const int line_len = snprintf (line_buf, line_size, "%s--%s", (char *) mojolicious->salt_buf, (char *) ptr_plain);
 

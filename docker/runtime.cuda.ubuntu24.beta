@@ -1,0 +1,22 @@
+FROM hashcat-binaries as build
+
+FROM nvidia/cuda:12.9.1-devel-ubuntu24.04 as runtime
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+WORKDIR /root/
+
+RUN \
+apt-get update && apt-get upgrade -y && \
+apt-get install -y curl wget unzip tar p7zip-full && \
+apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN removeopencl=$(dpkg --list | awk '/opencl/ && $2 ~ /^cuda-opencl-/ {print $2; exit}') && \
+apt-get remove -y $removeopencl && \
+apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /root/hashcat
+COPY --from=build /root/hashcat /root/hashcat
+
+WORKDIR /root/hashcat

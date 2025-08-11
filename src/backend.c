@@ -119,6 +119,32 @@ static const int kern_run_all[] =
   KERN_RUN_AUX4,
 };
 
+#if defined (__APPLE__)
+static mtl_pipeline metal_pipeline_with_id (hc_device_param_t *device_param, const int kern_run)
+{
+  switch (kern_run)
+  {
+    case KERN_RUN_1:      return device_param->metal_pipeline1;       break;
+    case KERN_RUN_12:     return device_param->metal_pipeline12;      break;
+    case KERN_RUN_2P:     return device_param->metal_pipeline2p;      break;
+    case KERN_RUN_2:      return device_param->metal_pipeline2;       break;
+    case KERN_RUN_2E:     return device_param->metal_pipeline2e;      break;
+    case KERN_RUN_23:     return device_param->metal_pipeline23;      break;
+    case KERN_RUN_3:      return device_param->metal_pipeline3;       break;
+    case KERN_RUN_4:      return device_param->metal_pipeline4;       break;
+    case KERN_RUN_INIT2:  return device_param->metal_pipeline_init2;  break;
+    case KERN_RUN_LOOP2P: return device_param->metal_pipeline_loop2p; break;
+    case KERN_RUN_LOOP2:  return device_param->metal_pipeline_loop2;  break;
+    case KERN_RUN_AUX1:   return device_param->metal_pipeline_aux1;   break;
+    case KERN_RUN_AUX2:   return device_param->metal_pipeline_aux1;   break;
+    case KERN_RUN_AUX3:   return device_param->metal_pipeline_aux1;   break;
+    case KERN_RUN_AUX4:   return device_param->metal_pipeline_aux1;   break;
+  }
+
+  return NULL;
+}
+#endif
+
 static cl_kernel opencl_kernel_with_id (hc_device_param_t *device_param, const int kern_run)
 {
   switch (kern_run)
@@ -190,6 +216,30 @@ static CUfunction cuda_function_with_id (hc_device_param_t *device_param, const 
 
   return NULL;
 }
+
+#if defined (__APPLE__)
+int metal_query_max_local_size_bytes (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
+{
+  size_t max_local_size_bytes = 0;
+
+  for (int kern_run_idx = 0; kern_run_idx < kern_run_cnt; kern_run_idx++)
+  {
+    mtl_pipeline pipeline = metal_pipeline_with_id (device_param, kern_run_all[kern_run_idx]);
+
+    if (pipeline == NULL) continue;
+
+    size_t local_size_bytes = 0;
+
+    if (hc_mtlGetStaticThreadgroupMemoryLength (hashcat_ctx, pipeline, (unsigned int *) &local_size_bytes) == -1) return -1;
+
+    if (local_size_bytes == 0) continue;
+
+    max_local_size_bytes = MAX (max_local_size_bytes, local_size_bytes);
+  }
+
+  return (int) max_local_size_bytes;
+}
+#endif
 
 int opencl_query_threads_per_block (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, cl_kernel kernel)
 {
@@ -724,12 +774,12 @@ static bool opencl_test_instruction (hashcat_ctx_t *hashcat_ctx, cl_context cont
 
     #endif
 
-    hc_clReleaseProgram (hashcat_ctx, program);
+    hc_clReleaseProgramPtr (hashcat_ctx, &program);
 
     return false;
   }
 
-  if (hc_clReleaseProgram (hashcat_ctx, program) == -1) return false;
+  if (hc_clReleaseProgramPtr (hashcat_ctx, &program) == -1) return false;
 
   return true;
 }
@@ -1004,7 +1054,7 @@ int gidd_to_pw_t (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, c
   #if defined (__APPLE__)
   if (device_param->is_metal == true)
   {
-    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, &pw_idx, device_param->metal_d_pws_idx, gidd * sizeof (pw_idx_t), sizeof (pw_idx_t)) == -1) return -1;
+    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, &pw_idx, device_param->metal_d_pws_idx, gidd * sizeof (pw_idx_t), sizeof (pw_idx_t)) == -1) return -1;
   }
   #endif
 
@@ -1037,7 +1087,7 @@ int gidd_to_pw_t (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, c
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, pw->i, device_param->metal_d_pws_comp_buf, off * sizeof (u32), cnt * sizeof (u32)) == -1) return -1;
+      if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, pw->i, device_param->metal_d_pws_comp_buf, off * sizeof (u32), cnt * sizeof (u32)) == -1) return -1;
     }
     #endif
 
@@ -1088,7 +1138,7 @@ int copy_pws_idx (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, u
   #if defined (__APPLE__)
   if (device_param->is_metal == true)
   {
-    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, dest, device_param->metal_d_pws_idx, gidd * sizeof (pw_idx_t), (cnt * sizeof (pw_idx_t))) == -1) return -1;
+    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, dest, device_param->metal_d_pws_idx, gidd * sizeof (pw_idx_t), (cnt * sizeof (pw_idx_t))) == -1) return -1;
   }
   #endif
 
@@ -1126,7 +1176,7 @@ int copy_pws_comp (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
   #if defined (__APPLE__)
   if (device_param->is_metal == true)
   {
-    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, dest, device_param->metal_d_pws_comp_buf, off * sizeof (u32), cnt * sizeof (u32)) == -1) return -1;
+    if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, dest, device_param->metal_d_pws_comp_buf, off * sizeof (u32), cnt * sizeof (u32)) == -1) return -1;
   }
   #endif
 
@@ -1381,7 +1431,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
         #if defined (__APPLE__)
         if (device_param->is_metal == true)
         {
-          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, device_param->hooks_buf, device_param->metal_d_hooks, 0, pws_cnt * hashconfig->hook_size) == -1) return -1;
+          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->hooks_buf, device_param->metal_d_hooks, 0, pws_cnt * hashconfig->hook_size) == -1) return -1;
         }
         #endif
 
@@ -1436,7 +1486,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
         #if defined (__APPLE__)
         if (device_param->is_metal == true)
         {
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_hooks, 0, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_hooks, 0, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
         }
         #endif
 
@@ -1542,7 +1592,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, device_param->h_tmps, device_param->metal_d_tmps, 0, pws_cnt * hashconfig->tmp_size) == -1) return -1;
+              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->h_tmps, device_param->metal_d_tmps, 0, pws_cnt * hashconfig->tmp_size) == -1) return -1;
             }
             #endif
 
@@ -1571,7 +1621,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_tmps, 0, device_param->h_tmps, pws_cnt * hashconfig->tmp_size) == -1) return -1;
+              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_tmps, 0, device_param->h_tmps, pws_cnt * hashconfig->tmp_size) == -1) return -1;
             }
             #endif
 
@@ -1633,7 +1683,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, device_param->hooks_buf, device_param->metal_d_hooks, 0, pws_cnt * hashconfig->hook_size) == -1) return -1;
+              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->hooks_buf, device_param->metal_d_hooks, 0, pws_cnt * hashconfig->hook_size) == -1) return -1;
             }
             #endif
 
@@ -1688,7 +1738,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_hooks, 0, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
+              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_hooks, 0, device_param->hooks_buf, pws_cnt * hashconfig->hook_size) == -1) return -1;
             }
             #endif
 
@@ -1782,7 +1832,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, device_param->h_tmps, device_param->metal_d_tmps, 0, pws_cnt * hashconfig->tmp_size) == -1) return -1;
+              if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->h_tmps, device_param->metal_d_tmps, 0, pws_cnt * hashconfig->tmp_size) == -1) return -1;
             }
             #endif
 
@@ -1811,7 +1861,7 @@ int choose_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, 
             #if defined (__APPLE__)
             if (device_param->is_metal == true)
             {
-              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_tmps, 0, device_param->h_tmps, pws_cnt * hashconfig->tmp_size) == -1) return -1;
+              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_tmps, 0, device_param->h_tmps, pws_cnt * hashconfig->tmp_size) == -1) return -1;
             }
             #endif
 
@@ -2175,7 +2225,7 @@ int run_hip_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_
 }
 
 #if defined (__APPLE__)
-int run_metal_kernel_atinit (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, id buf, const u64 num)
+int run_metal_kernel_atinit (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t mem, const u64 num)
 {
   u64 num_elements = num;
 
@@ -2193,7 +2243,7 @@ int run_metal_kernel_atinit (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devi
 
   if (hc_mtlEncodeComputeCommand_pre (hashcat_ctx, device_param->metal_pipeline_atinit, device_param->metal_command_queue, &metal_command_buffer, &metal_command_encoder) == -1) return -1;
 
-  if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, buf, NULL, 0) == -1) return -1;
+  if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, mem.buf_ptr, NULL, 0) == -1) return -1;
   if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 1, NULL, device_param->kernel_params_atinit[1], sizeof (u64)) == -1) return -1;
 
   double ms = 0;
@@ -2203,7 +2253,7 @@ int run_metal_kernel_atinit (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devi
   return 0;
 }
 
-int run_metal_kernel_utf8toutf16le (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, id buf, const u64 num)
+int run_metal_kernel_utf8toutf16le (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t mem, const u64 num)
 {
   u64 num_elements = num;
 
@@ -2221,7 +2271,7 @@ int run_metal_kernel_utf8toutf16le (hashcat_ctx_t *hashcat_ctx, hc_device_param_
 
   if (hc_mtlEncodeComputeCommand_pre (hashcat_ctx, device_param->metal_pipeline_utf8toutf16le, device_param->metal_command_queue, &metal_command_buffer, &metal_command_encoder) == -1) return -1;
 
-  if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, buf, NULL, 0) == -1) return -1;
+  if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, mem.buf_ptr, NULL, 0) == -1) return -1;
   if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 1, NULL, device_param->kernel_params_utf8toutf16le[1], sizeof (u64)) == -1) return -1;
 
   double ms = 0;
@@ -2231,7 +2281,7 @@ int run_metal_kernel_utf8toutf16le (hashcat_ctx_t *hashcat_ctx, hc_device_param_
   return 0;
 }
 
-int run_metal_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, id buf, const u64 size)
+int run_metal_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t mem, const u64 size)
 {
   const u64 num16d = size / 16;
   const u64 num16m = size % 16;
@@ -2249,7 +2299,7 @@ int run_metal_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devic
 
     if (hc_mtlEncodeComputeCommand_pre (hashcat_ctx, device_param->metal_pipeline_bzero, device_param->metal_command_queue, &metal_command_buffer, &metal_command_encoder) == -1) return -1;
 
-    if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, buf, NULL, 0) == -1) return -1;
+    if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 0, mem.buf_ptr, NULL, 0) == -1) return -1;
     if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, 1, NULL, (void *) &num16d, sizeof (u64)) == -1) return -1;
 
     const size_t global_work_size[3] = { num_elements,   1, 1 };
@@ -2268,20 +2318,20 @@ int run_metal_kernel_bzero (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devic
     {
       u8 *bzeros_apple = (u8 *) hccalloc (num16m, sizeof (u8));
 
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, buf, num16d * 16, bzeros_apple, num16m) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, mem, num16d * 16, bzeros_apple, num16m) == -1) return -1;
 
       hcfree (bzeros_apple);
     }
     else
     {
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, buf, num16d * 16, bzeros, num16m) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, mem, num16d * 16, bzeros, num16m) == -1) return -1;
     }
   }
 
   return 0;
 }
 
-int run_metal_kernel_memset32 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 offset, const u32 value, const u64 size)
+int run_metal_kernel_memset32 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t mem, const u64 offset, const u32 value, const u64 size)
 {
   int rc;
 
@@ -2300,7 +2350,7 @@ int run_metal_kernel_memset32 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *de
     tmp[i] = value;
   }
 
-  rc = hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, buf, offset, tmp, size);
+  rc = hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, mem, offset, tmp, size);
 
   hcfree (tmp);
 
@@ -2828,13 +2878,14 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
       case KERN_RUN_AUX4:   metal_pipeline = device_param->metal_pipeline_aux4;   break;
     }
 
-    if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_kernel_param, 0, &device_param->kernel_param, device_param->size_kernel_params) == -1) return -1;
+    if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_kernel_param, 0, &device_param->kernel_param, device_param->size_kernel_params) == -1) return -1;
 
     if (hc_mtlEncodeComputeCommand_pre (hashcat_ctx, metal_pipeline, device_param->metal_command_queue, &metal_command_buffer, &metal_command_encoder) == -1) return -1;
 
-    mtl_mem metal_buffer = NULL;
+    mtl_mem_t mem;
+    mem.buf_ptr = NULL;
 
-    if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, sizeof (u8), NULL, &metal_buffer) == -1) return -1;
+    if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, sizeof (u8), NULL, &mem, metal_private_storageMode) == -1) return -1;
 
     // all buffers must be allocated
     for (u32 i = 0; i <= 24; i++)
@@ -2842,7 +2893,7 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
       // allocate fake buffer if NULL
       if (device_param->kernel_params[i] == NULL)
       {
-        if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, metal_buffer, NULL, 0) == -1) return -1;
+        if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, mem.buf_ptr, NULL, 0) == -1) return -1;
       }
       else
       {
@@ -2939,7 +2990,7 @@ int run_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, con
         // allocate fake buffer if NULL
         if (device_param->kernel_params[i] == NULL)
         {
-          if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, metal_buffer, NULL, 0) == -1) return -1;
+          if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, mem.buf_ptr, NULL, 0) == -1) return -1;
         }
         else
         {
@@ -3492,16 +3543,18 @@ int run_kernel_amp (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param,
     // all buffers must be allocated
     int tmp_buf_cnt = 0;
 
-    mtl_mem tmp_buf[5] = { 0 };
+    mtl_mem_t tmp_buf[5];
 
     for (int i = 0; i < 5; i++)
     {
       // allocate fake buffer if NULL
       if (device_param->kernel_params_amp[i] == NULL)
       {
-        if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, sizeof (u8), NULL, &tmp_buf[tmp_buf_cnt]) == -1) return -1;
+        tmp_buf[tmp_buf_cnt].buf_ptr = NULL;
 
-        if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, tmp_buf[tmp_buf_cnt], NULL, 0) == -1) return -1;
+        if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, sizeof (u8), NULL, &tmp_buf[tmp_buf_cnt], metal_private_storageMode) == -1) return -1;
+
+        if (hc_mtlSetCommandEncoderArg (hashcat_ctx, metal_command_encoder, 0, i, tmp_buf[tmp_buf_cnt].buf_ptr, NULL, 0) == -1) return -1;
 
         tmp_buf_cnt++;
       }
@@ -3522,9 +3575,9 @@ int run_kernel_amp (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param,
 
     for (int i = 0; i < tmp_buf_cnt; i++)
     {
-      hc_mtlReleaseMemObject (hashcat_ctx, tmp_buf[i]);
+      hc_mtlReleaseMemObject (hashcat_ctx, &tmp_buf[i]);
 
-      tmp_buf[i] = NULL;
+      tmp_buf[i].buf_ptr = NULL;
     }
 
     if (rc_cc == -1) return -1;
@@ -3671,7 +3724,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
 
       const pw_idx_t *pw_idx = device_param->pws_idx + pws_cnt;
 
@@ -3679,7 +3732,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
 
       if (off)
       {
-        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
+        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
       }
     }
     #endif
@@ -3735,7 +3788,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
+        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
 
         const pw_idx_t *pw_idx = device_param->pws_idx + pws_cnt;
 
@@ -3743,7 +3796,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
 
         if (off)
         {
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
         }
       }
       #endif
@@ -3833,7 +3886,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
         #if defined (__APPLE__)
         if (device_param->is_metal == true)
         {
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
 
           const pw_idx_t *pw_idx = device_param->pws_idx + pws_cnt;
 
@@ -3841,7 +3894,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
 
           if (off)
           {
-            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
+            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
           }
         }
         #endif
@@ -3897,7 +3950,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
           #if defined (__APPLE__)
           if (device_param->is_metal == true)
           {
-            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
+            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
 
             const pw_idx_t *pw_idx = device_param->pws_idx + pws_cnt;
 
@@ -3905,7 +3958,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
 
             if (off)
             {
-              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
+              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
             }
           }
           #endif
@@ -3959,7 +4012,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
           #if defined (__APPLE__)
           if (device_param->is_metal == true)
           {
-            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
+            if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_idx, 0, device_param->pws_idx, pws_cnt * sizeof (pw_idx_t)) == -1) return -1;
 
             const pw_idx_t *pw_idx = device_param->pws_idx + pws_cnt;
 
@@ -3967,7 +4020,7 @@ int run_copy (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, const
 
             if (off)
             {
-              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
+              if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_pws_comp_buf, 0, device_param->pws_comp, off * sizeof (u32)) == -1) return -1;
             }
           }
           #endif
@@ -4359,7 +4412,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
               #if defined (__APPLE__)
               if (device_param->is_metal == true)
               {
-                if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_combs_c, 0, device_param->combs_buf, innerloop_left * sizeof (pw_t)) == -1) return -1;
+                if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_combs_c, 0, device_param->combs_buf, innerloop_left * sizeof (pw_t)) == -1) return -1;
               }
               #endif
 
@@ -4552,7 +4605,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
               #if defined (__APPLE__)
               if (device_param->is_metal == true)
               {
-                if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_combs_c, 0, device_param->combs_buf, innerloop_left * sizeof (pw_t)) == -1) return -1;
+                if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_combs_c, 0, device_param->combs_buf, innerloop_left * sizeof (pw_t)) == -1) return -1;
               }
               #endif
 
@@ -5103,20 +5156,31 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
       event_log_warning (hashcat_ctx, "You are probably missing the CUDA, HIP or OpenCL runtime installation.");
       event_log_warning (hashcat_ctx, NULL);
 
-      #if defined (__linux__)
-      event_log_warning (hashcat_ctx, "* AMD GPUs on Linux require this driver:");
-      event_log_warning (hashcat_ctx, "  \"AMDGPU\" (21.50 or later) and \"ROCm\" (5.0 or later)");
-      #elif defined (_WIN)
-      event_log_warning (hashcat_ctx, "* AMD GPUs on Windows require this driver:");
-      event_log_warning (hashcat_ctx, "  \"AMD Adrenalin Edition\" (23.7.2 or later) and \"AMD HIP SDK\" (23.Q3 or later)");
+      #if defined (__APPLE__)
+      event_log_error (hashcat_ctx, "ATTENTION! No OpenCL, Metal, HIP or CUDA compatible platform found.");
+      #else
+      event_log_error (hashcat_ctx, "ATTENTION! No OpenCL, HIP or CUDA compatible platform found.");
       #endif
 
-      event_log_warning (hashcat_ctx, "* Intel CPUs require this runtime:");
-      event_log_warning (hashcat_ctx, "  \"OpenCL Runtime for Intel Core and Intel Xeon Processors\" (16.1.1 or later)");
+      event_log_warning (hashcat_ctx, "You are probably missing the OpenCL, CUDA or HIP runtime installation.");
+      event_log_warning (hashcat_ctx, NULL);
 
-      event_log_warning (hashcat_ctx, "* NVIDIA GPUs require this runtime and/or driver (both):");
-      event_log_warning (hashcat_ctx, "  \"NVIDIA Driver\" (440.64 or later)");
-      event_log_warning (hashcat_ctx, "  \"CUDA Toolkit\" (9.0 or later)");
+      #if defined (__linux__)
+      event_log_warning (hashcat_ctx, "* AMD GPUs on Linux require this driver:");
+      event_log_warning (hashcat_ctx, "  \"AMD Radeon Software for Linux\" with \"ROCm\"");
+      #elif defined (_WIN)
+      event_log_warning (hashcat_ctx, "* AMD GPUs on Windows require this driver:");
+      event_log_warning (hashcat_ctx, "  \"AMD Adrenalin Edition\" and \"AMD HIP SDK\"");
+      #endif
+
+      event_log_warning (hashcat_ctx, "* Intel and AMD CPUs require this runtime:");
+      event_log_warning (hashcat_ctx, "  \"Intel CPU Runtime for OpenCL\" or PoCL");
+
+      event_log_warning (hashcat_ctx, "* Intel GPUs require this driver:");
+      event_log_warning (hashcat_ctx, "  \"Intel Graphics Compute Runtime\" aka NEO");
+
+      event_log_warning (hashcat_ctx, "* NVIDIA GPUs require this runtime and driver:");
+      event_log_warning (hashcat_ctx, "  \"NVIDIA CUDA Toolkit\" (both runtime and driver included)");
       event_log_warning (hashcat_ctx, NULL);
 
       return -1;
@@ -5323,6 +5387,9 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
         const int CL_rc = hc_clGetDeviceIDs (hashcat_ctx, opencl_platform, CL_DEVICE_TYPE_ALL, DEVICES_MAX, opencl_platform_devices, &opencl_platform_devices_cnt);
 
+        // they conflict with hip/cuda AND with opencl devices
+        if (opencl_platform_vendor_id == VENDOR_ID_MICROSOFT) opencl_platform_devices_cnt = 0;
+
         if (CL_rc == -1)
         {
           // Special handling for CL_DEVICE_NOT_FOUND, see: https://github.com/hashcat/hashcat/issues/2455
@@ -5456,18 +5523,20 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
     #if defined (__linux__)
     event_log_warning (hashcat_ctx, "* AMD GPUs on Linux require this driver:");
-    event_log_warning (hashcat_ctx, "  \"AMDGPU\" (21.50 or later) and \"ROCm\" (5.0 or later)");
+    event_log_warning (hashcat_ctx, "  \"AMD Radeon Software for Linux\" with \"ROCm\"");
     #elif defined (_WIN)
     event_log_warning (hashcat_ctx, "* AMD GPUs on Windows require this driver:");
-    event_log_warning (hashcat_ctx, "  \"AMD Adrenalin Edition\" (23.7.2 or later) and \"AMD HIP SDK\" (23.Q3 or later)");
+    event_log_warning (hashcat_ctx, "  \"AMD Adrenalin Edition\" and \"AMD HIP SDK\"");
     #endif
 
-    event_log_warning (hashcat_ctx, "* Intel CPUs require this runtime:");
-    event_log_warning (hashcat_ctx, "  \"OpenCL Runtime for Intel Core and Intel Xeon Processors\" (16.1.1 or later)");
+    event_log_warning (hashcat_ctx, "* Intel and AMD CPUs require this runtime:");
+    event_log_warning (hashcat_ctx, "  \"Intel CPU Runtime for OpenCL\" or PoCL");
 
-    event_log_warning (hashcat_ctx, "* NVIDIA GPUs require this runtime and/or driver (both):");
-    event_log_warning (hashcat_ctx, "  \"NVIDIA Driver\" (440.64 or later)");
-    event_log_warning (hashcat_ctx, "  \"CUDA Toolkit\" (9.0 or later)");
+    event_log_warning (hashcat_ctx, "* Intel GPUs require this driver:");
+    event_log_warning (hashcat_ctx, "  \"Intel Graphics Compute Runtime\" aka NEO");
+
+    event_log_warning (hashcat_ctx, "* NVIDIA GPUs require this runtime and driver:");
+    event_log_warning (hashcat_ctx, "  \"NVIDIA CUDA Toolkit\" (both runtime and driver included)");
     event_log_warning (hashcat_ctx, NULL);
 
     hcfree (backend_ctx->devices_param);
@@ -5581,9 +5650,10 @@ static void backend_ctx_devices_init_cuda (hashcat_ctx_t *hashcat_ctx, int *virt
       device_param->is_metal  = false;
       device_param->is_opencl = false;
 
+      device_param->use_opencl11 = false;
       device_param->use_opencl12 = false;
       device_param->use_opencl20 = false;
-      device_param->use_opencl21 = false;
+      device_param->use_opencl30 = false;
 
       // device_name
 
@@ -5896,15 +5966,17 @@ static void backend_ctx_devices_init_cuda (hashcat_ctx_t *hashcat_ctx, int *virt
             }
           }
 
-          if (device_param->kernel_exec_timeout != 0)
-          {
-            if ((user_options->quiet == false) && (is_virtualized == false))
-            {
-              event_log_advice (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
-              event_log_advice (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
-              event_log_advice (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
-            }
-          }
+          // v7: all our kernels should stay within watchdog range, this is no longer mandatory
+
+          // if (device_param->kernel_exec_timeout != 0)
+          // {
+          //   if ((user_options->quiet == false) && (is_virtualized == false))
+          //   {
+          //     event_log_advice (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
+          //     event_log_advice (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
+          //     event_log_advice (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
+          //   }
+          // }
         }
 
         // activate device moved below, at end
@@ -5927,7 +5999,7 @@ static void backend_ctx_devices_init_cuda (hashcat_ctx_t *hashcat_ctx, int *virt
       device_param->has_lop3  = (sm >= 50) ? true : false;
       device_param->has_mov64 = (sm >= 10) ? true : false;
       device_param->has_prmt  = (sm >= 20) ? true : false;
-      device_param->has_shfw  = (sm >= 70) ? true : false;
+      device_param->has_shfw  = (sm >= 70) ? true : true; // still faster
 
       // one-time init cuda context
 
@@ -6058,9 +6130,10 @@ static void backend_ctx_devices_init_hip (hashcat_ctx_t *hashcat_ctx, int *virth
       device_param->is_metal  = false;
       device_param->is_opencl = false;
 
+      device_param->use_opencl11 = false;
       device_param->use_opencl12 = false;
       device_param->use_opencl20 = false;
-      device_param->use_opencl21 = false;
+      device_param->use_opencl30 = false;
 
       // device_name
 
@@ -6107,16 +6180,17 @@ static void backend_ctx_devices_init_hip (hashcat_ctx_t *hashcat_ctx, int *virth
 
       device_param->device_processors = device_processors;
 
-      if ((device_param->device_processors == 1) && (device_param->device_host_unified_memory == 1))
-      {
+      // We have 32 threads now
+      //if ((device_param->device_processors == 1) && (device_param->device_host_unified_memory == 1))
+      //{
         // APUs return some weird numbers. These values seem more appropriate (from rocminfo)
         //Compute Unit:            2
         //SIMDs per CU:            2
         //Wavefront Size:          32(0x20)
         //Max Waves Per CU:        32(0x20)
 
-        device_param->device_processors = 2 * 32;
-      }
+      //  device_param->device_processors = 2 * 32;
+      //}
 
       // device_global_mem, device_maxmem_alloc, device_available_mem
 
@@ -6160,6 +6234,30 @@ static void backend_ctx_devices_init_hip (hashcat_ctx_t *hashcat_ctx, int *virth
       }
 
       device_param->gcnArchName = strdup (prop.gcnArchName);
+
+      // to recheck: -b -m 1000 is enough
+
+      #if defined (_WIN) || defined (__CYGWIN__)
+      int gcnarch = 0;
+
+      bool gcnskip = false;
+
+      if (sscanf (device_param->gcnArchName, "gfx%d", &gcnarch) == 1)
+      {
+        if (gcnarch < 1000) gcnskip = true;
+      }
+      else
+      {
+        gcnskip = true;
+      }
+
+      if ((user_options->force == false) && (gcnskip == true))
+      {
+        event_log_error (hashcat_ctx, "* Device #%u: This HIP version does not support this device on Windows. Falling back to OpenCL. Use --force to override.", device_id + 1);
+
+        device_param->skipped = true;
+      }
+      #endif
 
       // regsPerBlock
 
@@ -6372,7 +6470,6 @@ static void backend_ctx_devices_init_hip (hashcat_ctx_t *hashcat_ctx, int *virth
          backend_ctx->need_sysfs_amdgpu = true;
          #endif
       }
-
       // CPU burning loop damper
       // Value is given as number between 0-100
       // By default 8%
@@ -6399,15 +6496,15 @@ static void backend_ctx_devices_init_hip (hashcat_ctx_t *hashcat_ctx, int *virth
             }
           }
 
-          if (device_param->kernel_exec_timeout != 0)
-          {
-            if ((user_options->quiet == false) && (is_virtualized == false))
-            {
-              event_log_advice (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
-              event_log_advice (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
-              event_log_advice (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
-            }
-          }
+          // if (device_param->kernel_exec_timeout != 0)
+          // {
+          //   if ((user_options->quiet == false) && (is_virtualized == false))
+          //   {
+          //     event_log_advice (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
+          //     event_log_advice (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
+          //     event_log_advice (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
+          //   }
+          // }
         }
 
         // activate device moved below, at end
@@ -6567,9 +6664,10 @@ static void backend_ctx_devices_init_metal (hashcat_ctx_t *hashcat_ctx, MAYBE_UN
       device_param->is_metal  = true;
       device_param->is_opencl = false;
 
+      device_param->use_opencl11 = false;
       device_param->use_opencl12 = false;
       device_param->use_opencl20 = false;
-      device_param->use_opencl21 = false;
+      device_param->use_opencl30 = false;
 
       device_param->is_apple_silicon = is_apple_silicon ();
 
@@ -6589,31 +6687,6 @@ static void backend_ctx_devices_init_metal (hashcat_ctx_t *hashcat_ctx, MAYBE_UN
 
       device_param->opencl_device_vendor     = strdup ("Apple");
       device_param->opencl_device_c_version  = "";
-
-      /* unused and deprecated
-
-      // sm_minor, sm_major
-
-      int mtl_major = 0;
-      int mtl_minor = 0;
-
-      if (hc_mtlDeviceGetAttribute (hashcat_ctx, &mtl_major, MTL_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, metal_device) == -1)
-      {
-        device_param->skipped = true;
-
-        continue;
-      }
-
-      if (hc_mtlDeviceGetAttribute (hashcat_ctx, &mtl_minor, MTL_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, metal_device) == -1)
-      {
-        device_param->skipped = true;
-
-        continue;
-      }
-
-      device_param->mtl_major = mtl_major;
-      device_param->mtl_minor = mtl_minor;
-      */
 
       // device_name
 
@@ -6812,23 +6885,7 @@ static void backend_ctx_devices_init_metal (hashcat_ctx_t *hashcat_ctx, MAYBE_UN
 
       device_param->device_local_mem_size = max_shared_memory_per_block;
 
-      // device_max_constant_buffer_size
-
-      int device_max_constant_buffer_size = 0;
-
-      if (hc_mtlDeviceGetAttribute (hashcat_ctx, &device_max_constant_buffer_size, MTL_DEVICE_ATTRIBUTE_TOTAL_CONSTANT_MEMORY, metal_device) == -1)
-      {
-        device_param->skipped = true;
-
-        continue;
-      }
-
-      if (device_max_constant_buffer_size < 65536)
-      {
-        event_log_error (hashcat_ctx, "* Device #%u: This device's local mem size is too small.", device_id + 1);
-
-        device_param->skipped = true;
-      }
+      // no device_max_constant_buffer_size on Metal
 
       // gpu properties
 
@@ -6936,7 +6993,10 @@ static void backend_ctx_devices_init_metal (hashcat_ctx_t *hashcat_ctx, MAYBE_UN
 
 static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *virthost, int *virthost_finder, int *backend_devices_idx, int *bridge_link_device)
 {
+  #if defined (__linux__)
   const folder_config_t *folder_config = hashcat_ctx->folder_config;
+  #endif
+
   const bridge_ctx_t    *bridge_ctx    = hashcat_ctx->bridge_ctx;
         backend_ctx_t   *backend_ctx   = hashcat_ctx->backend_ctx;
         user_options_t  *user_options  = hashcat_ctx->user_options;
@@ -7016,26 +7076,34 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
         // check OpenCL version
 
+        device_param->use_opencl11 = false;
         device_param->use_opencl12 = false;
         device_param->use_opencl20 = false;
-        device_param->use_opencl21 = false;
+        device_param->use_opencl30 = false;
 
-        int opencl_version_min = 0;
         int opencl_version_maj = 0;
+        int opencl_version_min = 0;
 
-        if (sscanf (opencl_platform_version, "OpenCL %d.%d", &opencl_version_min, &opencl_version_maj) == 2)
+        if (sscanf (opencl_platform_version, "OpenCL %d.%d", &opencl_version_maj, &opencl_version_min) == 2)
         {
-          if ((opencl_version_min == 1) && (opencl_version_maj == 2))
+          if (opencl_version_maj == 1)
+          {
+            device_param->use_opencl11 = true;
+          }
+
+          if ((opencl_version_maj == 1) && (opencl_version_min == 2))
           {
             device_param->use_opencl12 = true;
           }
-          else if ((opencl_version_min == 2) && (opencl_version_maj == 0))
+
+          if (opencl_version_maj == 2)
           {
             device_param->use_opencl20 = true;
           }
-          else if ((opencl_version_min == 2) && (opencl_version_maj == 1))
+
+          if (opencl_version_maj == 3)
           {
-            device_param->use_opencl21 = true;
+            device_param->use_opencl30 = true;
           }
         }
 
@@ -7278,16 +7346,29 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
         device_param->device_processors = device_processors;
 
-        if ((device_param->device_processors == 1) && (device_param->device_host_unified_memory == 1))
+        // Intel iGPU need to be "corrected".
+        // From clinfo:
+        // Max compute units: 32
+        // Preferred work group size multiple (device): 64
+        // Preferred work group size multiple (kernel): 64
+        // This is misleading.
+
+        if ((device_param->opencl_device_type & CL_DEVICE_TYPE_GPU) && (device_param->device_host_unified_memory == 1) && (device_param->opencl_device_vendor_id == VENDOR_ID_INTEL_SDK))
         {
+          device_param->device_processors = 1;
+        }
+
+        // We have 32 threads now
+        //if ((device_param->device_processors == 1) && (device_param->device_host_unified_memory == 1))
+        //{
           // APUs return some weird numbers. These values seem more appropriate (from rocminfo)
           //Compute Unit:            2
           //SIMDs per CU:            2
           //Wavefront Size:          32(0x20)
           //Max Waves Per CU:        32(0x20)
 
-          device_param->device_processors = 2 * 32;
-        }
+        //  device_param->device_processors = 2 * 32;
+        //}
 
         #if defined (__APPLE__)
         if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
@@ -7489,10 +7570,23 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
         // kernel_preferred_wgs_multiple
 
-        // There is global query for this attribute on OpenCL that is not linked to a specific kernel, so we set it to a fixed value
-        // Later in the code, we add vendor specific extensions to query it
+        // There is no global query for this attribute on OpenCL that is not linked to a specific kernel, so we set it to a fixed value
+        // and later in the code we add vendor specific extensions to query it
 
-        device_param->kernel_preferred_wgs_multiple = 8;
+        if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
+        {
+          device_param->kernel_preferred_wgs_multiple = 32;
+        }
+        else if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
+        {
+          device_param->kernel_preferred_wgs_multiple = 1;
+        }
+        else
+        {
+          // redundant for readability
+
+          device_param->kernel_preferred_wgs_multiple = 1;
+        }
 
         // device_local_mem_type
 
@@ -7579,38 +7673,25 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
         if (opencl_platform_vendor_id == VENDOR_ID_POCL)
         {
-          char *pocl_version_ptr = strstr (opencl_platform_version, "pocl ");
+          bool pocl_skip = false;
+
+          char *pocl_version_ptr = strstr (opencl_platform_version, "PoCL ");
           char *llvm_version_ptr = strstr (opencl_platform_version, "LLVM ");
 
           if ((pocl_version_ptr != NULL) && (llvm_version_ptr != NULL))
           {
-            bool pocl_skip = false;
-
             int pocl_maj = 0;
             int pocl_min = 0;
 
-            int pocl_bug_whitespace_on_path = 0;
-            int pocl_bug_kernel_compiling_failure = 0;
-
-            const int res1 = sscanf (pocl_version_ptr, "pocl %d.%d", &pocl_maj, &pocl_min);
+            const int res1 = sscanf (pocl_version_ptr, "PoCL %d.%d", &pocl_maj, &pocl_min);
 
             if (res1 == 2)
             {
               const int pocl_version = (pocl_maj * 100) + pocl_min;
 
-              if (pocl_version < 109)
+              if (pocl_version < 500)
               {
-                if (strchr (folder_config->cpath_real, ' ') != NULL)
-                {
-                  pocl_skip = true;
-                  pocl_bug_whitespace_on_path = 1;
-                }
-
-                if (pocl_version < 105)
-                {
-                  pocl_skip = true;
-                  pocl_bug_kernel_compiling_failure = 1;
-                }
+                pocl_skip = true;
               }
             }
 
@@ -7623,37 +7704,30 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
             {
               const int llvm_version = (llvm_maj * 100) + llvm_min;
 
-              if (llvm_version < 900)
+              if (llvm_version < 1000)
               {
                 pocl_skip = true;
               }
             }
+          }
+          else
+          {
+            pocl_skip = true;
+          }
 
-            if (pocl_skip == true)
+          if (pocl_skip == true)
+          {
+            if (user_options->force == false)
             {
-              if (user_options->force == false)
+              event_log_error (hashcat_ctx, "* Device #%u: Outdated PoCL OpenCL runtime detected!", device_id + 1);
+
+              if (user_options->quiet == false)
               {
-                event_log_error (hashcat_ctx, "* Device #%u: Outdated POCL OpenCL driver detected!", device_id + 1);
-
-                if (user_options->quiet == false)
-                {
-                  if (pocl_bug_kernel_compiling_failure == 1)
-                  {
-                    event_log_warning (hashcat_ctx, "This OpenCL driver may fail kernel compilation or produce false negatives.");
-                  }
-
-                  if (pocl_bug_whitespace_on_path == 1)
-                  {
-                    event_log_warning (hashcat_ctx, "Consider moving hashcat to a path with no spaces if you want to use this POCL version.");
-                  }
-
-                  event_log_warning (hashcat_ctx, "We recommend using a version of POCL >= 1.9");
-                  event_log_warning (hashcat_ctx, "You can use --force to override, but do not report related errors.");
-                  event_log_warning (hashcat_ctx, NULL);
-                }
-
-                device_param->skipped = true;
+                event_log_warning (hashcat_ctx, "You can use --force to override, but do not report related errors.");
+                event_log_warning (hashcat_ctx, NULL);
               }
+
+              device_param->skipped = true;
             }
           }
         }
@@ -7831,6 +7905,13 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
             #endif
           }
 
+          if (device_param->opencl_device_vendor_id == VENDOR_ID_INTEL_SDK)
+          {
+            #if defined (__linux__)
+            backend_ctx->need_sysfs_intelgpu = true;
+            #endif
+          }
+
           #if defined (__APPLE__)
           if (strncmp (device_param->device_name, "Apple M", 7) == 0)
           {
@@ -7842,15 +7923,60 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
           #endif
         }
 
-        if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
-        {
-          // they like this
-
-          device_param->kernel_preferred_wgs_multiple = 1;
-        }
-
         if (device_param->opencl_device_type & CL_DEVICE_TYPE_GPU)
         {
+          if (device_param->opencl_platform_vendor_id == VENDOR_ID_INTEL_SDK)
+          {
+            #define CL_DEVICE_NUM_SLICES_INTEL                 0x4252
+            #define CL_DEVICE_NUM_SUB_SLICES_PER_SLICE_INTEL   0x4253
+            #define CL_DEVICE_NUM_EUS_PER_SUB_SLICE_INTEL      0x4254
+            #define CL_DEVICE_NUM_THREADS_PER_EU_INTEL         0x4255
+
+            //cl_uint num_slices;
+            //cl_uint num_subslices_per_slice;
+            cl_uint num_eus_per_subslice;
+            cl_uint num_threads_per_eu;
+
+            if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NUM_EUS_PER_SUB_SLICE_INTEL, sizeof (num_eus_per_subslice), &num_eus_per_subslice, NULL) == -1)
+            {
+              device_param->skipped = true;
+
+              continue;
+            }
+
+            if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NUM_THREADS_PER_EU_INTEL, sizeof (num_threads_per_eu), &num_threads_per_eu, NULL) == -1)
+            {
+              device_param->skipped = true;
+
+              continue;
+            }
+
+            device_param->device_processors = num_eus_per_subslice;
+
+            device_param->kernel_preferred_wgs_multiple = num_threads_per_eu;
+
+            #define CL_DEVICE_PCI_BUS_INFO_INTEL 0x410F
+
+            typedef struct _cl_device_pci_bus_info_intel {
+                cl_uint pci_domain;
+                cl_uint pci_bus;
+                cl_uint pci_device;
+                cl_uint pci_function;
+            } cl_device_pci_bus_info_intel;
+
+            cl_device_pci_bus_info_intel pci_info;
+
+            if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_PCI_BUS_INFO_INTEL, sizeof (pci_info), &pci_info, NULL) == 0)
+            {
+              // If this is not supported we will silently ignore. Most of the Intel GPU's do not support this
+
+              device_param->pcie_domain   = pci_info.pci_domain;
+              device_param->pcie_bus      = pci_info.pci_bus;
+              device_param->pcie_device   = pci_info.pci_device;
+              device_param->pcie_function = pci_info.pci_function;
+            }
+          }
+
           if ((device_param->opencl_platform_vendor_id == VENDOR_ID_APPLE) && (device_param->opencl_device_vendor_id == VENDOR_ID_AMD))
           {
             // from https://www.khronos.org/registry/OpenCL/extensions/amd/cl_amd_device_attribute_query.txt
@@ -8082,7 +8208,7 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
           device_param->has_lop3  = (sm >= 50) ? true : false;
           device_param->has_mov64 = (sm >= 10) ? true : false;
           device_param->has_prmt  = (sm >= 20) ? true : false;
-          device_param->has_shfw  = (sm >= 70) ? true : false;
+          device_param->has_shfw  = (sm >= 70) ? true : true; // still faster
         }
 
         // common driver check
@@ -8091,14 +8217,12 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
         {
           if ((user_options->force == false) && (user_options->backend_info == 0))
           {
+            bool warn_and_skip = false;
+
             if (opencl_device_type & CL_DEVICE_TYPE_CPU)
             {
               if (device_param->opencl_platform_vendor_id == VENDOR_ID_INTEL_SDK)
               {
-                bool intel_warn = false;
-
-                // Intel OpenCL runtime 18
-
                 int opencl_driver1 = 0;
                 int opencl_driver2 = 0;
                 int opencl_driver3 = 0;
@@ -8108,36 +8232,11 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
                 if (res18 == 4)
                 {
-                  // so far all versions 18 are ok
+                  if (opencl_driver1 < 2020) warn_and_skip = true;
                 }
                 else
                 {
-                  // Intel OpenCL runtime 16
-
-                  float opencl_version = 0;
-                  int   opencl_build   = 0;
-
-                  const int res16 = sscanf (device_param->opencl_device_version, "OpenCL %f (Build %d)", &opencl_version, &opencl_build);
-
-                  if (res16 == 2)
-                  {
-                    if (opencl_build < 25) intel_warn = true;
-                  }
-                }
-
-                if (intel_warn == true)
-                {
-                  event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken Intel OpenCL runtime '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-
-                  event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported runtime.");
-                  event_log_warning (hashcat_ctx, "See hashcat.net for the officially supported Intel OpenCL runtime.");
-                  event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                  event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                  event_log_warning (hashcat_ctx, NULL);
-
-                  device_param->skipped = true;
-
-                  continue;
+                  warn_and_skip = true;
                 }
               }
             }
@@ -8145,46 +8244,23 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
             {
               if (device_param->opencl_platform_vendor_id == VENDOR_ID_AMD)
               {
-                bool amd_warn = true;
+                int opencl_driver1 = 0;
+                int opencl_driver2 = 0;
 
-                #if defined (__linux__)
-                // AMDGPU-PRO Driver 16.40 and higher
-                if (strtoul (device_param->opencl_driver_version, NULL, 10) >= 2117) amd_warn = false;
-                // AMDGPU-PRO Driver 16.50 is known to be broken
-                if (strtoul (device_param->opencl_driver_version, NULL, 10) == 2236) amd_warn = true;
-                // AMDGPU-PRO Driver 16.60 is known to be broken
-                if (strtoul (device_param->opencl_driver_version, NULL, 10) == 2264) amd_warn = true;
-                // AMDGPU-PRO Driver 17.10 is known to be broken
-                if (strtoul (device_param->opencl_driver_version, NULL, 10) == 2348) amd_warn = true;
-                // AMDGPU-PRO Driver 17.20 (2416) is fine, doesn't need check will match >= 2117
-                #elif defined (_WIN)
-                // AMD Radeon Software 14.9 and higher, should be updated to 15.12
-                if (strtoul (device_param->opencl_driver_version, NULL, 10) >= 1573) amd_warn = false;
-                #else
-                // we have no information about other os
-                if (amd_warn == true) amd_warn = false;
-                #endif
+                const int res18 = sscanf (device_param->opencl_driver_version, "%d.%d", &opencl_driver1, &opencl_driver2);
 
-                if (amd_warn == true)
+                if (res18 == 2)
                 {
-                  event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken AMD driver '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-
-                  event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported driver.");
-                  event_log_warning (hashcat_ctx, "See hashcat.net for officially supported AMD drivers.");
-                  event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                  event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                  event_log_warning (hashcat_ctx, NULL);
-
-                  device_param->skipped = true;
-
-                  continue;
+                  if (opencl_driver1 <  3000) warn_and_skip = true;
+                }
+                else
+                {
+                  warn_and_skip = true;
                 }
               }
 
               if (device_param->opencl_platform_vendor_id == VENDOR_ID_NV)
               {
-                int nv_warn = true;
-
                 int version_maj = 0;
                 int version_min = 0;
 
@@ -8192,43 +8268,11 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
 
                 if (r == 2)
                 {
-                  // nvidia 441.x looks ok
-
-                  if (version_maj == 440)
-                  {
-                    if (version_min >= 64)
-                    {
-                      nv_warn = false;
-                    }
-                  }
-                  else
-                  {
-                    // unknown version scheme, probably new driver version
-
-                    nv_warn = false;
-                  }
+                  if (version_maj < 500) warn_and_skip = true;
                 }
                 else
                 {
-                  // unknown version scheme, probably new driver version
-
-                  nv_warn = false;
-                }
-
-                if (nv_warn == true)
-                {
-                  event_log_warning (hashcat_ctx, "* Device #%u: Outdated or broken NVIDIA driver '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-                  event_log_warning (hashcat_ctx, NULL);
-
-                  event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported driver.");
-                  event_log_warning (hashcat_ctx, "See hashcat's homepage for officially supported NVIDIA drivers.");
-                  event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                  event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                  event_log_warning (hashcat_ctx, NULL);
-
-                  device_param->skipped = true;
-
-                  continue;
+                  warn_and_skip = true;
                 }
 
                 if (device_param->sm_major < 5)
@@ -8241,15 +8285,15 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
                   }
                 }
 
-                if (device_param->kernel_exec_timeout != 0)
-                {
-                  if ((user_options->quiet == false) && (is_virtualized == false))
-                  {
-                    event_log_warning (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
-                    event_log_warning (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
-                    event_log_warning (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
-                  }
-                }
+                // if (device_param->kernel_exec_timeout != 0)
+                // {
+                //   if ((user_options->quiet == false) && (is_virtualized == false))
+                //   {
+                //     event_log_warning (hashcat_ctx, "* Device #%u: WARNING! Kernel exec timeout is not disabled.", device_id + 1);
+                //     event_log_warning (hashcat_ctx, "             This may cause \"CL_OUT_OF_RESOURCES\" or related errors.");
+                //     event_log_warning (hashcat_ctx, "             To disable the timeout, see: https://hashcat.net/q/timeoutpatch");
+                //   }
+                // }
               }
 
               #if defined (__APPLE__)
@@ -8294,51 +8338,39 @@ static void backend_ctx_devices_init_opencl (hashcat_ctx_t *hashcat_ctx, int *vi
                     }
                     else
                     {
-                      event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken Apple OpenCL driver '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-
-                      event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported driver.");
-                      event_log_warning (hashcat_ctx, "See hashcat.net for officially supported Apple OpenCL drivers.");
-                      event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                      event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                      event_log_warning (hashcat_ctx, NULL);
-
-                      device_param->skipped = true;
-
-                      continue;
+                      warn_and_skip = true;
                     }
                   }
                   else
                   {
-                    event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken Apple OpenCL driver '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-
-                    event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported driver.");
-                    event_log_warning (hashcat_ctx, "See hashcat.net for officially supported Apple OpenCL drivers.");
-                    event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                    event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                    event_log_warning (hashcat_ctx, NULL);
-
-                    device_param->skipped = true;
-
-                    continue;
+                    warn_and_skip = true;
                   }
-
+                }
+                else
+                {
+                  warn_and_skip = true;
                 }
               }
               else
               {
-                event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken Apple OpenCL driver '%s' detected!", device_id + 1, device_param->opencl_driver_version);
-
-                event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported driver.");
-                event_log_warning (hashcat_ctx, "See hashcat.net for officially supported Apple OpenCL drivers.");
-                event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
-                event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
-                event_log_warning (hashcat_ctx, NULL);
-
-                device_param->skipped = true;
-
-                continue;
+                warn_and_skip = true;
               }
               #endif // __APPLE__
+            }
+
+            if (warn_and_skip == true)
+            {
+              event_log_error (hashcat_ctx, "* Device #%u: Outdated or broken Intel OpenCL runtime '%s' detected!", device_id + 1, device_param->opencl_driver_version);
+
+              event_log_warning (hashcat_ctx, "You are STRONGLY encouraged to use the officially supported runtime.");
+              event_log_warning (hashcat_ctx, "See hashcat.net for the officially supported Intel OpenCL runtime.");
+              event_log_warning (hashcat_ctx, "See also: https://hashcat.net/faq/wrongdriver");
+              event_log_warning (hashcat_ctx, "You can use --force to override this, but do not report related errors.");
+              event_log_warning (hashcat_ctx, NULL);
+
+              device_param->skipped = true;
+
+              continue;
             }
           }
 
@@ -8367,12 +8399,13 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
   user_options_t    *user_options  = hashcat_ctx->user_options;
   hc_device_param_t *devices_param = backend_ctx->devices_param;
 
-  backend_ctx->need_adl           = false;
-  backend_ctx->need_nvml          = false;
-  backend_ctx->need_nvapi         = false;
-  backend_ctx->need_sysfs_amdgpu  = false;
-  backend_ctx->need_sysfs_cpu     = false;
-  backend_ctx->need_iokit         = false;
+  backend_ctx->need_adl             = false;
+  backend_ctx->need_nvml            = false;
+  backend_ctx->need_nvapi           = false;
+  backend_ctx->need_sysfs_amdgpu    = false;
+  backend_ctx->need_sysfs_intelgpu  = false;
+  backend_ctx->need_sysfs_cpu       = false;
+  backend_ctx->need_iokit           = false;
 
   int bridge_link_device = 0; // this will only count active device
 
@@ -8626,7 +8659,7 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
       {
         // following the same logic as for OpenCL, explained later
 
-        mtl_mem *tmp_device = (mtl_mem *) hccalloc (MAX_ALLOC_CHECKS_CNT, sizeof (mtl_mem));
+        mtl_mem_t *tmp_device = (mtl_mem_t *) hccalloc (MAX_ALLOC_CHECKS_CNT, sizeof (mtl_mem_t));
 
         u64 c;
 
@@ -8634,7 +8667,8 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
         {
           if (((c + 1 + 1) * MAX_ALLOC_CHECKS_SIZE) >= device_param->device_global_mem) break;
 
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, MAX_ALLOC_CHECKS_SIZE, NULL, &tmp_device[c]) == -1)
+          // using SHARED by default here, no performance requirements
+          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, MAX_ALLOC_CHECKS_SIZE, NULL, &tmp_device[c], metal_shared_storageMode) == -1)
           {
             c--;
 
@@ -8645,11 +8679,11 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
 
           u8 tmp_host[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, tmp_device[c], 0, tmp_host, sizeof (tmp_host)) == -1) break;
-          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, tmp_host, tmp_device[c], 0, sizeof (tmp_host)) == -1) break;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, tmp_device[c], 0, tmp_host, sizeof (tmp_host)) == -1) break;
+          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, tmp_host, tmp_device[c], 0, sizeof (tmp_host)) == -1) break;
 
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, tmp_device[c], MAX_ALLOC_CHECKS_SIZE - sizeof (tmp_host), tmp_host, sizeof (tmp_host)) == -1) break;
-          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_command_queue, tmp_host, tmp_device[c], MAX_ALLOC_CHECKS_SIZE - sizeof (tmp_host), sizeof (tmp_host)) == -1) break;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, tmp_device[c], MAX_ALLOC_CHECKS_SIZE - sizeof (tmp_host), tmp_host, sizeof (tmp_host)) == -1) break;
+          if (hc_mtlMemcpyDtoH (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, tmp_host, tmp_device[c], MAX_ALLOC_CHECKS_SIZE - sizeof (tmp_host), sizeof (tmp_host)) == -1) break;
         }
 
         device_param->device_available_mem = MAX_ALLOC_CHECKS_SIZE;
@@ -8665,9 +8699,9 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
         {
           if (((c + 1 + 1) * MAX_ALLOC_CHECKS_SIZE) >= device_param->device_global_mem) break;
 
-          if (tmp_device[c] != NULL)
+          if (tmp_device[c].buf_ptr != NULL)
           {
-            if (hc_mtlReleaseMemObject (hashcat_ctx, tmp_device[c]) == -1) return -1;
+            if (hc_mtlReleaseMemObject (hashcat_ctx, &tmp_device[c]) == -1) return -1;
           }
         }
 
@@ -8973,7 +9007,7 @@ int backend_ctx_devices_init (hashcat_ctx_t *hashcat_ctx, const int comptime)
 
               if (tmp_device[c] != NULL)
               {
-                if (hc_clReleaseMemObject (hashcat_ctx, tmp_device[c]) == -1) r = -1;
+                if (hc_clReleaseMemObjectPtr (hashcat_ctx, &tmp_device[c]) == -1) r = -1;
               }
             }
 
@@ -9054,7 +9088,7 @@ void backend_ctx_devices_destroy (hashcat_ctx_t *hashcat_ctx)
     {
       if (device_param->metal_command_queue)
       {
-        hc_mtlReleaseCommandQueue (hashcat_ctx, device_param->metal_command_queue);
+        hc_mtlReleaseCommandQueue (hashcat_ctx, &device_param->metal_command_queue);
 
         device_param->metal_command_queue = NULL;
       }
@@ -9095,12 +9129,13 @@ void backend_ctx_devices_destroy (hashcat_ctx_t *hashcat_ctx)
   backend_ctx->opencl_devices_cnt     = 0;
   backend_ctx->opencl_devices_active  = 0;
 
-  backend_ctx->need_adl           = false;
-  backend_ctx->need_nvml          = false;
-  backend_ctx->need_nvapi         = false;
-  backend_ctx->need_sysfs_amdgpu  = false;
-  backend_ctx->need_sysfs_cpu     = false;
-  backend_ctx->need_iokit         = false;
+  backend_ctx->need_adl             = false;
+  backend_ctx->need_nvml            = false;
+  backend_ctx->need_nvapi           = false;
+  backend_ctx->need_sysfs_amdgpu    = false;
+  backend_ctx->need_sysfs_intelgpu  = false;
+  backend_ctx->need_sysfs_cpu       = false;
+  backend_ctx->need_iokit           = false;
 }
 
 void backend_ctx_devices_sync_tuning (hashcat_ctx_t *hashcat_ctx)
@@ -9213,6 +9248,7 @@ void backend_ctx_devices_update_power (hashcat_ctx_t *hashcat_ctx)
 
         event_log_advice (hashcat_ctx, "The wordlist or mask that you are using is too small.");
         event_log_advice (hashcat_ctx, "This means that hashcat cannot use the full parallel power of your device(s).");
+        event_log_advice (hashcat_ctx, "Hashcat is expecting at least %" PRIu64 " base words but only got %.1f%% of that.", backend_ctx->kernel_power_all, (100.f * status_ctx->words_base) / backend_ctx->kernel_power_all);
         event_log_advice (hashcat_ctx, "Unless you supply more work, your cracking speed will drop.");
         event_log_advice (hashcat_ctx, "For tips on supplying more work, see: https://hashcat.net/faq/morework");
         event_log_advice (hashcat_ctx, NULL);
@@ -9318,6 +9354,23 @@ static int get_hip_kernel_local_mem_size (hashcat_ctx_t *hashcat_ctx, hipFunctio
 
   return 0;
 }
+
+#if defined (__APPLE__)
+static int get_metal_kernel_wgs (hashcat_ctx_t *hashcat_ctx, mtl_pipeline pipeline, u32 *result)
+{
+  return hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, pipeline, result);
+}
+
+static int get_metal_kernel_preferred_wgs_multiple (hashcat_ctx_t *hashcat_ctx, mtl_pipeline pipeline, u32 *result)
+{
+  return hc_mtlGetThreadExecutionWidth (hashcat_ctx, pipeline, result);
+}
+
+static int get_metal_kernel_local_mem_size (hashcat_ctx_t *hashcat_ctx, mtl_pipeline pipeline, u64 *result)
+{
+  return hc_mtlGetStaticThreadgroupMemoryLength (hashcat_ctx, pipeline, (unsigned int *) result);
+}
+#endif
 
 static int get_opencl_kernel_wgs (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, cl_kernel kernel, u32 *result)
 {
@@ -9932,7 +9985,7 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
 
         *opencl_program = fin;
 
-        hc_clReleaseProgram (hashcat_ctx, p1);
+        hc_clReleaseProgramPtr (hashcat_ctx, &p1);
       }
 
       if (cache_disable == false)
@@ -10090,6 +10143,3240 @@ static bool load_kernel (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_p
   return true;
 }
 
+static int backend_session_setup_cuda_kernel_shared (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
+{
+  // GPU memset
+
+  if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_memset, device_param->cuda_module_shared, "gpu_memset") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_memset, &device_param->kernel_wgs_memset) == -1) return -1;
+
+  if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_memset = device_param->device_local_mem_size - device_param->kernel_local_mem_size_memset;
+
+  device_param->kernel_preferred_wgs_multiple_memset = device_param->cuda_warp_size;
+
+  // GPU bzero
+
+  if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_bzero, device_param->cuda_module_shared, "gpu_bzero") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
+
+  if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_bzero = device_param->device_local_mem_size - device_param->kernel_local_mem_size_bzero;
+
+  device_param->kernel_preferred_wgs_multiple_bzero = device_param->cuda_warp_size;
+
+  // GPU autotune init
+
+  if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_atinit, device_param->cuda_module_shared, "gpu_atinit") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
+
+  if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_atinit = device_param->device_local_mem_size - device_param->kernel_local_mem_size_atinit;
+
+  device_param->kernel_preferred_wgs_multiple_atinit = device_param->cuda_warp_size;
+
+  // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]); if (CL_rc == -1) return -1;
+  // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]); if (CL_rc == -1) return -1;
+
+  // GPU decompress
+
+  if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_decompress, device_param->cuda_module_shared, "gpu_decompress") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
+
+  if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_decompress = device_param->device_local_mem_size - device_param->kernel_local_mem_size_decompress;
+
+  device_param->kernel_preferred_wgs_multiple_decompress = device_param->cuda_warp_size;
+
+  // GPU utf8 to utf16le conversion
+
+  if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_utf8toutf16le, device_param->cuda_module_shared, "gpu_utf8_to_utf16") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
+
+  if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_utf8toutf16le = device_param->device_local_mem_size - device_param->kernel_local_mem_size_utf8toutf16le;
+
+  device_param->kernel_preferred_wgs_multiple_utf8toutf16le = device_param->cuda_warp_size;
+
+  return 0;
+}
+
+static int backend_session_setup_hip_kernel_shared (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
+{
+  // GPU memset
+
+  if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_memset, device_param->hip_module_shared, "gpu_memset") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_memset, &device_param->kernel_wgs_memset) == -1) return -1;
+
+  if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_memset = device_param->device_local_mem_size - device_param->kernel_local_mem_size_memset;
+
+  device_param->kernel_preferred_wgs_multiple_memset = device_param->hip_warp_size;
+
+  // GPU bzero
+
+  if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_bzero, device_param->hip_module_shared, "gpu_bzero") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
+
+  if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_bzero = device_param->device_local_mem_size - device_param->kernel_local_mem_size_bzero;
+
+  device_param->kernel_preferred_wgs_multiple_bzero = device_param->hip_warp_size;
+
+  // GPU autotune init
+
+  if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_atinit, device_param->hip_module_shared, "gpu_atinit") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
+
+  if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_atinit = device_param->device_local_mem_size - device_param->kernel_local_mem_size_atinit;
+
+  device_param->kernel_preferred_wgs_multiple_atinit = device_param->hip_warp_size;
+
+  // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]); if (CL_rc == -1) return -1;
+  // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]); if (CL_rc == -1) return -1;
+
+  // GPU decompress
+
+  if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_decompress, device_param->hip_module_shared, "gpu_decompress") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
+
+  if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_decompress = device_param->device_local_mem_size - device_param->kernel_local_mem_size_decompress;
+
+  device_param->kernel_preferred_wgs_multiple_decompress = device_param->hip_warp_size;
+
+  // GPU utf8 to utf16le conversion
+
+  if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_utf8toutf16le, device_param->hip_module_shared, "gpu_utf8_to_utf16") == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
+
+  if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_utf8toutf16le = device_param->device_local_mem_size - device_param->kernel_local_mem_size_utf8toutf16le;
+
+  device_param->kernel_preferred_wgs_multiple_utf8toutf16le = device_param->hip_warp_size;
+
+  return 0;
+}
+
+#if defined (__APPLE__)
+static int backend_session_setup_metal_kernel_shared (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
+{
+  // GPU memset
+
+  if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_memset", &device_param->metal_function_memset, &device_param->metal_pipeline_memset) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_memset, &device_param->kernel_wgs_memset) == -1) return -1;
+
+  if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
+
+  if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_memset, &device_param->kernel_preferred_wgs_multiple_memset) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_memset = 0;
+
+  // GPU bzero
+
+  if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_bzero", &device_param->metal_function_bzero, &device_param->metal_pipeline_bzero) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
+
+  if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
+
+  if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_bzero, &device_param->kernel_preferred_wgs_multiple_bzero) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_bzero = 0;
+
+  // GPU autotune init
+
+  if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_atinit", &device_param->metal_function_atinit, &device_param->metal_pipeline_atinit) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
+
+  if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
+
+  if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_atinit, &device_param->kernel_preferred_wgs_multiple_atinit) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_atinit = 0;
+
+  // GPU decompress
+
+  if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_decompress", &device_param->metal_function_decompress, &device_param->metal_pipeline_decompress) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
+
+  if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
+
+  if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_decompress, &device_param->kernel_preferred_wgs_multiple_decompress) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_decompress = 0;
+
+  // GPU utf8 to utf16le conversion
+
+  if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_utf8_to_utf16", &device_param->metal_function_utf8toutf16le, &device_param->metal_pipeline_utf8toutf16le) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
+
+  if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
+
+  if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_utf8toutf16le, &device_param->kernel_preferred_wgs_multiple_utf8toutf16le) == -1) return -1;
+
+  device_param->kernel_dynamic_local_mem_size_utf8toutf16le = 0;
+
+  return 0;
+}
+#endif // __APPLE__
+
+static int backend_session_setup_opencl_kernel_shared (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
+{
+  // GPU memset
+
+  if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_memset", &device_param->opencl_kernel_memset) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_wgs_memset) == -1) return -1;
+
+  if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
+
+  if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_dynamic_local_mem_size_memset) == -1) return -1;
+
+  if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_preferred_wgs_multiple_memset) == -1) return -1;
+
+  // GPU bzero
+
+  if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_bzero", &device_param->opencl_kernel_bzero) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
+
+  if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
+
+  if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_dynamic_local_mem_size_bzero) == -1) return -1;
+
+  if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_preferred_wgs_multiple_bzero) == -1) return -1;
+
+  // apple hack, but perhaps also an alternative for other vendors
+
+  if (device_param->kernel_preferred_wgs_multiple == 0) device_param->kernel_preferred_wgs_multiple = device_param->kernel_preferred_wgs_multiple_bzero;
+
+  // GPU autotune init
+
+  if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_atinit", &device_param->opencl_kernel_atinit) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
+
+  if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
+
+  if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_dynamic_local_mem_size_atinit) == -1) return -1;
+
+  if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_preferred_wgs_multiple_atinit) == -1) return -1;
+
+  // GPU decompress
+
+  if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_decompress", &device_param->opencl_kernel_decompress) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
+
+  if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
+
+  if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_dynamic_local_mem_size_decompress) == -1) return -1;
+
+  if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_preferred_wgs_multiple_decompress) == -1) return -1;
+
+  // GPU utf8 to utf16le conversion
+
+  if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_utf8_to_utf16", &device_param->opencl_kernel_utf8toutf16le) == -1)
+  {
+    event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
+
+    device_param->skipped_warning = true;
+
+    return -2; //continue;
+  }
+
+  if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
+
+  if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
+
+  if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_dynamic_local_mem_size_utf8toutf16le) == -1) return -1;
+
+  if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_preferred_wgs_multiple_utf8toutf16le) == -1) return -1;
+
+  return 0;
+}
+
+static int backend_session_setup_cuda_kernel_types (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, int kern_type)
+{
+  const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  char kernel_name[64] = { 0 };
+
+  if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+  {
+    if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+        device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+        device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+        device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function4, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
+
+        device_param->kernel_preferred_wgs_multiple4 = device_param->cuda_warp_size;
+      }
+    }
+    else
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+        device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+        device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+        device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
+
+        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function4, device_param->cuda_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; // continue;
+        }
+
+        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
+
+        device_param->kernel_preferred_wgs_multiple4 = device_param->cuda_warp_size;
+      }
+    }
+
+    if (user_options->slow_candidates == true)
+    {
+    }
+    else
+    {
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
+
+          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_tm, device_param->cuda_module, kernel_name) == -1)
+          {
+            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+            device_param->skipped_warning = true;
+
+            return -2; // continue;
+          }
+
+          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_tm, &device_param->kernel_wgs_tm) == -1) return -1;
+
+          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
+
+          device_param->kernel_dynamic_local_mem_size_tm = device_param->device_local_mem_size - device_param->kernel_local_mem_size_tm;
+
+          device_param->kernel_preferred_wgs_multiple_tm = device_param->cuda_warp_size;
+        }
+      }
+    }
+  }
+  else
+  {
+    // kernel1
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
+
+    if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; // continue;
+    }
+
+    if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+    if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+    device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
+
+    // kernel2
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
+
+    if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; // continue;
+    }
+
+    if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+    if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+    device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
+
+    // kernel3
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
+
+    if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; // continue;
+    }
+
+    if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+    if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+    device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+    {
+      // kernel2p
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2p, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size2p;
+
+      device_param->kernel_preferred_wgs_multiple2p = device_param->cuda_warp_size;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+    {
+      // kernel2e
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2e, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2e, &device_param->kernel_wgs2e) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2e = device_param->device_local_mem_size - device_param->kernel_local_mem_size2e;
+
+      device_param->kernel_preferred_wgs_multiple2e = device_param->cuda_warp_size;
+    }
+
+    // kernel12
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function12, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function12, &device_param->kernel_wgs12) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function12, &device_param->kernel_local_mem_size12) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size12 = device_param->device_local_mem_size - device_param->kernel_local_mem_size12;
+
+      device_param->kernel_preferred_wgs_multiple12 = device_param->cuda_warp_size;
+    }
+
+    // kernel23
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function23, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function23, &device_param->kernel_wgs23) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function23, &device_param->kernel_local_mem_size23) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size23 = device_param->device_local_mem_size - device_param->kernel_local_mem_size23;
+
+      device_param->kernel_preferred_wgs_multiple23 = device_param->cuda_warp_size;
+    }
+
+    // init2
+
+    if (hashconfig->opts_type & OPTS_TYPE_INIT2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_init2, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_init2, &device_param->kernel_wgs_init2) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_init2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_init2;
+
+      device_param->kernel_preferred_wgs_multiple_init2 = device_param->cuda_warp_size;
+    }
+
+    // loop2 prepare
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_loop2p, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2p;
+
+      device_param->kernel_preferred_wgs_multiple_loop2p = device_param->cuda_warp_size;
+    }
+
+    // loop2
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_loop2, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2;
+
+      device_param->kernel_preferred_wgs_multiple_loop2 = device_param->cuda_warp_size;
+    }
+
+    // aux1
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX1)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux1, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux1;
+
+      device_param->kernel_preferred_wgs_multiple_aux1 = device_param->cuda_warp_size;
+    }
+
+    // aux2
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux2, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux2;
+
+      device_param->kernel_preferred_wgs_multiple_aux2 = device_param->cuda_warp_size;
+    }
+
+    // aux3
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX3)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux3, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux3;
+
+      device_param->kernel_preferred_wgs_multiple_aux3 = device_param->cuda_warp_size;
+    }
+
+    // aux4
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX4)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux4, device_param->cuda_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux4;
+
+      device_param->kernel_preferred_wgs_multiple_aux4 = device_param->cuda_warp_size;
+    }
+  }
+
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]); if (CL_rc == -1) return -1;
+
+  // MP start
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (user_options->attack_mode == ATTACK_MODE_BF)
+    {
+      // mp_l
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp_l, device_param->cuda_module_mp, "l_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_l = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_l;
+
+      device_param->kernel_preferred_wgs_multiple_mp_l = device_param->cuda_warp_size;
+
+      // mp_r
+
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp_r, device_param->cuda_module_mp, "r_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_r = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_r;
+
+      device_param->kernel_preferred_wgs_multiple_mp_r = device_param->cuda_warp_size;
+
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]); if (CL_rc == -1) return -1;
+          //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]); if (CL_rc == -1) return -1;
+        }
+      }
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
+    {
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp, device_param->cuda_module_mp, "C_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
+
+      device_param->kernel_preferred_wgs_multiple_mp = device_param->cuda_warp_size;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp, device_param->cuda_module_mp, "C_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
+
+      device_param->kernel_preferred_wgs_multiple_mp = device_param->cuda_warp_size;
+    }
+  }
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_amp, device_param->cuda_module_amp, "amp") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
+
+        device_param->skipped_warning = true;
+
+        return -2; // continue;
+      }
+
+      if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_amp, &device_param->kernel_wgs_amp) == -1) return -1;
+
+      if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_amp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_amp;
+
+      device_param->kernel_preferred_wgs_multiple_amp = device_param->cuda_warp_size;
+    }
+
+    /*
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      for (u32 i = 0; i < 5; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+
+      for (u32 i = 5; i < 6; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+
+      for (u32 i = 6; i < 7; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+    }
+    */
+  }
+
+  return 0;
+}
+
+static int backend_session_setup_hip_kernel_types (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, int kern_type)
+{
+  const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  char kernel_name[64] = { 0 };
+
+  if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+  {
+    if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+        device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+        device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+        device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function4, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
+
+        device_param->kernel_preferred_wgs_multiple4 = device_param->hip_warp_size;
+      }
+    }
+    else
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+        device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+        device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+        device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
+
+        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function4, device_param->hip_module, kernel_name) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
+
+        device_param->kernel_preferred_wgs_multiple4 = device_param->hip_warp_size;
+      }
+    }
+
+    if (user_options->slow_candidates == true)
+    {
+    }
+    else
+    {
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
+
+          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_tm, device_param->hip_module, kernel_name) == -1)
+          {
+            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+            device_param->skipped_warning = true;
+
+            return -2; //continue;
+          }
+
+          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_tm, &device_param->kernel_wgs_tm) == -1) return -1;
+
+          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
+
+          device_param->kernel_dynamic_local_mem_size_tm = device_param->device_local_mem_size - device_param->kernel_local_mem_size_tm;
+
+          device_param->kernel_preferred_wgs_multiple_tm = device_param->hip_warp_size;
+        }
+      }
+    }
+  }
+  else
+  {
+    // kernel1
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
+
+    if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
+
+    if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
+
+    device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
+
+    // kernel2
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
+
+    if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
+
+    if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
+
+    device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
+
+    // kernel3
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
+
+    if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
+
+    if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
+
+    device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+    {
+      // kernel2p
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2p, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size2p;
+
+      device_param->kernel_preferred_wgs_multiple2p = device_param->hip_warp_size;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+    {
+      // kernel2e
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2e, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2e, &device_param->kernel_wgs2e) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2e = device_param->device_local_mem_size - device_param->kernel_local_mem_size2e;
+
+      device_param->kernel_preferred_wgs_multiple2e = device_param->hip_warp_size;
+    }
+
+    // kernel12
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function12, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function12, &device_param->kernel_wgs12) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function12, &device_param->kernel_local_mem_size12) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size12 = device_param->device_local_mem_size - device_param->kernel_local_mem_size12;
+
+      device_param->kernel_preferred_wgs_multiple12 = device_param->hip_warp_size;
+    }
+
+    // kernel23
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function23, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function23, &device_param->kernel_wgs23) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function23, &device_param->kernel_local_mem_size23) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size23 = device_param->device_local_mem_size - device_param->kernel_local_mem_size23;
+
+      device_param->kernel_preferred_wgs_multiple23 = device_param->hip_warp_size;
+    }
+
+    // init2
+
+    if (hashconfig->opts_type & OPTS_TYPE_INIT2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_init2, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_init2, &device_param->kernel_wgs_init2) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_init2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_init2;
+
+      device_param->kernel_preferred_wgs_multiple_init2 = device_param->hip_warp_size;
+    }
+
+    // loop2 prepare
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_loop2p, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2p;
+
+      device_param->kernel_preferred_wgs_multiple_loop2p = device_param->hip_warp_size;
+    }
+
+    // loop2
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_loop2, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2;
+
+      device_param->kernel_preferred_wgs_multiple_loop2 = device_param->hip_warp_size;
+    }
+
+    // aux1
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX1)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux1, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux1;
+
+      device_param->kernel_preferred_wgs_multiple_aux1 = device_param->hip_warp_size;
+    }
+
+    // aux2
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux2, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux2;
+
+      device_param->kernel_preferred_wgs_multiple_aux2 = device_param->hip_warp_size;
+    }
+
+    // aux3
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX3)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux3, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux3;
+
+      device_param->kernel_preferred_wgs_multiple_aux3 = device_param->hip_warp_size;
+    }
+
+    // aux4
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX4)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux4, device_param->hip_module, kernel_name) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux4;
+
+      device_param->kernel_preferred_wgs_multiple_aux4 = device_param->hip_warp_size;
+    }
+  }
+
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]); if (CL_rc == -1) return -1;
+  //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]); if (CL_rc == -1) return -1;
+
+  // MP start
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (user_options->attack_mode == ATTACK_MODE_BF)
+    {
+      // mp_l
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp_l, device_param->hip_module_mp, "l_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_l = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_l;
+
+      device_param->kernel_preferred_wgs_multiple_mp_l = device_param->hip_warp_size;
+
+      // mp_r
+
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp_r, device_param->hip_module_mp, "r_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_r = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_r;
+
+      device_param->kernel_preferred_wgs_multiple_mp_r = device_param->hip_warp_size;
+
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]); if (CL_rc == -1) return -1;
+          //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]); if (CL_rc == -1) return -1;
+        }
+      }
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
+    {
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp, device_param->hip_module_mp, "C_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
+
+      device_param->kernel_preferred_wgs_multiple_mp = device_param->hip_warp_size;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp, device_param->hip_module_mp, "C_markov") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
+
+      device_param->kernel_preferred_wgs_multiple_mp = device_param->hip_warp_size;
+    }
+  }
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_amp, device_param->hip_module_amp, "amp") == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_amp, &device_param->kernel_wgs_amp) == -1) return -1;
+
+      if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_amp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_amp;
+
+      device_param->kernel_preferred_wgs_multiple_amp = device_param->hip_warp_size;
+    }
+
+    /*
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      for (u32 i = 0; i < 5; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+
+      for (u32 i = 5; i < 6; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+
+      for (u32 i = 6; i < 7; i++)
+      {
+        //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]);
+
+        //if (CL_rc == -1) return -1;
+      }
+    }
+    */
+  }
+
+  return 0;
+}
+
+#if defined (__APPLE__)
+static int backend_session_setup_metal_kernel_types (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, int kern_type)
+{
+  const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  char kernel_name[64] = { 0 };
+
+  if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+  {
+    if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1: m%05u_s%02d
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = 0;
+
+        // kernel2: m%05u_s%02d
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = 0;
+
+        // kernel3: m%05u_s%02d
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = 0;
+      }
+      else
+      {
+        // kernel4: m%05u_sxx
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function4, &device_param->metal_pipeline4) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = 0;
+      }
+    }
+    else // multi
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size1 = 0;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size2 = 0;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size3 = 0;
+      }
+      else
+      {
+        // kernel4
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
+
+        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function4, &device_param->metal_pipeline4) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
+
+        device_param->kernel_dynamic_local_mem_size4 = 0;
+      }
+    }
+
+    if (user_options->slow_candidates == true)
+    {
+    }
+    else
+    {
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
+
+          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_tm, &device_param->metal_pipeline_tm) == -1)
+          {
+            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+            device_param->skipped_warning = true;
+
+            return -2; //continue;
+          }
+
+          if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_tm, &device_param->kernel_wgs_tm) == -1) return -1;
+
+          if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
+
+          if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_tm, &device_param->kernel_preferred_wgs_multiple_tm) == -1) return -1;
+
+          device_param->kernel_dynamic_local_mem_size_tm = 0;
+        }
+      }
+    }
+  }
+  else
+  {
+    // kernel1: m%05u_init
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
+
+    if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
+
+    if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+    if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size1 = 0;
+
+    // kernel2: m%05u_loop
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
+
+    if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
+
+    if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+    if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size2 = 0;
+
+    // kernel3: m%05u_comp
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
+
+    if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
+
+    if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+    if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+
+    device_param->kernel_dynamic_local_mem_size3 = 0;
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+    {
+      // kernel2p: m%05u_loop_prepare
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2p, &device_param->metal_pipeline2p) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline2p, &device_param->kernel_preferred_wgs_multiple2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2p = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+    {
+      // kernel2e: m%05u_loop_extended
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2e, &device_param->metal_pipeline2e) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline2e, &device_param->kernel_wgs2e) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline2e, &device_param->kernel_preferred_wgs_multiple2e) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size2e = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
+    {
+      // kernel12: m%05u_hook12
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function12, &device_param->metal_pipeline12) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline12, &device_param->kernel_wgs12) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline12, &device_param->kernel_local_mem_size12) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline12, &device_param->kernel_preferred_wgs_multiple12) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size12 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
+    {
+      // kernel23: m%05u_hook23
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function23, &device_param->metal_pipeline23) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline23, &device_param->kernel_wgs23) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline23, &device_param->kernel_local_mem_size23) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline23, &device_param->kernel_preferred_wgs_multiple23) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size23 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_INIT2)
+    {
+      // init2: m%05u_init2
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_init2, &device_param->metal_pipeline_init2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_init2, &device_param->kernel_wgs_init2) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_init2, &device_param->kernel_preferred_wgs_multiple_init2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_init2 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+    {
+      // loop2 prepare: m%05u_loop2_prepare
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_loop2p, &device_param->metal_pipeline_loop2p) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_loop2p, &device_param->kernel_preferred_wgs_multiple_loop2p) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2p = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
+    {
+      // loop2: m%05u_loop2
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_loop2, &device_param->metal_pipeline_loop2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_loop2, &device_param->kernel_preferred_wgs_multiple_loop2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_loop2 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX1)
+    {
+      // aux1: m%05u_aux1
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux1, &device_param->metal_pipeline_aux1) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_aux1, &device_param->kernel_preferred_wgs_multiple_aux1) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux1 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX2)
+    {
+      // aux2: m%05u_aux2
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux2, &device_param->metal_pipeline_aux2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_aux2, &device_param->kernel_preferred_wgs_multiple_aux2) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux2 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX3)
+    {
+      // aux3: m%05u_aux3
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux3, &device_param->metal_pipeline_aux3) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_aux3, &device_param->kernel_preferred_wgs_multiple_aux3) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux3 = 0;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX4)
+    {
+      // aux4: m%05u_aux4
+
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux4, &device_param->metal_pipeline_aux4) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_aux4, &device_param->kernel_preferred_wgs_multiple_aux4) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_aux4 = 0;
+    }
+  }
+
+  // MP start
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (user_options->attack_mode == ATTACK_MODE_BF)
+    {
+      // mp_l: l_markov
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "l_markov", &device_param->metal_function_mp_l, &device_param->metal_pipeline_mp_l) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_mp_l, &device_param->kernel_preferred_wgs_multiple_mp_l) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_l = 0;
+
+      // mp_r: r_markov
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "r_markov", &device_param->metal_function_mp_r, &device_param->metal_pipeline_mp_r) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_mp_r, &device_param->kernel_preferred_wgs_multiple_mp_r) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp_r = 0;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
+    {
+      // mp_c: C_markov
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "C_markov", &device_param->metal_function_mp, &device_param->metal_pipeline_mp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = 0;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      // mp_c: C_markov
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "C_markov", &device_param->metal_function_mp, &device_param->metal_pipeline_mp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_mp = 0;
+    }
+  }
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      // amp
+
+      if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_amp, "amp", &device_param->metal_function_amp, &device_param->metal_pipeline_amp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_metal_kernel_wgs (hashcat_ctx, device_param->metal_pipeline_amp, &device_param->kernel_wgs_amp) == -1) return -1;
+
+      if (get_metal_kernel_local_mem_size (hashcat_ctx, device_param->metal_pipeline_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
+
+      if (get_metal_kernel_preferred_wgs_multiple (hashcat_ctx, device_param->metal_pipeline_amp, &device_param->kernel_preferred_wgs_multiple_amp) == -1) return -1;
+
+      device_param->kernel_dynamic_local_mem_size_amp = 0;
+    }
+  }
+
+  return 0;
+}
+#endif // __APPLE__
+
+static int backend_session_setup_opencl_kernel_types (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, int kern_type)
+{
+  const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
+  const user_options_t *user_options = hashcat_ctx->user_options;
+
+  // GPU autotune init
+
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]) == -1) return -1;
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]) == -1) return -1;
+
+  // GPU utf8 to utf16le init
+
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_utf8toutf16le, 0, sizeof (cl_mem),   device_param->kernel_params_utf8toutf16le[0]) == -1) return -1;
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_utf8toutf16le, 1, sizeof (cl_ulong), device_param->kernel_params_utf8toutf16le[1]) == -1) return -1;
+
+  // GPU decompress
+
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]) == -1) return -1;
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]) == -1) return -1;
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]) == -1) return -1;
+  if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]) == -1) return -1;
+
+  char kernel_name[64] = { 0 };
+
+  if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+  {
+    if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel4) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_dynamic_local_mem_size4) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
+      }
+    }
+    else
+    {
+      if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+      {
+        // kernel1
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+        // kernel2
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+        // kernel3
+
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+      }
+      else
+      {
+        snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
+
+        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel4) == -1)
+        {
+          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+          device_param->skipped_warning = true;
+
+          return -2; //continue;
+        }
+
+        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_wgs4) == -1) return -1;
+
+        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_local_mem_size4) == -1) return -1;
+
+        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_dynamic_local_mem_size4) == -1) return -1;
+
+        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
+      }
+    }
+
+    if (user_options->slow_candidates == true)
+    {
+    }
+    else
+    {
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
+
+          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_tm) == -1)
+          {
+            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+            device_param->skipped_warning = true;
+
+            return -2; //continue;
+          }
+
+          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_wgs_tm) == -1) return -1;
+
+          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
+
+          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_dynamic_local_mem_size_tm) == -1) return -1;
+
+          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_preferred_wgs_multiple_tm) == -1) return -1;
+        }
+      }
+    }
+  }
+  else
+  {
+    // kernel1
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
+
+    if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
+
+    if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
+
+    if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
+
+    if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
+
+    // kernel2
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
+
+    if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
+
+    if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
+
+    if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
+
+    if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
+
+    // kernel3
+
+    snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
+
+    if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
+    {
+      event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+      device_param->skipped_warning = true;
+
+      return -2; //continue;
+    }
+
+    if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
+
+    if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
+
+    if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
+
+    if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
+
+    // aux1
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2p) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_wgs2p) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_dynamic_local_mem_size2p) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_preferred_wgs_multiple2p) == -1) return -1;
+    }
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2e) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_wgs2e) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_dynamic_local_mem_size2e) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_preferred_wgs_multiple2e) == -1) return -1;
+    }
+
+    // kernel12
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel12) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_wgs12) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_local_mem_size12) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_dynamic_local_mem_size12) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_preferred_wgs_multiple12) == -1) return -1;
+    }
+
+    // kernel23
+
+    if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel23) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_wgs23) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_local_mem_size23) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_dynamic_local_mem_size23) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_preferred_wgs_multiple23) == -1) return -1;
+    }
+
+    // init2
+
+    if (hashconfig->opts_type & OPTS_TYPE_INIT2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_init2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_wgs_init2) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_dynamic_local_mem_size_init2) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_preferred_wgs_multiple_init2) == -1) return -1;
+    }
+
+    // loop2 prepare
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_loop2p) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_dynamic_local_mem_size_loop2p) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_preferred_wgs_multiple_loop2p) == -1) return -1;
+    }
+
+    // loop2
+
+    if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_loop2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_dynamic_local_mem_size_loop2) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_preferred_wgs_multiple_loop2) == -1) return -1;
+    }
+
+    // aux1
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX1)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux1) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_dynamic_local_mem_size_aux1) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_preferred_wgs_multiple_aux1) == -1) return -1;
+    }
+
+    // aux2
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX2)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux2) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_dynamic_local_mem_size_aux2) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_preferred_wgs_multiple_aux2) == -1) return -1;
+    }
+
+    // aux3
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX3)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux3) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_dynamic_local_mem_size_aux3) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_preferred_wgs_multiple_aux3) == -1) return -1;
+    }
+
+    // aux4
+
+    if (hashconfig->opts_type & OPTS_TYPE_AUX4)
+    {
+      snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux4) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_dynamic_local_mem_size_aux4) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_preferred_wgs_multiple_aux4) == -1) return -1;
+    }
+  }
+
+  // MP start
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (user_options->attack_mode == ATTACK_MODE_BF)
+    {
+      // mp_l
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "l_markov", &device_param->opencl_kernel_mp_l) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_dynamic_local_mem_size_mp_l) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_preferred_wgs_multiple_mp_l) == -1) return -1;
+
+      // mp_r
+
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "r_markov", &device_param->opencl_kernel_mp_r) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_dynamic_local_mem_size_mp_r) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_preferred_wgs_multiple_mp_r) == -1) return -1;
+
+      if (user_options->attack_mode == ATTACK_MODE_BF)
+      {
+        if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
+        {
+          if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]) == -1) return -1;
+          if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]) == -1) return -1;
+        }
+      }
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
+    {
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "C_markov", &device_param->opencl_kernel_mp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_dynamic_local_mem_size_mp) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "C_markov", &device_param->opencl_kernel_mp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_wgs_mp) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_dynamic_local_mem_size_mp) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
+    }
+  }
+
+  if (user_options->slow_candidates == true)
+  {
+  }
+  else
+  {
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_amp, "amp", &device_param->opencl_kernel_amp) == -1)
+      {
+        event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
+
+        device_param->skipped_warning = true;
+
+        return -2; //continue;
+      }
+
+      if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_wgs_amp) == -1) return -1;
+
+      if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
+
+      if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_dynamic_local_mem_size_amp) == -1) return -1;
+
+      if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_preferred_wgs_multiple_amp) == -1) return -1;
+    }
+
+    if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
+    {
+      // nothing to do
+    }
+    else
+    {
+      for (u32 i = 0; i < 5; i++)
+      {
+        if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]) == -1) return -1;
+      }
+
+      for (u32 i = 5; i < 6; i++)
+      {
+        if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]) == -1) return -1;
+      }
+
+      for (u32 i = 6; i < 7; i++)
+      {
+        if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]) == -1) return -1;
+      }
+    }
+  }
+
+  return 0;
+}
+
 int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 {
   const bitmap_ctx_t         *bitmap_ctx          = hashcat_ctx->bitmap_ctx;
@@ -10194,57 +13481,48 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       // We need this because we can't trust CUDA/HIP to give us the real free device memory
       // The only way to do so is through low level APIs
 
-      for (int i = 0; i < 10; i++)
+      const u64 used_bytes = hm_get_memoryused_with_devices_idx (hashcat_ctx, device_id);
+
+      if (used_bytes)
       {
-        const u64 used_bytes = hm_get_memoryused_with_devices_idx (hashcat_ctx, device_id);
+        const u64 new_left = device_param->device_global_mem - used_bytes;
 
-        if (used_bytes)
+        if (used_bytes > (device_param->device_global_mem * 0.15))
         {
-          if ((used_bytes > (3ULL * 1024 * 1024 * 1024))
-           || (used_bytes > (device_param->device_global_mem * 0.5)))
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Memory usage is too high: %" PRIu64 "/%" PRIu64 ", waiting...", device_id + 1, used_bytes, device_param->device_global_mem);
-
-            sleep (1);
-
-            continue;
-          }
-
-          device_param->device_available_mem = MIN (device_param->device_available_mem, device_param->device_global_mem - used_bytes);
-
-          break;
+          event_log_warning (hashcat_ctx, "* Device #%u: High memory usage by desktop or other apps detected: %" PRIu64 "/%" PRIu64, device_id + 1, used_bytes, device_param->device_global_mem);
+          event_log_warning (hashcat_ctx, "             Performance is capped at %.2f%%", ((double) new_left / device_param->device_global_mem) * 100);
         }
-        else
+
+        device_param->device_available_mem = MIN (device_param->device_available_mem, new_left);
+      }
+      else
+      {
+        if (user_options->hwmon == false)
         {
-          if (user_options->hwmon == false)
+          if (user_options->machine_readable == false)
           {
-            if (user_options->machine_readable == false)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: The hardware monitor was disabled, but it is the only reliable method to query actual free memory.", device_id + 1);
-              event_log_warning (hashcat_ctx, "             Falling back to --backend-devices-keepfree method.");
-              event_log_warning (hashcat_ctx, NULL);
-            }
+            event_log_warning (hashcat_ctx, "* Device #%u: The hardware monitor was disabled, but it is the only reliable method to query actual free memory.", device_id + 1);
+            event_log_warning (hashcat_ctx, "             Falling back to --backend-devices-keepfree method.");
+            event_log_warning (hashcat_ctx, NULL);
+          }
+        }
+
+        if (user_options->backend_devices_keepfree == 0)
+        {
+          const u64 device_available_mem_sav = device_param->device_available_mem;
+
+          const u64 device_available_mem_new = device_available_mem_sav - (device_available_mem_sav * 0.34);
+
+          if (user_options->machine_readable == false)
+          {
+            event_log_warning (hashcat_ctx, "* Device #%u: This system does not offer any reliable method to query actual free memory. Estimated base: %" PRIu64, device_id + 1, device_available_mem_sav);
+            event_log_warning (hashcat_ctx, "             Assuming normal desktop activity, reducing estimate by 34%%: %" PRIu64, device_available_mem_new);
+            event_log_warning (hashcat_ctx, "             This can hurt performance drastically, especially on memory-heavy algorithms.");
+            event_log_warning (hashcat_ctx, "             You can adjust this percentage using --backend-devices-keepfree");
+            event_log_warning (hashcat_ctx, NULL);
           }
 
-          if (user_options->backend_devices_keepfree == 0)
-          {
-            const u64 device_available_mem_sav = device_param->device_available_mem;
-
-            const u64 device_available_mem_new = device_available_mem_sav - (device_available_mem_sav * 0.34);
-
-            if (user_options->machine_readable == false)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: This system does not offer any reliable method to query actual free memory. Estimated base: %" PRIu64, device_id + 1, device_available_mem_sav);
-              event_log_warning (hashcat_ctx, "             Assuming normal desktop activity, reducing estimate by 34%%: %" PRIu64, device_available_mem_new);
-              event_log_warning (hashcat_ctx, "             This can hurt performance drastically, especially on memory-heavy algorithms.");
-              event_log_warning (hashcat_ctx, "             You can adjust this percentage using --backend-devices-keepfree");
-              event_log_warning (hashcat_ctx, NULL);
-            }
-
-            device_param->device_available_mem = device_available_mem_new;
-          }
-
-          break;
+          device_param->device_available_mem = device_available_mem_new;
         }
       }
 
@@ -10351,10 +13629,19 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
           if (device_param->is_opencl == true)
           {
-            if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG, sizeof (vector_width), &vector_width, NULL) == -1)
+            // For CPU we can ask the runtime
+            // For GPUs we want to be more selective and we will use the tuning db
+
+            vector_width = 1;
+
+            if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
             {
-              device_param->skipped = true;
-              continue;
+              if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG, sizeof (vector_width), &vector_width, NULL) == -1)
+              {
+                device_param->skipped = true;
+
+                continue;
+              }
             }
           }
         }
@@ -10385,11 +13672,19 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
           if (device_param->is_opencl == true)
           {
-            if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NATIVE_VECTOR_WIDTH_INT,  sizeof (vector_width), &vector_width, NULL) == -1)
-            {
-              device_param->skipped = true;
+            // For CPU we can ask the runtime
+            // For GPUs we want to be more selective and we will use the tuning db
 
-              continue;
+            vector_width = 1;
+
+            if (device_param->opencl_device_type & CL_DEVICE_TYPE_CPU)
+            {
+              if (hc_clGetDeviceInfo (hashcat_ctx, device_param->opencl_device, CL_DEVICE_NATIVE_VECTOR_WIDTH_INT,  sizeof (vector_width), &vector_width, NULL) == -1)
+              {
+                device_param->skipped = true;
+
+                continue;
+              }
             }
           }
         }
@@ -10702,19 +13997,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       }
       else if (device_param->is_metal == true)
       {
-        // metal: todo - remove this section after below section is implemented
-
-        const u32 native_threads = device_param->kernel_preferred_wgs_multiple;
-
-        if ((native_threads >= device_param->kernel_threads_min) && (native_threads <= device_param->kernel_threads_max))
-        {
-          device_param->kernel_threads_min = native_threads;
-          device_param->kernel_threads_max = native_threads;
-        }
-        else
-        {
-          // abort?
-        }
+        // we will find this after loading the kernel with suppport of runtime api
       }
     }
 
@@ -11007,7 +14290,15 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     char *build_options_buf = (char *) hcmalloc (build_options_sz);
 
-    int build_options_len = snprintf (build_options_buf, build_options_sz, "-D KERNEL_STATIC ");
+    int build_options_len = snprintf(build_options_buf, build_options_sz, "-D KERNEL_STATIC ");
+
+    #if defined (DEBUG) && (DEBUG >= 1)
+    // only HIP and OpenCL have '-g'
+    if (device_param->is_hip == true || device_param->is_opencl == true)
+    {
+      build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-g ");
+    }
+    #endif
 
     if ((device_param->is_cuda == true) || (device_param->is_hip == true))
     {
@@ -11046,10 +14337,16 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     /* currently disabled, hangs NEO drivers since 20.09.
        was required for NEO driver 20.08 to workaround the same issue!
        we go with the latest version
+       v7 re-enabled
+      */
 
     if (device_param->is_opencl == true)
     {
-      if (device_param->use_opencl12 == true)
+      if (device_param->use_opencl11 == true)
+      {
+        build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-cl-std=CL1.1 ");
+      }
+      else if (device_param->use_opencl12 == true)
       {
         build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-cl-std=CL1.2 ");
       }
@@ -11057,12 +14354,11 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-cl-std=CL2.0 ");
       }
-      else if (device_param->use_opencl21 == true)
+      else if (device_param->use_opencl30 == true)
       {
-        build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-cl-std=CL2.1 ");
+        build_options_len += snprintf (build_options_buf + build_options_len, build_options_sz - build_options_len, "-cl-std=CL3.0 ");
       }
     }
-    */
 
     // we don't have sm_* on vendors not NV but it doesn't matter
 
@@ -11186,419 +14482,39 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         return -1;
       }
 
+      int rc = -1;
+
       if (device_param->is_cuda == true)
       {
-        // GPU memset
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_memset, device_param->cuda_module_shared, "gpu_memset") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_memset, &device_param->kernel_wgs_memset) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_memset = device_param->device_local_mem_size - device_param->kernel_local_mem_size_memset;
-
-        device_param->kernel_preferred_wgs_multiple_memset = device_param->cuda_warp_size;
-
-        // GPU bzero
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_bzero, device_param->cuda_module_shared, "gpu_bzero") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_bzero = device_param->device_local_mem_size - device_param->kernel_local_mem_size_bzero;
-
-        device_param->kernel_preferred_wgs_multiple_bzero = device_param->cuda_warp_size;
-
-        // GPU autotune init
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_atinit, device_param->cuda_module_shared, "gpu_atinit") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_atinit = device_param->device_local_mem_size - device_param->kernel_local_mem_size_atinit;
-
-        device_param->kernel_preferred_wgs_multiple_atinit = device_param->cuda_warp_size;
-
-        // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]); if (CL_rc == -1) return -1;
-        // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]); if (CL_rc == -1) return -1;
-
-        // GPU decompress
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_decompress, device_param->cuda_module_shared, "gpu_decompress") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_decompress = device_param->device_local_mem_size - device_param->kernel_local_mem_size_decompress;
-
-        device_param->kernel_preferred_wgs_multiple_decompress = device_param->cuda_warp_size;
-
-        // GPU utf8 to utf16le conversion
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_utf8toutf16le, device_param->cuda_module_shared, "gpu_utf8_to_utf16") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_utf8toutf16le = device_param->device_local_mem_size - device_param->kernel_local_mem_size_utf8toutf16le;
-
-        device_param->kernel_preferred_wgs_multiple_utf8toutf16le = device_param->cuda_warp_size;
+        rc = backend_session_setup_cuda_kernel_shared (hashcat_ctx, device_param);
       }
 
       if (device_param->is_hip == true)
       {
-        // GPU memset
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_memset, device_param->hip_module_shared, "gpu_memset") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_memset, &device_param->kernel_wgs_memset) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_memset = device_param->device_local_mem_size - device_param->kernel_local_mem_size_memset;
-
-        device_param->kernel_preferred_wgs_multiple_memset = device_param->hip_warp_size;
-
-        // GPU bzero
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_bzero, device_param->hip_module_shared, "gpu_bzero") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_bzero = device_param->device_local_mem_size - device_param->kernel_local_mem_size_bzero;
-
-        device_param->kernel_preferred_wgs_multiple_bzero = device_param->hip_warp_size;
-
-        // GPU autotune init
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_atinit, device_param->hip_module_shared, "gpu_atinit") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_atinit = device_param->device_local_mem_size - device_param->kernel_local_mem_size_atinit;
-
-        device_param->kernel_preferred_wgs_multiple_atinit = device_param->hip_warp_size;
-
-        // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]); if (CL_rc == -1) return -1;
-        // CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]); if (CL_rc == -1) return -1;
-
-        // GPU decompress
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_decompress, device_param->hip_module_shared, "gpu_decompress") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_decompress = device_param->device_local_mem_size - device_param->kernel_local_mem_size_decompress;
-
-        device_param->kernel_preferred_wgs_multiple_decompress = device_param->hip_warp_size;
-
-        // GPU utf8 to utf16le conversion
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_utf8toutf16le, device_param->hip_module_shared, "gpu_utf8_to_utf16") == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size_utf8toutf16le = device_param->device_local_mem_size - device_param->kernel_local_mem_size_utf8toutf16le;
-
-        device_param->kernel_preferred_wgs_multiple_utf8toutf16le = device_param->hip_warp_size;
+        rc = backend_session_setup_hip_kernel_shared (hashcat_ctx, device_param);
       }
 
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        // GPU memset
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_memset", &device_param->metal_function_memset, &device_param->metal_pipeline_memset) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_memset, &device_param->kernel_wgs_memset) == -1) return -1;
-
-        device_param->kernel_local_mem_size_memset = 0;
-        device_param->kernel_dynamic_local_mem_size_memset = 0;
-        device_param->kernel_preferred_wgs_multiple_memset = device_param->metal_warp_size;
-
-        // GPU bzero
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_bzero", &device_param->metal_function_bzero, &device_param->metal_pipeline_bzero) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
-
-        device_param->kernel_local_mem_size_bzero = 0;
-        device_param->kernel_dynamic_local_mem_size_bzero = 0;
-        device_param->kernel_preferred_wgs_multiple_bzero = device_param->metal_warp_size;
-
-        // GPU autotune init
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_atinit", &device_param->metal_function_atinit, &device_param->metal_pipeline_atinit) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
-
-        device_param->kernel_local_mem_size_atinit = 0;
-        device_param->kernel_dynamic_local_mem_size_atinit = 0;
-        device_param->kernel_preferred_wgs_multiple_atinit = device_param->metal_warp_size;
-
-        // GPU decompress
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_decompress", &device_param->metal_function_decompress, &device_param->metal_pipeline_decompress) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
-
-        device_param->kernel_local_mem_size_decompress = 0;
-        device_param->kernel_dynamic_local_mem_size_decompress = 0;
-        device_param->kernel_preferred_wgs_multiple_decompress = device_param->metal_warp_size;
-
-        // GPU utf8 to utf16le conversion
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_shared, "gpu_utf8_to_utf16", &device_param->metal_function_utf8toutf16le, &device_param->metal_pipeline_utf8toutf16le) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
-
-        device_param->kernel_local_mem_size_utf8toutf16le = 0;
-        device_param->kernel_dynamic_local_mem_size_utf8toutf16le = 0;
-        device_param->kernel_preferred_wgs_multiple_utf8toutf16le = device_param->metal_warp_size;
+        rc = backend_session_setup_metal_kernel_shared (hashcat_ctx, device_param);
       }
       #endif
 
       if (device_param->is_opencl == true)
       {
-        // GPU memset
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_memset", &device_param->opencl_kernel_memset) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_memset");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_wgs_memset) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_local_mem_size_memset) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_dynamic_local_mem_size_memset) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_memset, &device_param->kernel_preferred_wgs_multiple_memset) == -1) return -1;
-
-        // GPU bzero
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_bzero", &device_param->opencl_kernel_bzero) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_bzero");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_wgs_bzero) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_local_mem_size_bzero) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_dynamic_local_mem_size_bzero) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_bzero, &device_param->kernel_preferred_wgs_multiple_bzero) == -1) return -1;
-
-        // apple hack, but perhaps also an alternative for other vendors
-
-        if (device_param->kernel_preferred_wgs_multiple == 0) device_param->kernel_preferred_wgs_multiple = device_param->kernel_preferred_wgs_multiple_bzero;
-
-        // GPU autotune init
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_atinit", &device_param->opencl_kernel_atinit) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_atinit");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_wgs_atinit) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_local_mem_size_atinit) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_dynamic_local_mem_size_atinit) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_atinit, &device_param->kernel_preferred_wgs_multiple_atinit) == -1) return -1;
-
-        // GPU decompress
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_decompress", &device_param->opencl_kernel_decompress) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_decompress");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_wgs_decompress) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_local_mem_size_decompress) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_dynamic_local_mem_size_decompress) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_decompress, &device_param->kernel_preferred_wgs_multiple_decompress) == -1) return -1;
-
-        // GPU utf8 to utf16le conversion
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_shared, "gpu_utf8_to_utf16", &device_param->opencl_kernel_utf8toutf16le) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "gpu_utf8_to_utf16");
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_wgs_utf8toutf16le) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_local_mem_size_utf8toutf16le) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_dynamic_local_mem_size_utf8toutf16le) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_utf8toutf16le, &device_param->kernel_preferred_wgs_multiple_utf8toutf16le) == -1) return -1;
+        rc = backend_session_setup_opencl_kernel_shared (hashcat_ctx, device_param);
       }
+
+      if (rc == -2)
+      {
+        backend_kernel_create_warnings++;
+
+        continue;
+      }
+
+      if (rc == -1) return -1;
+
     }
 
     /**
@@ -11627,6 +14543,13 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
           if (sscanf (jit_build_options, "-D FIXED_LOCAL_SIZE=%u", &fixed_local_size) == 1)
           {
+            device_param->kernel_threads_min = fixed_local_size;
+            device_param->kernel_threads_max = fixed_local_size;
+          }
+          else if (sscanf (jit_build_options, "-D FORCED_THREAD_COUNT=%u", &fixed_local_size) == 1)
+          {
+            // FORCED_THREAD_COUNT is the same as FIXED_LOCAL_SIZE, but has no impact on the kernel jit
+
             device_param->kernel_threads_min = fixed_local_size;
             device_param->kernel_threads_max = fixed_local_size;
           }
@@ -12132,50 +15055,37 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      // gpu only
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s1_a)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s1_b)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s1_c)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s1_d)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s2_a)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s2_b)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s2_c)    == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, bitmap_ctx->bitmap_size, NULL, &device_param->metal_d_bitmap_s2_d)    == -1) return -1;
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_a);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_b);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_c);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_d);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_a);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_b);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_c);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_d);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_plains,             NULL, plain_bufs);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_digests,            NULL, digests_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_shown,              NULL, digests_shown);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_salts,              NULL, salt_bufs);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_results,            NULL, result);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_extra_buffer1,      NULL, extra0_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_extra_buffer2,      NULL, extra1_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_extra_buffer3,      NULL, extra2_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_extra_buffer4,      NULL, extra3_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_st_digests,         NULL, st_digests_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_st_salts,           NULL, st_salts_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_kernel_params,      NULL, kernel_param);
 
-      // shared
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_plains,             NULL, &device_param->metal_d_plain_bufs)     == -1) return -1;
-
-      // gpu only
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_digests,            NULL, &device_param->metal_d_digests_buf)    == -1) return -1;
-
-      // shared
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_shown,              NULL, &device_param->metal_d_digests_shown)  == -1) return -1;
-
-      // gpu only
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_salts,              NULL, &device_param->metal_d_salt_bufs)      == -1) return -1;
-
-      // shared
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_results,            NULL, &device_param->metal_d_result)         == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_extra_buffer1,      NULL, &device_param->metal_d_extra0_buf)     == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_extra_buffer2,      NULL, &device_param->metal_d_extra1_buf)     == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_extra_buffer3,      NULL, &device_param->metal_d_extra2_buf)     == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_extra_buffer4,      NULL, &device_param->metal_d_extra3_buf)     == -1) return -1;
-
-      // gpu only
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_st_digests,         NULL, &device_param->metal_d_st_digests_buf) == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_st_salts,           NULL, &device_param->metal_d_st_salts_buf)   == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_kernel_params,      NULL, &device_param->metal_d_kernel_param)   == -1) return -1;
-
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_a, 0, bitmap_ctx->bitmap_s1_a, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_b, 0, bitmap_ctx->bitmap_s1_b, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_c, 0, bitmap_ctx->bitmap_s1_c, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_d, 0, bitmap_ctx->bitmap_s1_d, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_a, 0, bitmap_ctx->bitmap_s2_a, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_b, 0, bitmap_ctx->bitmap_s2_b, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_c, 0, bitmap_ctx->bitmap_s2_c, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_d, 0, bitmap_ctx->bitmap_s2_d, bitmap_ctx->bitmap_size) == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_digests_buf, 0, hashes->digests_buf,     size_digests)            == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_salt_bufs,   0, hashes->salts_buf,       size_salts)              == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_a, 0, bitmap_ctx->bitmap_s1_a, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_b, 0, bitmap_ctx->bitmap_s1_b, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_c, 0, bitmap_ctx->bitmap_s1_c, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s1_d, 0, bitmap_ctx->bitmap_s1_d, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_a, 0, bitmap_ctx->bitmap_s2_a, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_b, 0, bitmap_ctx->bitmap_s2_b, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_c, 0, bitmap_ctx->bitmap_s2_c, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_bitmap_s2_d, 0, bitmap_ctx->bitmap_s2_d, bitmap_ctx->bitmap_size) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_digests_buf, 0, hashes->digests_buf,     size_digests)            == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_salt_bufs,   0, hashes->salts_buf,       size_salts)              == -1) return -1;
 
       /**
        * special buffers
@@ -12183,57 +15093,51 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       if (user_options->slow_candidates == true)
       {
-        // gpu only
-        if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_rules_c, NULL, &device_param->metal_d_rules_c) == -1) return -1;
+        HC_MTL_CREATEBUFFER(hashcat_ctx, size_rules_c,          NULL, rules_c);
       }
       else
       {
         if (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)
         {
-          // gpu only
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_rules, NULL, &device_param->metal_d_rules) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_rules_c, NULL, &device_param->metal_d_rules_c) == -1) return -1;
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_rules,          NULL, rules);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_rules_c,        NULL, rules_c);
 
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_rules, 0, straight_ctx->kernel_rules_buf, size_rules_src) == -1) return -1;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_rules, 0, straight_ctx->kernel_rules_buf, size_rules_src) == -1) return -1;
         }
         else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)
         {
-          // gpu only
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_combs, NULL, &device_param->metal_d_combs) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_combs, NULL, &device_param->metal_d_combs_c) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_root_css, NULL, &device_param->metal_d_root_css_buf) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_markov_css, NULL, &device_param->metal_d_markov_css_buf) == -1) return -1;
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_combs,          NULL, combs);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_combs,          NULL, combs_c);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_root_css,       NULL, root_css_buf);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_markov_css,     NULL, markov_css_buf);
         }
         else if (user_options_extra->attack_kern == ATTACK_KERN_BF)
         {
-          // gpu only
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_bfs, NULL, &device_param->metal_d_bfs) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_bfs, NULL, &device_param->metal_d_bfs_c) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_tm, NULL, &device_param->metal_d_tm_c) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_root_css, NULL, &device_param->metal_d_root_css_buf) == -1) return -1;
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_markov_css, NULL, &device_param->metal_d_markov_css_buf) == -1) return -1;
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_bfs,            NULL, bfs);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_bfs,            NULL, bfs_c);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_tm,             NULL, tm_c);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_root_css,       NULL, root_css_buf);
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_markov_css,     NULL, markov_css_buf);
         }
       }
 
       if (size_esalts)
       {
-        // gpu only
-        if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_esalts, NULL, &device_param->metal_d_esalt_bufs) == -1) return -1;
+        HC_MTL_CREATEBUFFER(hashcat_ctx, size_esalts,           NULL, esalt_bufs);
 
-        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_esalt_bufs, 0, hashes->esalts_buf, size_esalts) == -1) return -1;
+        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_esalt_bufs, 0, hashes->esalts_buf, size_esalts) == -1) return -1;
       }
 
       if (hashconfig->st_hash != NULL)
       {
-        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_st_digests_buf, 0, hashes->st_digests_buf, size_st_digests) == -1) return -1;
-        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_st_salts_buf, 0, hashes->st_salts_buf, size_st_salts) == -1) return -1;
+        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_st_digests_buf, 0, hashes->st_digests_buf, size_st_digests) == -1) return -1;
+        if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_st_salts_buf, 0, hashes->st_salts_buf, size_st_salts) == -1) return -1;
 
         if (size_esalts)
         {
-          // gpu only
-          if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_st_esalts, NULL, &device_param->metal_d_st_esalts_buf) == -1) return -1;
+          HC_MTL_CREATEBUFFER(hashcat_ctx, size_st_esalts,      NULL, st_esalts_buf);
 
-          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_st_esalts_buf, 0, hashes->st_esalts_buf, size_st_esalts) == -1) return -1;
+          if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_st_esalts_buf, 0, hashes->st_esalts_buf, size_st_esalts) == -1) return -1;
         }
       }
     }
@@ -12241,26 +15145,26 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->is_opencl == true)
     {
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s1_a)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s1_b)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s1_c)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s1_d)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s2_a)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s2_b)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s2_c)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   bitmap_ctx->bitmap_size, NULL, &device_param->opencl_d_bitmap_s2_d)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_plains,             NULL, &device_param->opencl_d_plain_bufs)     == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_digests,            NULL, &device_param->opencl_d_digests_buf)    == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_shown,              NULL, &device_param->opencl_d_digests_shown)  == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_salts,              NULL, &device_param->opencl_d_salt_bufs)      == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_results,            NULL, &device_param->opencl_d_result)         == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_extra_buffer1,      NULL, &device_param->opencl_d_extra0_buf)     == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_extra_buffer2,      NULL, &device_param->opencl_d_extra1_buf)     == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_extra_buffer3,      NULL, &device_param->opencl_d_extra2_buf)     == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_extra_buffer4,      NULL, &device_param->opencl_d_extra3_buf)     == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_st_digests,         NULL, &device_param->opencl_d_st_digests_buf) == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_st_salts,           NULL, &device_param->opencl_d_st_salts_buf)   == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_kernel_params,      NULL, &device_param->opencl_d_kernel_param)   == -1) return -1;
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_a);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_b);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_c);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s1_d);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_a);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_b);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_c);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, bitmap_ctx->bitmap_size, NULL, bitmap_s2_d);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_plains,             NULL, plain_bufs);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_digests,            NULL, digests_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_shown,              NULL, digests_shown);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_salts,              NULL, salt_bufs);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_results,            NULL, result);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_extra_buffer1,      NULL, extra0_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_extra_buffer2,      NULL, extra1_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_extra_buffer3,      NULL, extra2_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_extra_buffer4,      NULL, extra3_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_st_digests,         NULL, st_digests_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_st_salts,           NULL, st_salts_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_kernel_params,      NULL, kernel_param);
 
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_bitmap_s1_a, CL_TRUE, 0, bitmap_ctx->bitmap_size, bitmap_ctx->bitmap_s1_a, 0, NULL, NULL) == -1) return -1;
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_bitmap_s1_b, CL_TRUE, 0, bitmap_ctx->bitmap_size, bitmap_ctx->bitmap_s1_b, 0, NULL, NULL) == -1) return -1;
@@ -12271,7 +15175,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_bitmap_s2_c, CL_TRUE, 0, bitmap_ctx->bitmap_size, bitmap_ctx->bitmap_s2_c, 0, NULL, NULL) == -1) return -1;
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_bitmap_s2_d, CL_TRUE, 0, bitmap_ctx->bitmap_size, bitmap_ctx->bitmap_s2_d, 0, NULL, NULL) == -1) return -1;
       if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_digests_buf, CL_TRUE, 0, size_digests,            hashes->digests_buf,     0, NULL, NULL) == -1) return -1;
-      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_salt_bufs,   CL_FALSE, 0, size_salts,              hashes->salts_buf,       0, NULL, NULL) == -1) return -1;
+      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_salt_bufs,   CL_TRUE, 0, size_salts,              hashes->salts_buf,       0, NULL, NULL) == -1) return -1;
 
       /**
        * special buffers
@@ -12279,51 +15183,51 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
       if (user_options->slow_candidates == true)
       {
-        if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_rules_c, NULL, &device_param->opencl_d_rules_c)   == -1) return -1;
+        HC_OCL_CREATEBUFFER(hashcat_ctx, size_rules_c,          NULL, rules_c);
       }
       else
       {
         if (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)
         {
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_rules,   NULL, &device_param->opencl_d_rules)   == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_rules_c, NULL, &device_param->opencl_d_rules_c) == -1) return -1;
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_rules,          NULL, rules);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_rules_c,        NULL, rules_c);
 
-          if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_rules, CL_TRUE, 0, size_rules_src, straight_ctx->kernel_rules_buf, 0, NULL, NULL) == -1) return -1;
+          if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_rules,   CL_TRUE, 0, size_rules_src, straight_ctx->kernel_rules_buf, 0, NULL, NULL) == -1) return -1;
         }
         else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)
         {
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_combs,      NULL, &device_param->opencl_d_combs)          == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_combs,      NULL, &device_param->opencl_d_combs_c)        == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_root_css,   NULL, &device_param->opencl_d_root_css_buf)   == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_markov_css, NULL, &device_param->opencl_d_markov_css_buf) == -1) return -1;
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_combs,          NULL, combs);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_combs,          NULL, combs_c);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_root_css,       NULL, root_css_buf);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_markov_css,     NULL, markov_css_buf);
         }
         else if (user_options_extra->attack_kern == ATTACK_KERN_BF)
         {
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_bfs,        NULL, &device_param->opencl_d_bfs)            == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_bfs,        NULL, &device_param->opencl_d_bfs_c)          == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_tm,         NULL, &device_param->opencl_d_tm_c)           == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_root_css,   NULL, &device_param->opencl_d_root_css_buf)   == -1) return -1;
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_markov_css, NULL, &device_param->opencl_d_markov_css_buf) == -1) return -1;
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_bfs,            NULL, bfs);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_bfs,            NULL, bfs_c);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_tm,             NULL, tm_c);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_root_css,       NULL, root_css_buf);
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_markov_css,     NULL, markov_css_buf);
         }
       }
 
       if (size_esalts)
       {
-        if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_esalts, NULL, &device_param->opencl_d_esalt_bufs) == -1) return -1;
+        HC_OCL_CREATEBUFFER(hashcat_ctx, size_esalts,           NULL, esalt_bufs);
 
-        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_esalt_bufs, CL_TRUE, 0, size_esalts, hashes->esalts_buf, 0, NULL, NULL) == -1) return -1;
+        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_esalt_bufs,      CL_TRUE, 0, size_esalts,     hashes->esalts_buf,      0, NULL, NULL) == -1) return -1;
       }
 
       if (hashconfig->st_hash != NULL)
       {
-        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_digests_buf,  CL_FALSE, 0, size_st_digests,         hashes->st_digests_buf,  0, NULL, NULL) == -1) return -1;
-        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_salts_buf,    CL_FALSE, 0, size_st_salts,           hashes->st_salts_buf,    0, NULL, NULL) == -1) return -1;
+        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_digests_buf,  CL_TRUE, 0, size_st_digests, hashes->st_digests_buf,  0, NULL, NULL) == -1) return -1;
+        if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_salts_buf,    CL_TRUE, 0, size_st_salts,   hashes->st_salts_buf,    0, NULL, NULL) == -1) return -1;
 
         if (size_esalts)
         {
-          if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY, size_st_esalts, NULL, &device_param->opencl_d_st_esalts_buf) == -1) return -1;
+          HC_OCL_CREATEBUFFER(hashcat_ctx, size_st_esalts,      NULL, st_esalts_buf);
 
-          if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_esalts_buf, CL_TRUE, 0, size_st_esalts, hashes->st_esalts_buf, 0, NULL, NULL) == -1) return -1;
+          if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_st_esalts_buf, CL_TRUE, 0, size_st_esalts,  hashes->st_esalts_buf,   0, NULL, NULL) == -1) return -1;
         }
       }
 
@@ -12412,30 +15316,30 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     if (device_param->is_metal == true)
     {
       device_param->kernel_params[ 0] = NULL; // device_param->metal_d_pws_buf;
-      device_param->kernel_params[ 1] = device_param->metal_d_rules_c;
-      device_param->kernel_params[ 2] = device_param->metal_d_combs_c;
-      device_param->kernel_params[ 3] = device_param->metal_d_bfs_c;
+      device_param->kernel_params[ 1] = device_param->metal_d_rules_c.buf_ptr;
+      device_param->kernel_params[ 2] = device_param->metal_d_combs_c.buf_ptr;
+      device_param->kernel_params[ 3] = device_param->metal_d_bfs_c.buf_ptr;
       device_param->kernel_params[ 4] = NULL; // device_param->metal_d_tmps;
       device_param->kernel_params[ 5] = NULL; // device_param->metal_d_hooks;
-      device_param->kernel_params[ 6] = device_param->metal_d_bitmap_s1_a;
-      device_param->kernel_params[ 7] = device_param->metal_d_bitmap_s1_b;
-      device_param->kernel_params[ 8] = device_param->metal_d_bitmap_s1_c;
-      device_param->kernel_params[ 9] = device_param->metal_d_bitmap_s1_d;
-      device_param->kernel_params[10] = device_param->metal_d_bitmap_s2_a;
-      device_param->kernel_params[11] = device_param->metal_d_bitmap_s2_b;
-      device_param->kernel_params[12] = device_param->metal_d_bitmap_s2_c;
-      device_param->kernel_params[13] = device_param->metal_d_bitmap_s2_d;
-      device_param->kernel_params[14] = device_param->metal_d_plain_bufs;
-      device_param->kernel_params[15] = device_param->metal_d_digests_buf;
-      device_param->kernel_params[16] = device_param->metal_d_digests_shown;
-      device_param->kernel_params[17] = device_param->metal_d_salt_bufs;
-      device_param->kernel_params[18] = device_param->metal_d_esalt_bufs;
-      device_param->kernel_params[19] = device_param->metal_d_result;
-      device_param->kernel_params[20] = device_param->metal_d_extra0_buf;
-      device_param->kernel_params[21] = device_param->metal_d_extra1_buf;
-      device_param->kernel_params[22] = device_param->metal_d_extra2_buf;
-      device_param->kernel_params[23] = device_param->metal_d_extra3_buf;
-      device_param->kernel_params[24] = device_param->metal_d_kernel_param;
+      device_param->kernel_params[ 6] = device_param->metal_d_bitmap_s1_a.buf_ptr;
+      device_param->kernel_params[ 7] = device_param->metal_d_bitmap_s1_b.buf_ptr;
+      device_param->kernel_params[ 8] = device_param->metal_d_bitmap_s1_c.buf_ptr;
+      device_param->kernel_params[ 9] = device_param->metal_d_bitmap_s1_d.buf_ptr;
+      device_param->kernel_params[10] = device_param->metal_d_bitmap_s2_a.buf_ptr;
+      device_param->kernel_params[11] = device_param->metal_d_bitmap_s2_b.buf_ptr;
+      device_param->kernel_params[12] = device_param->metal_d_bitmap_s2_c.buf_ptr;
+      device_param->kernel_params[13] = device_param->metal_d_bitmap_s2_d.buf_ptr;
+      device_param->kernel_params[14] = device_param->metal_d_plain_bufs.buf_ptr;
+      device_param->kernel_params[15] = device_param->metal_d_digests_buf.buf_ptr;
+      device_param->kernel_params[16] = device_param->metal_d_digests_shown.buf_ptr;
+      device_param->kernel_params[17] = device_param->metal_d_salt_bufs.buf_ptr;
+      device_param->kernel_params[18] = device_param->metal_d_esalt_bufs.buf_ptr;
+      device_param->kernel_params[19] = device_param->metal_d_result.buf_ptr;
+      device_param->kernel_params[20] = device_param->metal_d_extra0_buf.buf_ptr;
+      device_param->kernel_params[21] = device_param->metal_d_extra1_buf.buf_ptr;
+      device_param->kernel_params[22] = device_param->metal_d_extra2_buf.buf_ptr;
+      device_param->kernel_params[23] = device_param->metal_d_extra3_buf.buf_ptr;
+      device_param->kernel_params[24] = device_param->metal_d_kernel_param.buf_ptr;
     }
     #endif // __APPLE__
 
@@ -12495,7 +15399,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         #if defined (__APPLE__)
         if (device_param->is_metal == true)
         {
-          device_param->kernel_params_mp[0] = device_param->metal_d_combs;
+          device_param->kernel_params_mp[0] = device_param->metal_d_combs.buf_ptr;
         }
         #endif
 
@@ -12521,7 +15425,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
           #if defined (__APPLE__)
           if (device_param->is_metal == true)
           {
-            device_param->kernel_params_mp[0] = device_param->metal_d_combs;
+            device_param->kernel_params_mp[0] = device_param->metal_d_combs.buf_ptr;
           }
           #endif
 
@@ -12553,8 +15457,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        device_param->kernel_params_mp[1] = device_param->metal_d_root_css_buf;
-        device_param->kernel_params_mp[2] = device_param->metal_d_markov_css_buf;
+        device_param->kernel_params_mp[1] = device_param->metal_d_root_css_buf.buf_ptr;
+        device_param->kernel_params_mp[2] = device_param->metal_d_markov_css_buf.buf_ptr;
       }
       #endif
 
@@ -12598,8 +15502,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        device_param->kernel_params_mp_l[1] = device_param->metal_d_root_css_buf;
-        device_param->kernel_params_mp_l[2] = device_param->metal_d_markov_css_buf;
+        device_param->kernel_params_mp_l[1] = device_param->metal_d_root_css_buf.buf_ptr;
+        device_param->kernel_params_mp_l[2] = device_param->metal_d_markov_css_buf.buf_ptr;
       }
       #endif
 
@@ -12641,9 +15545,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        device_param->kernel_params_mp_r[0] = device_param->metal_d_bfs;
-        device_param->kernel_params_mp_r[1] = device_param->metal_d_root_css_buf;
-        device_param->kernel_params_mp_r[2] = device_param->metal_d_markov_css_buf;
+        device_param->kernel_params_mp_r[0] = device_param->metal_d_bfs.buf_ptr;
+        device_param->kernel_params_mp_r[1] = device_param->metal_d_root_css_buf.buf_ptr;
+        device_param->kernel_params_mp_r[2] = device_param->metal_d_markov_css_buf.buf_ptr;
       }
       #endif
 
@@ -12687,9 +15591,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         device_param->kernel_params_amp[0] = NULL; // device_param->metal_d_pws_buf;
         device_param->kernel_params_amp[1] = NULL; // device_param->metal_d_pws_amp_buf;
-        device_param->kernel_params_amp[2] = device_param->metal_d_rules_c;
-        device_param->kernel_params_amp[3] = device_param->metal_d_combs_c;
-        device_param->kernel_params_amp[4] = device_param->metal_d_bfs_c;
+        device_param->kernel_params_amp[2] = device_param->metal_d_rules_c.buf_ptr;
+        device_param->kernel_params_amp[3] = device_param->metal_d_combs_c.buf_ptr;
+        device_param->kernel_params_amp[4] = device_param->metal_d_bfs_c.buf_ptr;
       }
       #endif
 
@@ -12720,8 +15624,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       #if defined (__APPLE__)
       if (device_param->is_metal == true)
       {
-        device_param->kernel_params_tm[0] = device_param->metal_d_bfs_c;
-        device_param->kernel_params_tm[1] = device_param->metal_d_tm_c;
+        device_param->kernel_params_tm[0] = device_param->metal_d_bfs_c.buf_ptr;
+        device_param->kernel_params_tm[1] = device_param->metal_d_tm_c.buf_ptr;
       }
       #endif
 
@@ -12800,750 +15704,48 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
      * kernel name
      */
 
+    int rc = -1;
+
     if (device_param->is_cuda == true)
     {
-      char kernel_name[64] = { 0 };
-
-      if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-      {
-        if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-            device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-            device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-            device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function4, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
-
-            device_param->kernel_preferred_wgs_multiple4 = device_param->cuda_warp_size;
-          }
-        }
-        else
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-            device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-            device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-            device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
-
-            if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function4, device_param->cuda_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
-
-            device_param->kernel_preferred_wgs_multiple4 = device_param->cuda_warp_size;
-          }
-        }
-
-        if (user_options->slow_candidates == true)
-        {
-        }
-        else
-        {
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
-
-              if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_tm, device_param->cuda_module, kernel_name) == -1)
-              {
-                event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-                backend_kernel_create_warnings++;
-
-                device_param->skipped_warning = true;
-                continue;
-              }
-
-              if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_tm, &device_param->kernel_wgs_tm) == -1) return -1;
-
-              if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
-
-              device_param->kernel_dynamic_local_mem_size_tm = device_param->device_local_mem_size - device_param->kernel_local_mem_size_tm;
-
-              device_param->kernel_preferred_wgs_multiple_tm = device_param->cuda_warp_size;
-            }
-          }
-        }
-      }
-      else
-      {
-        // kernel1
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function1, device_param->cuda_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-        device_param->kernel_preferred_wgs_multiple1 = device_param->cuda_warp_size;
-
-        // kernel2
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2, device_param->cuda_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-        device_param->kernel_preferred_wgs_multiple2 = device_param->cuda_warp_size;
-
-        // kernel3
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
-
-        if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function3, device_param->cuda_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-        if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-        device_param->kernel_preferred_wgs_multiple3 = device_param->cuda_warp_size;
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
-        {
-          // kernel2p
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2p, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_wgs2p) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size2p;
-
-          device_param->kernel_preferred_wgs_multiple2p = device_param->cuda_warp_size;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
-        {
-          // kernel2e
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function2e, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function2e, &device_param->kernel_wgs2e) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size2e = device_param->device_local_mem_size - device_param->kernel_local_mem_size2e;
-
-          device_param->kernel_preferred_wgs_multiple2e = device_param->cuda_warp_size;
-        }
-
-        // kernel12
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function12, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function12, &device_param->kernel_wgs12) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function12, &device_param->kernel_local_mem_size12) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size12 = device_param->device_local_mem_size - device_param->kernel_local_mem_size12;
-
-          device_param->kernel_preferred_wgs_multiple12 = device_param->cuda_warp_size;
-        }
-
-        // kernel23
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function23, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function23, &device_param->kernel_wgs23) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function23, &device_param->kernel_local_mem_size23) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size23 = device_param->device_local_mem_size - device_param->kernel_local_mem_size23;
-
-          device_param->kernel_preferred_wgs_multiple23 = device_param->cuda_warp_size;
-        }
-
-        // init2
-
-        if (hashconfig->opts_type & OPTS_TYPE_INIT2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_init2, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_init2, &device_param->kernel_wgs_init2) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_init2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_init2;
-
-          device_param->kernel_preferred_wgs_multiple_init2 = device_param->cuda_warp_size;
-        }
-
-        // loop2 prepare
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_loop2p, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_loop2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2p;
-
-          device_param->kernel_preferred_wgs_multiple_loop2p = device_param->cuda_warp_size;
-        }
-
-        // loop2
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_loop2, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_loop2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2;
-
-          device_param->kernel_preferred_wgs_multiple_loop2 = device_param->cuda_warp_size;
-        }
-
-        // aux1
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX1)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux1, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux1;
-
-          device_param->kernel_preferred_wgs_multiple_aux1 = device_param->cuda_warp_size;
-        }
-
-        // aux2
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux2, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux2;
-
-          device_param->kernel_preferred_wgs_multiple_aux2 = device_param->cuda_warp_size;
-        }
-
-        // aux3
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX3)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux3, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux3;
-
-          device_param->kernel_preferred_wgs_multiple_aux3 = device_param->cuda_warp_size;
-        }
-
-        // aux4
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX4)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_aux4, device_param->cuda_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux4;
-
-          device_param->kernel_preferred_wgs_multiple_aux4 = device_param->cuda_warp_size;
-        }
-      }
-
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]); if (CL_rc == -1) return -1;
-
-      // MP start
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (user_options->attack_mode == ATTACK_MODE_BF)
-        {
-          // mp_l
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp_l, device_param->cuda_module_mp, "l_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp_l = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_l;
-
-          device_param->kernel_preferred_wgs_multiple_mp_l = device_param->cuda_warp_size;
-
-          // mp_r
-
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp_r, device_param->cuda_module_mp, "r_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp_r = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_r;
-
-          device_param->kernel_preferred_wgs_multiple_mp_r = device_param->cuda_warp_size;
-
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]); if (CL_rc == -1) return -1;
-              //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]); if (CL_rc == -1) return -1;
-            }
-          }
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
-        {
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp, device_param->cuda_module_mp, "C_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
-
-          device_param->kernel_preferred_wgs_multiple_mp = device_param->cuda_warp_size;
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
-        {
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_mp, device_param->cuda_module_mp, "C_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
-
-          device_param->kernel_preferred_wgs_multiple_mp = device_param->cuda_warp_size;
-        }
-      }
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          if (hc_cuModuleGetFunction (hashcat_ctx, &device_param->cuda_function_amp, device_param->cuda_module_amp, "amp") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_cuda_kernel_wgs (hashcat_ctx, device_param->cuda_function_amp, &device_param->kernel_wgs_amp) == -1) return -1;
-
-          if (get_cuda_kernel_local_mem_size (hashcat_ctx, device_param->cuda_function_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_amp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_amp;
-
-          device_param->kernel_preferred_wgs_multiple_amp = device_param->cuda_warp_size;
-        }
-
-        /*
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          for (u32 i = 0; i < 5; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-
-          for (u32 i = 5; i < 6; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-
-          for (u32 i = 6; i < 7; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-        }
-        */
-      }
-
+      rc = backend_session_setup_cuda_kernel_types (hashcat_ctx, device_param, kern_type);
+    }
+
+    if (device_param->is_hip == true)
+    {
+      rc = backend_session_setup_hip_kernel_types (hashcat_ctx, device_param, kern_type);
+    }
+
+    #if defined (__APPLE__)
+    if (device_param->is_metal == true)
+    {
+      rc = backend_session_setup_metal_kernel_types (hashcat_ctx, device_param, kern_type);
+    }
+    #endif
+
+    if (device_param->is_opencl == true)
+    {
+      rc = backend_session_setup_opencl_kernel_types (hashcat_ctx, device_param, kern_type);
+    }
+
+    if (rc == -2)
+    {
+      backend_kernel_create_warnings++;
+
+      continue;
+    }
+
+    if (rc == -1) return -1;
+
+    if (device_param->is_cuda == true)
+    {
       // zero some data buffers
 
       if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_plain_bufs,    device_param->size_plains)  == -1) return -1;
       if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_digests_shown, device_param->size_shown)   == -1) return -1;
       if (run_cuda_kernel_bzero (hashcat_ctx, device_param, device_param->cuda_d_result,        device_param->size_results) == -1) return -1;
 
-      /**
-       * special buffers
-       */
+      // special buffers
 
       if (user_options->slow_candidates == true)
       {
@@ -13579,9 +15781,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         if ((user_options->attack_mode == ATTACK_MODE_HYBRID1) || (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          /**
-           * prepare mp
-           */
+          // prepare mp
 
           if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
           {
@@ -13606,9 +15806,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         }
         else if (user_options->attack_mode == ATTACK_MODE_BF)
         {
-          /**
-           * prepare mp_r and mp_l
-           */
+          // prepare mp_r and mp_l
 
           device_param->kernel_params_mp_l_buf32[6] = 0;
           device_param->kernel_params_mp_l_buf32[7] = 0;
@@ -13628,748 +15826,13 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->is_hip == true)
     {
-      char kernel_name[64] = { 0 };
-
-      if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-      {
-        if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-            device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-            device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-            device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function4, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
-
-            device_param->kernel_preferred_wgs_multiple4 = device_param->hip_warp_size;
-          }
-        }
-        else
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-            device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-            device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-            device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
-
-            if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function4, device_param->hip_module, kernel_name) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            device_param->kernel_dynamic_local_mem_size4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size4;
-
-            device_param->kernel_preferred_wgs_multiple4 = device_param->hip_warp_size;
-          }
-        }
-
-        if (user_options->slow_candidates == true)
-        {
-        }
-        else
-        {
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
-
-              if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_tm, device_param->hip_module, kernel_name) == -1)
-              {
-                event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-                backend_kernel_create_warnings++;
-
-                device_param->skipped_warning = true;
-                continue;
-              }
-
-              if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_tm, &device_param->kernel_wgs_tm) == -1) return -1;
-
-              if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
-
-              device_param->kernel_dynamic_local_mem_size_tm = device_param->device_local_mem_size - device_param->kernel_local_mem_size_tm;
-
-              device_param->kernel_preferred_wgs_multiple_tm = device_param->hip_warp_size;
-            }
-          }
-        }
-      }
-      else
-      {
-        // kernel1
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function1, device_param->hip_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function1, &device_param->kernel_wgs1) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size1;
-
-        device_param->kernel_preferred_wgs_multiple1 = device_param->hip_warp_size;
-
-        // kernel2
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2, device_param->hip_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2, &device_param->kernel_wgs2) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size2;
-
-        device_param->kernel_preferred_wgs_multiple2 = device_param->hip_warp_size;
-
-        // kernel3
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
-
-        if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function3, device_param->hip_module, kernel_name) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function3, &device_param->kernel_wgs3) == -1) return -1;
-
-        if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-        device_param->kernel_dynamic_local_mem_size3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size3;
-
-        device_param->kernel_preferred_wgs_multiple3 = device_param->hip_warp_size;
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
-        {
-          // kernel2p
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2p, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2p, &device_param->kernel_wgs2p) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size2p;
-
-          device_param->kernel_preferred_wgs_multiple2p = device_param->hip_warp_size;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
-        {
-          // kernel2e
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function2e, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function2e, &device_param->kernel_wgs2e) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size2e = device_param->device_local_mem_size - device_param->kernel_local_mem_size2e;
-
-          device_param->kernel_preferred_wgs_multiple2e = device_param->hip_warp_size;
-        }
-
-        // kernel12
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function12, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function12, &device_param->kernel_wgs12) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function12, &device_param->kernel_local_mem_size12) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size12 = device_param->device_local_mem_size - device_param->kernel_local_mem_size12;
-
-          device_param->kernel_preferred_wgs_multiple12 = device_param->hip_warp_size;
-        }
-
-        // kernel23
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function23, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function23, &device_param->kernel_wgs23) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function23, &device_param->kernel_local_mem_size23) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size23 = device_param->device_local_mem_size - device_param->kernel_local_mem_size23;
-
-          device_param->kernel_preferred_wgs_multiple23 = device_param->hip_warp_size;
-        }
-
-        // init2
-
-        if (hashconfig->opts_type & OPTS_TYPE_INIT2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_init2, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_init2, &device_param->kernel_wgs_init2) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_init2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_init2;
-
-          device_param->kernel_preferred_wgs_multiple_init2 = device_param->hip_warp_size;
-        }
-
-        // loop2 prepare
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_loop2p, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_loop2p = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2p;
-
-          device_param->kernel_preferred_wgs_multiple_loop2p = device_param->hip_warp_size;
-        }
-
-        // loop2
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_loop2, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_loop2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_loop2;
-
-          device_param->kernel_preferred_wgs_multiple_loop2 = device_param->hip_warp_size;
-        }
-
-        // aux1
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX1)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux1, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux1 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux1;
-
-          device_param->kernel_preferred_wgs_multiple_aux1 = device_param->hip_warp_size;
-        }
-
-        // aux2
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux2, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux2 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux2;
-
-          device_param->kernel_preferred_wgs_multiple_aux2 = device_param->hip_warp_size;
-        }
-
-        // aux3
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX3)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux3, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux3 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux3;
-
-          device_param->kernel_preferred_wgs_multiple_aux3 = device_param->hip_warp_size;
-        }
-
-        // aux4
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX4)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_aux4, device_param->hip_module, kernel_name) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_aux4 = device_param->device_local_mem_size - device_param->kernel_local_mem_size_aux4;
-
-          device_param->kernel_preferred_wgs_multiple_aux4 = device_param->hip_warp_size;
-        }
-      }
-
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]); if (CL_rc == -1) return -1;
-      //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]); if (CL_rc == -1) return -1;
-
-      // MP start
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (user_options->attack_mode == ATTACK_MODE_BF)
-        {
-          // mp_l
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp_l, device_param->hip_module_mp, "l_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp_l = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_l;
-
-          device_param->kernel_preferred_wgs_multiple_mp_l = device_param->hip_warp_size;
-
-          // mp_r
-
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp_r, device_param->hip_module_mp, "r_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp_r = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp_r;
-
-          device_param->kernel_preferred_wgs_multiple_mp_r = device_param->hip_warp_size;
-
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]); if (CL_rc == -1) return -1;
-              //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]); if (CL_rc == -1) return -1;
-            }
-          }
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
-        {
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp, device_param->hip_module_mp, "C_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
-
-          device_param->kernel_preferred_wgs_multiple_mp = device_param->hip_warp_size;
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
-        {
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_mp, device_param->hip_module_mp, "C_markov") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_mp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_mp;
-
-          device_param->kernel_preferred_wgs_multiple_mp = device_param->hip_warp_size;
-        }
-      }
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          if (hc_hipModuleGetFunction (hashcat_ctx, &device_param->hip_function_amp, device_param->hip_module_amp, "amp") == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_hip_kernel_wgs (hashcat_ctx, device_param->hip_function_amp, &device_param->kernel_wgs_amp) == -1) return -1;
-
-          if (get_hip_kernel_local_mem_size (hashcat_ctx, device_param->hip_function_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
-
-          device_param->kernel_dynamic_local_mem_size_amp = device_param->device_local_mem_size - device_param->kernel_local_mem_size_amp;
-
-          device_param->kernel_preferred_wgs_multiple_amp = device_param->hip_warp_size;
-        }
-
-        /*
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          for (u32 i = 0; i < 5; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-
-          for (u32 i = 5; i < 6; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-
-          for (u32 i = 6; i < 7; i++)
-          {
-            //CL_rc = hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]);
-
-            //if (CL_rc == -1) return -1;
-          }
-        }
-        */
-      }
-
       // zero some data buffers
 
       if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_plain_bufs,    device_param->size_plains)  == -1) return -1;
       if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_digests_shown, device_param->size_shown)   == -1) return -1;
       if (run_hip_kernel_bzero (hashcat_ctx, device_param, device_param->hip_d_result,        device_param->size_results) == -1) return -1;
 
-      /**
-       * special buffers
-       */
+      // special buffers
 
       if (user_options->slow_candidates == true)
       {
@@ -14405,9 +15868,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         if ((user_options->attack_mode == ATTACK_MODE_HYBRID1) || (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          /**
-           * prepare mp
-           */
+          // prepare mp
 
           if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
           {
@@ -14432,9 +15893,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         }
         else if (user_options->attack_mode == ATTACK_MODE_BF)
         {
-          /**
-           * prepare mp_r and mp_l
-           */
+          // prepare mp_r and mp_l
 
           device_param->kernel_params_mp_l_buf32[6] = 0;
           device_param->kernel_params_mp_l_buf32[7] = 0;
@@ -14455,714 +15914,13 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      char kernel_name[64] = { 0 };
-
-      if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-      {
-        if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1: m%05u_s%02d
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-            device_param->kernel_local_mem_size1 = 0;
-
-            device_param->kernel_dynamic_local_mem_size1 = 0;
-
-            // kernel2: m%05u_s%02d
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-            device_param->kernel_local_mem_size2 = 0;
-
-            device_param->kernel_dynamic_local_mem_size2 = 0;
-
-            // kernel3: m%05u_s%02d
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-
-            device_param->kernel_local_mem_size3 = 0;
-
-            device_param->kernel_dynamic_local_mem_size3 = 0;
-          }
-          else
-          {
-            // kernel4: m%05u_sxx
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function4, &device_param->metal_pipeline4) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
-
-            device_param->kernel_local_mem_size4 = 0;
-
-            device_param->kernel_dynamic_local_mem_size4 = 0;
-          }
-        }
-        else // multi
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-            device_param->kernel_local_mem_size1 = 0;
-
-            device_param->kernel_dynamic_local_mem_size1 = 0;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-            device_param->kernel_local_mem_size2 = 0;
-
-            device_param->kernel_dynamic_local_mem_size2 = 0;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-
-            device_param->kernel_local_mem_size3 = 0;
-
-            device_param->kernel_dynamic_local_mem_size3 = 0;
-          }
-          else
-          {
-            // kernel4
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
-
-            if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function4, &device_param->metal_pipeline4) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
-
-            device_param->kernel_local_mem_size4 = 0;
-
-            device_param->kernel_dynamic_local_mem_size4 = 0;
-          }
-        }
-
-        if (user_options->slow_candidates == true)
-        {
-        }
-        else
-        {
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
-
-              if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_tm, &device_param->metal_pipeline_tm) == -1)
-              {
-                event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-                backend_kernel_create_warnings++;
-
-                device_param->skipped_warning = true;
-                continue;
-              }
-
-              if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_tm, &device_param->kernel_wgs_tm) == -1) return -1;
-
-              if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_tm, &device_param->kernel_preferred_wgs_multiple_tm) == -1) return -1;
-
-              device_param->kernel_local_mem_size_tm = 0;
-
-              device_param->kernel_dynamic_local_mem_size_tm = 0;
-            }
-          }
-        }
-      }
-      else
-      {
-        // kernel1: m%05u_init
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function1, &device_param->metal_pipeline1) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_wgs1) == -1) return -1;
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-        device_param->kernel_local_mem_size1 = 0;
-
-        device_param->kernel_dynamic_local_mem_size1 = 0;
-
-        // kernel2: m%05u_loop
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2, &device_param->metal_pipeline2) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_wgs2) == -1) return -1;
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-        device_param->kernel_local_mem_size2 = 0;
-
-        device_param->kernel_dynamic_local_mem_size2 = 0;
-
-        // kernel3: m%05u_comp
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
-
-        if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function3, &device_param->metal_pipeline3) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_wgs3) == -1) return -1;
-
-        if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-
-        device_param->kernel_local_mem_size3 = 0;
-
-        device_param->kernel_dynamic_local_mem_size3 = 0;
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
-        {
-          // kernel2p: m%05u_loop_prepare
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2p, &device_param->metal_pipeline2p) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline2p, &device_param->kernel_wgs2p) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline2p, &device_param->kernel_preferred_wgs_multiple2p) == -1) return -1;
-
-          device_param->kernel_local_mem_size2p = 0;
-
-          device_param->kernel_dynamic_local_mem_size2p = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
-        {
-          // kernel2e: m%05u_loop_extended
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function2e, &device_param->metal_pipeline2e) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline2e, &device_param->kernel_wgs2e) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline2e, &device_param->kernel_preferred_wgs_multiple2e) == -1) return -1;
-
-          device_param->kernel_local_mem_size2e = 0;
-
-          device_param->kernel_dynamic_local_mem_size2e = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
-        {
-          // kernel12: m%05u_hook12
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function12, &device_param->metal_pipeline12) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline12, &device_param->kernel_wgs12) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline12, &device_param->kernel_preferred_wgs_multiple12) == -1) return -1;
-
-          device_param->kernel_local_mem_size12 = 0;
-
-          device_param->kernel_dynamic_local_mem_size12 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
-        {
-          // kernel23: m%05u_hook23
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function23, &device_param->metal_pipeline23) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline23, &device_param->kernel_wgs23) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline23, &device_param->kernel_preferred_wgs_multiple23) == -1) return -1;
-
-          device_param->kernel_local_mem_size23 = 0;
-
-          device_param->kernel_dynamic_local_mem_size23 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_INIT2)
-        {
-          // init2: m%05u_init2
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_init2, &device_param->metal_pipeline_init2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_init2, &device_param->kernel_wgs_init2) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_init2, &device_param->kernel_preferred_wgs_multiple_init2) == -1) return -1;
-
-          device_param->kernel_local_mem_size_init2 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_init2 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
-        {
-          // loop2 prepare: m%05u_loop2_prepare
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_loop2p, &device_param->metal_pipeline_loop2p) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_loop2p, &device_param->kernel_preferred_wgs_multiple_loop2p) == -1) return -1;
-
-          device_param->kernel_local_mem_size_loop2p = 0;
-
-          device_param->kernel_dynamic_local_mem_size_loop2p = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
-        {
-          // loop2: m%05u_loop2
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_loop2, &device_param->metal_pipeline_loop2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_loop2, &device_param->kernel_preferred_wgs_multiple_loop2) == -1) return -1;
-
-          device_param->kernel_local_mem_size_loop2 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_loop2 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX1)
-        {
-          // aux1: m%05u_aux1
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux1, &device_param->metal_pipeline_aux1) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_aux1, &device_param->kernel_preferred_wgs_multiple_aux1) == -1) return -1;
-
-          device_param->kernel_local_mem_size_aux1 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_aux1 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX2)
-        {
-          // aux2: m%05u_aux2
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux2, &device_param->metal_pipeline_aux2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_aux2, &device_param->kernel_preferred_wgs_multiple_aux2) == -1) return -1;
-
-          device_param->kernel_local_mem_size_aux2 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_aux2 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX3)
-        {
-          // aux3: m%05u_aux3
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux3, &device_param->metal_pipeline_aux3) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_aux3, &device_param->kernel_preferred_wgs_multiple_aux3) == -1) return -1;
-
-          device_param->kernel_local_mem_size_aux3 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_aux3 = 0;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX4)
-        {
-          // aux4: m%05u_aux4
-
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library, kernel_name, &device_param->metal_function_aux4, &device_param->metal_pipeline_aux4) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_aux4, &device_param->kernel_preferred_wgs_multiple_aux4) == -1) return -1;
-
-          device_param->kernel_local_mem_size_aux4 = 0;
-
-          device_param->kernel_dynamic_local_mem_size_aux4 = 0;
-        }
-      }
-
-      // MP start
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (user_options->attack_mode == ATTACK_MODE_BF)
-        {
-          // mp_l: l_markov
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "l_markov", &device_param->metal_function_mp_l, &device_param->metal_pipeline_mp_l) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_mp_l, &device_param->kernel_preferred_wgs_multiple_mp_l) == -1) return -1;
-
-          device_param->kernel_local_mem_size_mp_l = 0;
-
-          device_param->kernel_dynamic_local_mem_size_mp_l = 0;
-
-          // mp_r: r_markov
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "r_markov", &device_param->metal_function_mp_r, &device_param->metal_pipeline_mp_r) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_mp_r, &device_param->kernel_preferred_wgs_multiple_mp_r) == -1) return -1;
-
-          device_param->kernel_local_mem_size_mp_r = 0;
-
-          device_param->kernel_dynamic_local_mem_size_mp_r = 0;
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
-        {
-          // mp_c: C_markov
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "C_markov", &device_param->metal_function_mp, &device_param->metal_pipeline_mp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
-
-          device_param->kernel_local_mem_size_mp = 0;
-
-          device_param->kernel_dynamic_local_mem_size_mp = 0;
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
-        {
-          // mp_c: C_markov
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_mp, "C_markov", &device_param->metal_function_mp, &device_param->metal_pipeline_mp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
-
-          device_param->kernel_local_mem_size_mp = 0;
-
-          device_param->kernel_dynamic_local_mem_size_mp = 0;
-        }
-      }
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          // amp
-
-          if (hc_mtlCreateKernel (hashcat_ctx, device_param->metal_device, device_param->metal_library_amp, "amp", &device_param->metal_function_amp, &device_param->metal_pipeline_amp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (hc_mtlGetMaxTotalThreadsPerThreadgroup (hashcat_ctx, device_param->metal_pipeline_amp, &device_param->kernel_wgs_amp) == -1) return -1;
-
-          if (hc_mtlGetThreadExecutionWidth (hashcat_ctx, device_param->metal_pipeline_amp, &device_param->kernel_preferred_wgs_multiple_amp) == -1) return -1;
-
-          device_param->kernel_local_mem_size_amp = 0;
-
-          device_param->kernel_dynamic_local_mem_size_amp = 0;
-        }
-      }
-
       // zero some data buffers
 
       if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_plain_bufs,    device_param->size_plains)  == -1) return -1;
       if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_digests_shown, device_param->size_shown)   == -1) return -1;
       if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_result,        device_param->size_results) == -1) return -1;
 
-      /**
-       * special buffers
-       */
+      // special buffers
 
       if (user_options->slow_candidates == true)
       {
@@ -15198,9 +15956,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         if ((user_options->attack_mode == ATTACK_MODE_HYBRID1) || (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          /**
-           * prepare mp
-           */
+          // prepare mp
 
           if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
           {
@@ -15223,9 +15979,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         }
         else if (user_options->attack_mode == ATTACK_MODE_BF)
         {
-          /**
-           * prepare mp_r and mp_l
-           */
+          // prepare mp_r and mp_l
 
           device_param->kernel_params_mp_l_buf32[6] = 0;
           device_param->kernel_params_mp_l_buf32[7] = 0;
@@ -15239,754 +15993,17 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         }
       }
     }
-    #endif // __APPLE__
+    #endif
 
     if (device_param->is_opencl == true)
     {
-      // GPU autotune init
-
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 0, sizeof (cl_mem),   device_param->kernel_params_atinit[0]) == -1) return -1;
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_atinit, 1, sizeof (cl_ulong), device_param->kernel_params_atinit[1]) == -1) return -1;
-
-      // GPU utf8 to utf16le init
-
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_utf8toutf16le, 0, sizeof (cl_mem),   device_param->kernel_params_utf8toutf16le[0]) == -1) return -1;
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_utf8toutf16le, 1, sizeof (cl_ulong), device_param->kernel_params_utf8toutf16le[1]) == -1) return -1;
-
-      // GPU decompress
-
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 0, sizeof (cl_mem),   device_param->kernel_params_decompress[0]) == -1) return -1;
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 1, sizeof (cl_mem),   device_param->kernel_params_decompress[1]) == -1) return -1;
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 2, sizeof (cl_mem),   device_param->kernel_params_decompress[2]) == -1) return -1;
-      if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_decompress, 3, sizeof (cl_ulong), device_param->kernel_params_decompress[3]) == -1) return -1;
-
-      char kernel_name[64] = { 0 };
-
-      if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-      {
-        if (hashconfig->opti_type & OPTI_TYPE_SINGLE_HASH)
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 4);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 8);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_s%02d", kern_type, 16);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_sxx", kern_type);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel4) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_dynamic_local_mem_size4) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
-          }
-        }
-        else
-        {
-          if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
-          {
-            // kernel1
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 4);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-            // kernel2
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 8);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-            // kernel3
-
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_m%02d", kern_type, 16);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-          }
-          else
-          {
-            snprintf (kernel_name, sizeof (kernel_name), "m%05u_mxx", kern_type);
-
-            if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel4) == -1)
-            {
-              event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-              backend_kernel_create_warnings++;
-
-              device_param->skipped_warning = true;
-              continue;
-            }
-
-            if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_wgs4) == -1) return -1;
-
-            if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_local_mem_size4) == -1) return -1;
-
-            if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_dynamic_local_mem_size4) == -1) return -1;
-
-            if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel4, &device_param->kernel_preferred_wgs_multiple4) == -1) return -1;
-          }
-        }
-
-        if (user_options->slow_candidates == true)
-        {
-        }
-        else
-        {
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              snprintf (kernel_name, sizeof (kernel_name), "m%05u_tm", kern_type);
-
-              if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_tm) == -1)
-              {
-                event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-                backend_kernel_create_warnings++;
-
-                device_param->skipped_warning = true;
-                continue;
-              }
-
-              if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_wgs_tm) == -1) return -1;
-
-              if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_local_mem_size_tm) == -1) return -1;
-
-              if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_dynamic_local_mem_size_tm) == -1) return -1;
-
-              if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_tm, &device_param->kernel_preferred_wgs_multiple_tm) == -1) return -1;
-            }
-          }
-        }
-      }
-      else
-      {
-        // kernel1
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_init", kern_type);
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel1) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_wgs1) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_local_mem_size1) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_dynamic_local_mem_size1) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel1, &device_param->kernel_preferred_wgs_multiple1) == -1) return -1;
-
-        // kernel2
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop", kern_type);
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_wgs2) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_local_mem_size2) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_dynamic_local_mem_size2) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2, &device_param->kernel_preferred_wgs_multiple2) == -1) return -1;
-
-        // kernel3
-
-        snprintf (kernel_name, sizeof (kernel_name), "m%05u_comp", kern_type);
-
-        if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel3) == -1)
-        {
-          event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-          backend_kernel_create_warnings++;
-
-          device_param->skipped_warning = true;
-          continue;
-        }
-
-        if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_wgs3) == -1) return -1;
-
-        if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_local_mem_size3) == -1) return -1;
-
-        if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_dynamic_local_mem_size3) == -1) return -1;
-
-        if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel3, &device_param->kernel_preferred_wgs_multiple3) == -1) return -1;
-
-        // aux1
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_PREPARE)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_prepare", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2p) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_wgs2p) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_local_mem_size2p) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_dynamic_local_mem_size2p) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2p, &device_param->kernel_preferred_wgs_multiple2p) == -1) return -1;
-        }
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP_EXTENDED)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop_extended", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel2e) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_wgs2e) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_local_mem_size2e) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_dynamic_local_mem_size2e) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel2e, &device_param->kernel_preferred_wgs_multiple2e) == -1) return -1;
-        }
-
-        // kernel12
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK12)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook12", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel12) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_wgs12) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_local_mem_size12) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_dynamic_local_mem_size12) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel12, &device_param->kernel_preferred_wgs_multiple12) == -1) return -1;
-        }
-
-        // kernel23
-
-        if (hashconfig->opts_type & OPTS_TYPE_HOOK23)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_hook23", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel23) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_wgs23) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_local_mem_size23) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_dynamic_local_mem_size23) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel23, &device_param->kernel_preferred_wgs_multiple23) == -1) return -1;
-        }
-
-        // init2
-
-        if (hashconfig->opts_type & OPTS_TYPE_INIT2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_init2", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_init2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_wgs_init2) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_local_mem_size_init2) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_dynamic_local_mem_size_init2) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_init2, &device_param->kernel_preferred_wgs_multiple_init2) == -1) return -1;
-        }
-
-        // loop2 prepare
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2_PREPARE)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2_prepare", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_loop2p) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_wgs_loop2p) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_local_mem_size_loop2p) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_dynamic_local_mem_size_loop2p) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_loop2p, &device_param->kernel_preferred_wgs_multiple_loop2p) == -1) return -1;
-        }
-
-        // loop2
-
-        if (hashconfig->opts_type & OPTS_TYPE_LOOP2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_loop2", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_loop2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_wgs_loop2) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_local_mem_size_loop2) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_dynamic_local_mem_size_loop2) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_loop2, &device_param->kernel_preferred_wgs_multiple_loop2) == -1) return -1;
-        }
-
-        // aux1
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX1)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux1", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux1) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_wgs_aux1) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_local_mem_size_aux1) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_dynamic_local_mem_size_aux1) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux1, &device_param->kernel_preferred_wgs_multiple_aux1) == -1) return -1;
-        }
-
-        // aux2
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX2)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux2", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux2) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_wgs_aux2) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_local_mem_size_aux2) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_dynamic_local_mem_size_aux2) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux2, &device_param->kernel_preferred_wgs_multiple_aux2) == -1) return -1;
-        }
-
-        // aux3
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX3)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux3", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux3) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_wgs_aux3) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_local_mem_size_aux3) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_dynamic_local_mem_size_aux3) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux3, &device_param->kernel_preferred_wgs_multiple_aux3) == -1) return -1;
-        }
-
-        // aux4
-
-        if (hashconfig->opts_type & OPTS_TYPE_AUX4)
-        {
-          snprintf (kernel_name, sizeof (kernel_name), "m%05u_aux4", kern_type);
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program, kernel_name, &device_param->opencl_kernel_aux4) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, kernel_name);
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_wgs_aux4) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_local_mem_size_aux4) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_dynamic_local_mem_size_aux4) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_aux4, &device_param->kernel_preferred_wgs_multiple_aux4) == -1) return -1;
-        }
-      }
-
-      // MP start
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (user_options->attack_mode == ATTACK_MODE_BF)
-        {
-          // mp_l
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "l_markov", &device_param->opencl_kernel_mp_l) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "l_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_wgs_mp_l) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_local_mem_size_mp_l) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_dynamic_local_mem_size_mp_l) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp_l, &device_param->kernel_preferred_wgs_multiple_mp_l) == -1) return -1;
-
-          // mp_r
-
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "r_markov", &device_param->opencl_kernel_mp_r) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "r_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_wgs_mp_r) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_local_mem_size_mp_r) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_dynamic_local_mem_size_mp_r) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp_r, &device_param->kernel_preferred_wgs_multiple_mp_r) == -1) return -1;
-
-          if (user_options->attack_mode == ATTACK_MODE_BF)
-          {
-            if (hashconfig->opts_type & OPTS_TYPE_TM_KERNEL)
-            {
-              if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 0, sizeof (cl_mem), device_param->kernel_params_tm[0]) == -1) return -1;
-              if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_tm, 1, sizeof (cl_mem), device_param->kernel_params_tm[1]) == -1) return -1;
-            }
-          }
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
-        {
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "C_markov", &device_param->opencl_kernel_mp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_dynamic_local_mem_size_mp) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
-        }
-        else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
-        {
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_mp, "C_markov", &device_param->opencl_kernel_mp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "C_markov");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_wgs_mp) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_local_mem_size_mp) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_dynamic_local_mem_size_mp) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_mp, &device_param->kernel_preferred_wgs_multiple_mp) == -1) return -1;
-        }
-      }
-
-      if (user_options->slow_candidates == true)
-      {
-      }
-      else
-      {
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          if (hc_clCreateKernel (hashcat_ctx, device_param->opencl_program_amp, "amp", &device_param->opencl_kernel_amp) == -1)
-          {
-            event_log_warning (hashcat_ctx, "* Device #%u: Kernel %s create failed.", device_param->device_id + 1, "amp");
-
-            backend_kernel_create_warnings++;
-
-            device_param->skipped_warning = true;
-            continue;
-          }
-
-          if (get_opencl_kernel_wgs (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_wgs_amp) == -1) return -1;
-
-          if (get_opencl_kernel_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_local_mem_size_amp) == -1) return -1;
-
-          if (get_opencl_kernel_dynamic_local_mem_size (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_dynamic_local_mem_size_amp) == -1) return -1;
-
-          if (get_opencl_kernel_preferred_wgs_multiple (hashcat_ctx, device_param, device_param->opencl_kernel_amp, &device_param->kernel_preferred_wgs_multiple_amp) == -1) return -1;
-        }
-
-        if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-        {
-          // nothing to do
-        }
-        else
-        {
-          for (u32 i = 0; i < 5; i++)
-          {
-            if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_mem), device_param->kernel_params_amp[i]) == -1) return -1;
-          }
-
-          for (u32 i = 5; i < 6; i++)
-          {
-            if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_uint), device_param->kernel_params_amp[i]) == -1) return -1;
-          }
-
-          for (u32 i = 6; i < 7; i++)
-          {
-            if (hc_clSetKernelArg (hashcat_ctx, device_param->opencl_kernel_amp, i, sizeof (cl_ulong), device_param->kernel_params_amp[i]) == -1) return -1;
-          }
-        }
-      }
-
       // zero some data buffers
 
       if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_plain_bufs,    device_param->size_plains)   == -1) return -1;
       if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_digests_shown, device_param->size_shown)    == -1) return -1;
       if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_result,        device_param->size_results)  == -1) return -1;
 
-      /**
-       * special buffers
-       */
+      // special buffers
 
       if (user_options->slow_candidates == true)
       {
@@ -16022,9 +16039,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       {
         if ((user_options->attack_mode == ATTACK_MODE_HYBRID1) || (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          /**
-           * prepare mp
-           */
+          // prepare mp
 
           if (user_options->attack_mode == ATTACK_MODE_HYBRID1)
           {
@@ -16049,9 +16064,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         }
         else if (user_options->attack_mode == ATTACK_MODE_BF)
         {
-          /**
-           * prepare mp_r and mp_l
-           */
+          // prepare mp_r and mp_l
 
           device_param->kernel_params_mp_l_buf32[6] = 0;
           device_param->kernel_params_mp_l_buf32[7] = 0;
@@ -16201,7 +16214,6 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       device_param->overtune_unfriendly = true;
     }
 
-
     device_param->kernel_threads = 0;
     device_param->kernel_accel = 0;
 
@@ -16265,7 +16277,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
       if (device_param->is_cuda   == true) local_size_bytes = cuda_query_max_local_size_bytes   (hashcat_ctx, device_param);
       if (device_param->is_hip    == true) local_size_bytes = hip_query_max_local_size_bytes    (hashcat_ctx, device_param);
       if (device_param->is_opencl == true) local_size_bytes = opencl_query_max_local_size_bytes (hashcat_ctx, device_param);
-      // metal todo
+      #if defined (__APPLE__)
+      if (device_param->is_metal  == true) local_size_bytes = metal_query_max_local_size_bytes  (hashcat_ctx, device_param);
+      #endif
     }
 
     const u64 size_device_extra1234 = size_extra_buffer1 + size_extra_buffer2 + size_extra_buffer3 + size_extra_buffer4;
@@ -16561,12 +16575,12 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_pws,      NULL, &device_param->metal_d_pws_buf)      == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_pws_amp,  NULL, &device_param->metal_d_pws_amp_buf)  == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_pws_comp, NULL, &device_param->metal_d_pws_comp_buf) == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_pws_idx,  NULL, &device_param->metal_d_pws_idx)      == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_tmps,     NULL, &device_param->metal_d_tmps)         == -1) return -1;
-      if (hc_mtlCreateBuffer (hashcat_ctx, device_param->metal_device, size_hooks,    NULL, &device_param->metal_d_hooks)        == -1) return -1;
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_pws,      NULL, pws_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_pws_amp,  NULL, pws_amp_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_pws_comp, NULL, pws_comp_buf);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_pws_idx,  NULL, pws_idx);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_tmps,     NULL, tmps);
+      HC_MTL_CREATEBUFFER(hashcat_ctx, size_hooks,    NULL, hooks);
 
       if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_pws_buf,       device_param->size_pws)      == -1) return -1;
       if (run_metal_kernel_bzero (hashcat_ctx, device_param, device_param->metal_d_pws_amp_buf,   device_param->size_pws_amp)  == -1) return -1;
@@ -16579,12 +16593,12 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->is_opencl == true)
     {
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_pws,      NULL, &device_param->opencl_d_pws_buf)      == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_pws_amp,  NULL, &device_param->opencl_d_pws_amp_buf)  == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_pws_comp, NULL, &device_param->opencl_d_pws_comp_buf) == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_ONLY,   size_pws_idx,  NULL, &device_param->opencl_d_pws_idx)      == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_tmps,     NULL, &device_param->opencl_d_tmps)         == -1) return -1;
-      if (hc_clCreateBuffer (hashcat_ctx, device_param->opencl_context, CL_MEM_READ_WRITE,  size_hooks,    NULL, &device_param->opencl_d_hooks)        == -1) return -1;
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_pws,      NULL, pws_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_pws_amp,  NULL, pws_amp_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_pws_comp, NULL, pws_comp_buf);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_pws_idx,  NULL, pws_idx);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_tmps,     NULL, tmps);
+      HC_OCL_CREATEBUFFER(hashcat_ctx, size_hooks,    NULL, hooks);
 
       if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_pws_buf,       device_param->size_pws)      == -1) return -1;
       if (run_opencl_kernel_bzero (hashcat_ctx, device_param, device_param->opencl_d_pws_amp_buf,   device_param->size_pws_amp)  == -1) return -1;
@@ -16600,7 +16614,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 
     if (hashconfig->bridge_type)
     {
-      void *h_tmps = hcmalloc_aligned (device_param->size_tmps, 64);
+      void *h_tmps = hcmalloc_bridge_aligned (device_param->size_tmps, 64);
 
       device_param->h_tmps = h_tmps;
     }
@@ -16664,9 +16678,9 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      device_param->kernel_params[ 0] = device_param->metal_d_pws_buf;
-      device_param->kernel_params[ 4] = device_param->metal_d_tmps;
-      device_param->kernel_params[ 5] = device_param->metal_d_hooks;
+      device_param->kernel_params[ 0] = device_param->metal_d_pws_buf.buf_ptr;
+      device_param->kernel_params[ 4] = device_param->metal_d_tmps.buf_ptr;
+      device_param->kernel_params[ 5] = device_param->metal_d_hooks.buf_ptr;
     }
     #endif
 
@@ -16712,8 +16726,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
           if (device_param->is_metal == true)
           {
             device_param->kernel_params_mp[0] = (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-                                              ? device_param->metal_d_pws_buf
-                                              : device_param->metal_d_pws_amp_buf;
+                                              ? device_param->metal_d_pws_buf.buf_ptr
+                                              : device_param->metal_d_pws_amp_buf.buf_ptr;
           }
           #endif
 
@@ -16752,8 +16766,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         if (device_param->is_metal == true)
         {
           device_param->kernel_params_mp_l[0] = (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-                                              ? device_param->metal_d_pws_buf
-                                              : device_param->metal_d_pws_amp_buf;
+                                              ? device_param->metal_d_pws_buf.buf_ptr
+                                              : device_param->metal_d_pws_amp_buf.buf_ptr;
         }
         #endif
 
@@ -16794,8 +16808,8 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
         #if defined (__APPLE__)
         if (device_param->is_metal == true)
         {
-          device_param->kernel_params_amp[0] = device_param->metal_d_pws_buf;
-          device_param->kernel_params_amp[1] = device_param->metal_d_pws_amp_buf;
+          device_param->kernel_params_amp[0] = device_param->metal_d_pws_buf.buf_ptr;
+          device_param->kernel_params_amp[1] = device_param->metal_d_pws_amp_buf.buf_ptr;
         }
         #endif
 
@@ -16839,11 +16853,11 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      device_param->kernel_params_decompress[0] = device_param->metal_d_pws_idx;
-      device_param->kernel_params_decompress[1] = device_param->metal_d_pws_comp_buf;
+      device_param->kernel_params_decompress[0] = device_param->metal_d_pws_idx.buf_ptr;
+      device_param->kernel_params_decompress[1] = device_param->metal_d_pws_comp_buf.buf_ptr;
       device_param->kernel_params_decompress[2] = (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
-                                                ? device_param->metal_d_pws_buf
-                                                : device_param->metal_d_pws_amp_buf;
+                                                ? device_param->metal_d_pws_buf.buf_ptr
+                                                : device_param->metal_d_pws_amp_buf.buf_ptr;
     }
     #endif
 
@@ -16929,7 +16943,7 @@ void backend_session_destroy (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->skipped == true) continue;
 
-    hcfree_aligned (device_param->h_tmps);
+    hcfree_bridge_aligned (device_param->h_tmps);
     hcfree (device_param->pws_comp);
     hcfree (device_param->pws_idx);
     hcfree (device_param->pws_pre_buf);
@@ -16944,552 +16958,325 @@ void backend_session_destroy (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->is_cuda == true)
     {
-      if (device_param->cuda_d_pws_buf)        hc_cuMemFree (hashcat_ctx, device_param->cuda_d_pws_buf);
-      if (device_param->cuda_d_pws_amp_buf)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_pws_amp_buf);
-      if (device_param->cuda_d_pws_comp_buf)   hc_cuMemFree (hashcat_ctx, device_param->cuda_d_pws_comp_buf);
-      if (device_param->cuda_d_pws_idx)        hc_cuMemFree (hashcat_ctx, device_param->cuda_d_pws_idx);
-      if (device_param->cuda_d_rules)          hc_cuMemFree (hashcat_ctx, device_param->cuda_d_rules);
-      //if (device_param->cuda_d_rules_c)        hc_cuMemFree (hashcat_ctx, device_param->cuda_d_rules_c);
-      if (device_param->cuda_d_combs)          hc_cuMemFree (hashcat_ctx, device_param->cuda_d_combs);
-      if (device_param->cuda_d_combs_c)        hc_cuMemFree (hashcat_ctx, device_param->cuda_d_combs_c);
-      if (device_param->cuda_d_bfs)            hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bfs);
-      //if (device_param->cuda_d_bfs_c)          hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bfs_c);
-      if (device_param->cuda_d_bitmap_s1_a)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s1_a);
-      if (device_param->cuda_d_bitmap_s1_b)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s1_b);
-      if (device_param->cuda_d_bitmap_s1_c)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s1_c);
-      if (device_param->cuda_d_bitmap_s1_d)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s1_d);
-      if (device_param->cuda_d_bitmap_s2_a)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s2_a);
-      if (device_param->cuda_d_bitmap_s2_b)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s2_b);
-      if (device_param->cuda_d_bitmap_s2_c)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s2_c);
-      if (device_param->cuda_d_bitmap_s2_d)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_bitmap_s2_d);
-      if (device_param->cuda_d_plain_bufs)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_plain_bufs);
-      if (device_param->cuda_d_digests_buf)    hc_cuMemFree (hashcat_ctx, device_param->cuda_d_digests_buf);
-      if (device_param->cuda_d_digests_shown)  hc_cuMemFree (hashcat_ctx, device_param->cuda_d_digests_shown);
-      if (device_param->cuda_d_salt_bufs)      hc_cuMemFree (hashcat_ctx, device_param->cuda_d_salt_bufs);
-      if (device_param->cuda_d_esalt_bufs)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_esalt_bufs);
-      if (device_param->cuda_d_tmps)           hc_cuMemFree (hashcat_ctx, device_param->cuda_d_tmps);
-      if (device_param->cuda_d_hooks)          hc_cuMemFree (hashcat_ctx, device_param->cuda_d_hooks);
-      if (device_param->cuda_d_result)         hc_cuMemFree (hashcat_ctx, device_param->cuda_d_result);
-      if (device_param->cuda_d_extra0_buf)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_extra0_buf);
-      if (device_param->cuda_d_extra1_buf)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_extra1_buf);
-      if (device_param->cuda_d_extra2_buf)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_extra2_buf);
-      if (device_param->cuda_d_extra3_buf)     hc_cuMemFree (hashcat_ctx, device_param->cuda_d_extra3_buf);
-      if (device_param->cuda_d_root_css_buf)   hc_cuMemFree (hashcat_ctx, device_param->cuda_d_root_css_buf);
-      if (device_param->cuda_d_markov_css_buf) hc_cuMemFree (hashcat_ctx, device_param->cuda_d_markov_css_buf);
-      if (device_param->cuda_d_tm_c)           hc_cuMemFree (hashcat_ctx, device_param->cuda_d_tm_c);
-      if (device_param->cuda_d_st_digests_buf) hc_cuMemFree (hashcat_ctx, device_param->cuda_d_st_digests_buf);
-      if (device_param->cuda_d_st_salts_buf)   hc_cuMemFree (hashcat_ctx, device_param->cuda_d_st_salts_buf);
-      if (device_param->cuda_d_st_esalts_buf)  hc_cuMemFree (hashcat_ctx, device_param->cuda_d_st_esalts_buf);
-      if (device_param->cuda_d_kernel_param)   hc_cuMemFree (hashcat_ctx, device_param->cuda_d_kernel_param);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_pws_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_pws_amp_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_pws_comp_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_pws_idx);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_rules);
+    //hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_rules_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_combs);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_combs_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bfs);
+    //hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bfs_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s1_a);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s1_b);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s1_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s1_d);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s2_a);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s2_b);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s2_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_bitmap_s2_d);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_plain_bufs);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_digests_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_digests_shown);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_salt_bufs);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_esalt_bufs);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_tmps);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_hooks);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_result);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_extra0_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_extra1_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_extra2_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_extra3_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_root_css_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_markov_css_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_tm_c);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_st_digests_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_st_salts_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_st_esalts_buf);
+      hc_cuMemFreePtr           (hashcat_ctx, &device_param->cuda_d_kernel_param);
 
-      if (device_param->cuda_event1)           hc_cuEventDestroy (hashcat_ctx, device_param->cuda_event1);
-      if (device_param->cuda_event2)           hc_cuEventDestroy (hashcat_ctx, device_param->cuda_event2);
-      if (device_param->cuda_event3)           hc_cuEventDestroy (hashcat_ctx, device_param->cuda_event3);
+      hc_cuEventDestroyPtr      (hashcat_ctx, &device_param->cuda_event1);
+      hc_cuEventDestroyPtr      (hashcat_ctx, &device_param->cuda_event2);
+      hc_cuEventDestroyPtr      (hashcat_ctx, &device_param->cuda_event3);
 
-      if (device_param->cuda_stream)           hc_cuStreamDestroy (hashcat_ctx, device_param->cuda_stream);
+      hc_cuStreamDestroyPtr     (hashcat_ctx, &device_param->cuda_stream);
 
-      if (device_param->cuda_module)           hc_cuModuleUnload (hashcat_ctx, device_param->cuda_module);
-      if (device_param->cuda_module_mp)        hc_cuModuleUnload (hashcat_ctx, device_param->cuda_module_mp);
-      if (device_param->cuda_module_amp)       hc_cuModuleUnload (hashcat_ctx, device_param->cuda_module_amp);
-      if (device_param->cuda_module_shared)    hc_cuModuleUnload (hashcat_ctx, device_param->cuda_module_shared);
+      hc_cuModuleUnloadPtr      (hashcat_ctx, &device_param->cuda_module);
+      hc_cuModuleUnloadPtr      (hashcat_ctx, &device_param->cuda_module_mp);
+      hc_cuModuleUnloadPtr      (hashcat_ctx, &device_param->cuda_module_amp);
+      hc_cuModuleUnloadPtr      (hashcat_ctx, &device_param->cuda_module_shared);
 
-      //if (device_param->cuda_context)          hc_cuCtxDestroy (hashcat_ctx, device_param->cuda_context);
+      device_param->cuda_d_rules_c              = 0;
+      device_param->cuda_d_bfs_c                = 0;
 
-      device_param->cuda_d_pws_buf            = 0;
-      device_param->cuda_d_pws_amp_buf        = 0;
-      device_param->cuda_d_pws_comp_buf       = 0;
-      device_param->cuda_d_pws_idx            = 0;
-      device_param->cuda_d_rules              = 0;
-      device_param->cuda_d_rules_c            = 0;
-      device_param->cuda_d_combs              = 0;
-      device_param->cuda_d_combs_c            = 0;
-      device_param->cuda_d_bfs                = 0;
-      device_param->cuda_d_bfs_c              = 0;
-      device_param->cuda_d_bitmap_s1_a        = 0;
-      device_param->cuda_d_bitmap_s1_b        = 0;
-      device_param->cuda_d_bitmap_s1_c        = 0;
-      device_param->cuda_d_bitmap_s1_d        = 0;
-      device_param->cuda_d_bitmap_s2_a        = 0;
-      device_param->cuda_d_bitmap_s2_b        = 0;
-      device_param->cuda_d_bitmap_s2_c        = 0;
-      device_param->cuda_d_bitmap_s2_d        = 0;
-      device_param->cuda_d_plain_bufs         = 0;
-      device_param->cuda_d_digests_buf        = 0;
-      device_param->cuda_d_digests_shown      = 0;
-      device_param->cuda_d_salt_bufs          = 0;
-      device_param->cuda_d_esalt_bufs         = 0;
-      device_param->cuda_d_tmps               = 0;
-      device_param->cuda_d_hooks              = 0;
-      device_param->cuda_d_result             = 0;
-      device_param->cuda_d_extra0_buf         = 0;
-      device_param->cuda_d_extra1_buf         = 0;
-      device_param->cuda_d_extra2_buf         = 0;
-      device_param->cuda_d_extra3_buf         = 0;
-      device_param->cuda_d_root_css_buf       = 0;
-      device_param->cuda_d_markov_css_buf     = 0;
-      device_param->cuda_d_tm_c               = 0;
-      device_param->cuda_d_st_digests_buf     = 0;
-      device_param->cuda_d_st_salts_buf       = 0;
-      device_param->cuda_d_st_esalts_buf      = 0;
-      device_param->cuda_d_kernel_param       = 0;
-
-      device_param->cuda_function1            = NULL;
-      device_param->cuda_function12           = NULL;
-      device_param->cuda_function2p           = NULL;
-      device_param->cuda_function2            = NULL;
-      device_param->cuda_function2e           = NULL;
-      device_param->cuda_function23           = NULL;
-      device_param->cuda_function3            = NULL;
-      device_param->cuda_function4            = NULL;
-      device_param->cuda_function_init2       = NULL;
-      device_param->cuda_function_loop2p      = NULL;
-      device_param->cuda_function_loop2       = NULL;
-      device_param->cuda_function_mp          = NULL;
-      device_param->cuda_function_mp_l        = NULL;
-      device_param->cuda_function_mp_r        = NULL;
-      device_param->cuda_function_tm          = NULL;
-      device_param->cuda_function_amp         = NULL;
-      device_param->cuda_function_memset      = NULL;
-      device_param->cuda_function_bzero       = NULL;
-      device_param->cuda_function_atinit      = NULL;
+      device_param->cuda_function1              = NULL;
+      device_param->cuda_function12             = NULL;
+      device_param->cuda_function2p             = NULL;
+      device_param->cuda_function2              = NULL;
+      device_param->cuda_function2e             = NULL;
+      device_param->cuda_function23             = NULL;
+      device_param->cuda_function3              = NULL;
+      device_param->cuda_function4              = NULL;
+      device_param->cuda_function_init2         = NULL;
+      device_param->cuda_function_loop2p        = NULL;
+      device_param->cuda_function_loop2         = NULL;
+      device_param->cuda_function_mp            = NULL;
+      device_param->cuda_function_mp_l          = NULL;
+      device_param->cuda_function_mp_r          = NULL;
+      device_param->cuda_function_tm            = NULL;
+      device_param->cuda_function_amp           = NULL;
+      device_param->cuda_function_memset        = NULL;
+      device_param->cuda_function_bzero         = NULL;
+      device_param->cuda_function_atinit        = NULL;
       device_param->cuda_function_utf8toutf16le = NULL;
-      device_param->cuda_function_decompress  = NULL;
-      device_param->cuda_function_aux1        = NULL;
-      device_param->cuda_function_aux2        = NULL;
-      device_param->cuda_function_aux3        = NULL;
-      device_param->cuda_function_aux4        = NULL;
+      device_param->cuda_function_decompress    = NULL;
+      device_param->cuda_function_aux1          = NULL;
+      device_param->cuda_function_aux2          = NULL;
+      device_param->cuda_function_aux3          = NULL;
+      device_param->cuda_function_aux4          = NULL;
 
-      device_param->cuda_event1               = NULL;
-      device_param->cuda_event2               = NULL;
-      device_param->cuda_event3               = NULL;
-
-      device_param->cuda_stream               = NULL;
-
-      device_param->cuda_module               = NULL;
-      device_param->cuda_module_mp            = NULL;
-      device_param->cuda_module_amp           = NULL;
-      device_param->cuda_module_shared        = NULL;
-
+      //if (device_param->cuda_context)         hc_cuCtxDestroy (hashcat_ctx, device_param->cuda_context);
       //device_param->cuda_context              = NULL;
     }
 
     if (device_param->is_hip == true)
     {
-      if (device_param->hip_d_pws_buf)        hc_hipMemFree (hashcat_ctx, device_param->hip_d_pws_buf);
-      if (device_param->hip_d_pws_amp_buf)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_pws_amp_buf);
-      if (device_param->hip_d_pws_comp_buf)   hc_hipMemFree (hashcat_ctx, device_param->hip_d_pws_comp_buf);
-      if (device_param->hip_d_pws_idx)        hc_hipMemFree (hashcat_ctx, device_param->hip_d_pws_idx);
-      if (device_param->hip_d_rules)          hc_hipMemFree (hashcat_ctx, device_param->hip_d_rules);
-      //if (device_param->hip_d_rules_c)        hc_hipMemFree (hashcat_ctx, device_param->hip_d_rules_c);
-      if (device_param->hip_d_combs)          hc_hipMemFree (hashcat_ctx, device_param->hip_d_combs);
-      if (device_param->hip_d_combs_c)        hc_hipMemFree (hashcat_ctx, device_param->hip_d_combs_c);
-      if (device_param->hip_d_bfs)            hc_hipMemFree (hashcat_ctx, device_param->hip_d_bfs);
-      //if (device_param->hip_d_bfs_c)          hc_hipMemFree (hashcat_ctx, device_param->hip_d_bfs_c);
-      if (device_param->hip_d_bitmap_s1_a)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s1_a);
-      if (device_param->hip_d_bitmap_s1_b)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s1_b);
-      if (device_param->hip_d_bitmap_s1_c)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s1_c);
-      if (device_param->hip_d_bitmap_s1_d)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s1_d);
-      if (device_param->hip_d_bitmap_s2_a)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s2_a);
-      if (device_param->hip_d_bitmap_s2_b)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s2_b);
-      if (device_param->hip_d_bitmap_s2_c)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s2_c);
-      if (device_param->hip_d_bitmap_s2_d)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_bitmap_s2_d);
-      if (device_param->hip_d_plain_bufs)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_plain_bufs);
-      if (device_param->hip_d_digests_buf)    hc_hipMemFree (hashcat_ctx, device_param->hip_d_digests_buf);
-      if (device_param->hip_d_digests_shown)  hc_hipMemFree (hashcat_ctx, device_param->hip_d_digests_shown);
-      if (device_param->hip_d_salt_bufs)      hc_hipMemFree (hashcat_ctx, device_param->hip_d_salt_bufs);
-      if (device_param->hip_d_esalt_bufs)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_esalt_bufs);
-      if (device_param->hip_d_tmps)           hc_hipMemFree (hashcat_ctx, device_param->hip_d_tmps);
-      if (device_param->hip_d_hooks)          hc_hipMemFree (hashcat_ctx, device_param->hip_d_hooks);
-      if (device_param->hip_d_result)         hc_hipMemFree (hashcat_ctx, device_param->hip_d_result);
-      if (device_param->hip_d_extra0_buf)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_extra0_buf);
-      if (device_param->hip_d_extra1_buf)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_extra1_buf);
-      if (device_param->hip_d_extra2_buf)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_extra2_buf);
-      if (device_param->hip_d_extra3_buf)     hc_hipMemFree (hashcat_ctx, device_param->hip_d_extra3_buf);
-      if (device_param->hip_d_root_css_buf)   hc_hipMemFree (hashcat_ctx, device_param->hip_d_root_css_buf);
-      if (device_param->hip_d_markov_css_buf) hc_hipMemFree (hashcat_ctx, device_param->hip_d_markov_css_buf);
-      if (device_param->hip_d_tm_c)           hc_hipMemFree (hashcat_ctx, device_param->hip_d_tm_c);
-      if (device_param->hip_d_st_digests_buf) hc_hipMemFree (hashcat_ctx, device_param->hip_d_st_digests_buf);
-      if (device_param->hip_d_st_salts_buf)   hc_hipMemFree (hashcat_ctx, device_param->hip_d_st_salts_buf);
-      if (device_param->hip_d_st_esalts_buf)  hc_hipMemFree (hashcat_ctx, device_param->hip_d_st_esalts_buf);
-      if (device_param->hip_d_kernel_param)   hc_hipMemFree (hashcat_ctx, device_param->hip_d_kernel_param);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_pws_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_pws_amp_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_pws_comp_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_pws_idx);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_rules);
+    //hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_rules_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_combs);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_combs_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bfs);
+    //hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bfs_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s1_a);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s1_b);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s1_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s1_d);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s2_a);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s2_b);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s2_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_bitmap_s2_d);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_plain_bufs);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_digests_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_digests_shown);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_salt_bufs);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_esalt_bufs);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_tmps);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_hooks);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_result);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_extra0_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_extra1_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_extra2_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_extra3_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_root_css_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_markov_css_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_tm_c);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_st_digests_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_st_salts_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_st_esalts_buf);
+      hc_hipMemFreePtr          (hashcat_ctx, &device_param->hip_d_kernel_param);
 
-      if (device_param->hip_event1)           hc_hipEventDestroy (hashcat_ctx, device_param->hip_event1);
-      if (device_param->hip_event2)           hc_hipEventDestroy (hashcat_ctx, device_param->hip_event2);
-      if (device_param->hip_event3)           hc_hipEventDestroy (hashcat_ctx, device_param->hip_event3);
+      hc_hipEventDestroyPtr     (hashcat_ctx, &device_param->hip_event1);
+      hc_hipEventDestroyPtr     (hashcat_ctx, &device_param->hip_event2);
+      hc_hipEventDestroyPtr     (hashcat_ctx, &device_param->hip_event3);
 
-      if (device_param->hip_stream)           hc_hipStreamDestroy (hashcat_ctx, device_param->hip_stream);
+      hc_hipStreamDestroyPtr    (hashcat_ctx, &device_param->hip_stream);
 
-      if (device_param->hip_module)           hc_hipModuleUnload (hashcat_ctx, device_param->hip_module);
-      if (device_param->hip_module_mp)        hc_hipModuleUnload (hashcat_ctx, device_param->hip_module_mp);
-      if (device_param->hip_module_amp)       hc_hipModuleUnload (hashcat_ctx, device_param->hip_module_amp);
-      if (device_param->hip_module_shared)    hc_hipModuleUnload (hashcat_ctx, device_param->hip_module_shared);
+      hc_hipModuleUnloadPtr     (hashcat_ctx, &device_param->hip_module);
+      hc_hipModuleUnloadPtr     (hashcat_ctx, &device_param->hip_module_mp);
+      hc_hipModuleUnloadPtr     (hashcat_ctx, &device_param->hip_module_amp);
+      hc_hipModuleUnloadPtr     (hashcat_ctx, &device_param->hip_module_shared);
 
-      device_param->hip_d_pws_buf            = 0;
-      device_param->hip_d_pws_amp_buf        = 0;
-      device_param->hip_d_pws_comp_buf       = 0;
-      device_param->hip_d_pws_idx            = 0;
-      device_param->hip_d_rules              = 0;
-      device_param->hip_d_rules_c            = 0;
-      device_param->hip_d_combs              = 0;
-      device_param->hip_d_combs_c            = 0;
-      device_param->hip_d_bfs                = 0;
-      device_param->hip_d_bfs_c              = 0;
-      device_param->hip_d_bitmap_s1_a        = 0;
-      device_param->hip_d_bitmap_s1_b        = 0;
-      device_param->hip_d_bitmap_s1_c        = 0;
-      device_param->hip_d_bitmap_s1_d        = 0;
-      device_param->hip_d_bitmap_s2_a        = 0;
-      device_param->hip_d_bitmap_s2_b        = 0;
-      device_param->hip_d_bitmap_s2_c        = 0;
-      device_param->hip_d_bitmap_s2_d        = 0;
-      device_param->hip_d_plain_bufs         = 0;
-      device_param->hip_d_digests_buf        = 0;
-      device_param->hip_d_digests_shown      = 0;
-      device_param->hip_d_salt_bufs          = 0;
-      device_param->hip_d_esalt_bufs         = 0;
-      device_param->hip_d_tmps               = 0;
-      device_param->hip_d_hooks              = 0;
-      device_param->hip_d_result             = 0;
-      device_param->hip_d_extra0_buf         = 0;
-      device_param->hip_d_extra1_buf         = 0;
-      device_param->hip_d_extra2_buf         = 0;
-      device_param->hip_d_extra3_buf         = 0;
-      device_param->hip_d_root_css_buf       = 0;
-      device_param->hip_d_markov_css_buf     = 0;
-      device_param->hip_d_tm_c               = 0;
-      device_param->hip_d_st_digests_buf     = 0;
-      device_param->hip_d_st_salts_buf       = 0;
-      device_param->hip_d_st_esalts_buf      = 0;
-      device_param->hip_d_kernel_param       = 0;
+      device_param->hip_d_rules_c              = 0;
+      device_param->hip_d_bfs_c                = 0;
 
-      device_param->hip_function1            = NULL;
-      device_param->hip_function12           = NULL;
-      device_param->hip_function2p           = NULL;
-      device_param->hip_function2            = NULL;
-      device_param->hip_function2e           = NULL;
-      device_param->hip_function23           = NULL;
-      device_param->hip_function3            = NULL;
-      device_param->hip_function4            = NULL;
-      device_param->hip_function_init2       = NULL;
-      device_param->hip_function_loop2p      = NULL;
-      device_param->hip_function_loop2       = NULL;
-      device_param->hip_function_mp          = NULL;
-      device_param->hip_function_mp_l        = NULL;
-      device_param->hip_function_mp_r        = NULL;
-      device_param->hip_function_tm          = NULL;
-      device_param->hip_function_amp         = NULL;
-      device_param->hip_function_memset      = NULL;
-      device_param->hip_function_bzero       = NULL;
-      device_param->hip_function_atinit      = NULL;
+      device_param->hip_function1              = NULL;
+      device_param->hip_function12             = NULL;
+      device_param->hip_function2p             = NULL;
+      device_param->hip_function2              = NULL;
+      device_param->hip_function2e             = NULL;
+      device_param->hip_function23             = NULL;
+      device_param->hip_function3              = NULL;
+      device_param->hip_function4              = NULL;
+      device_param->hip_function_init2         = NULL;
+      device_param->hip_function_loop2p        = NULL;
+      device_param->hip_function_loop2         = NULL;
+      device_param->hip_function_mp            = NULL;
+      device_param->hip_function_mp_l          = NULL;
+      device_param->hip_function_mp_r          = NULL;
+      device_param->hip_function_tm            = NULL;
+      device_param->hip_function_amp           = NULL;
+      device_param->hip_function_memset        = NULL;
+      device_param->hip_function_bzero         = NULL;
+      device_param->hip_function_atinit        = NULL;
       device_param->hip_function_utf8toutf16le = NULL;
-      device_param->hip_function_decompress  = NULL;
-      device_param->hip_function_aux1        = NULL;
-      device_param->hip_function_aux2        = NULL;
-      device_param->hip_function_aux3        = NULL;
-      device_param->hip_function_aux4        = NULL;
-
-      device_param->hip_event1               = NULL;
-      device_param->hip_event2               = NULL;
-      device_param->hip_event3               = NULL;
-
-      device_param->hip_stream               = NULL;
-
-      device_param->hip_module               = NULL;
-      device_param->hip_module_mp            = NULL;
-      device_param->hip_module_amp           = NULL;
-      device_param->hip_module_shared        = NULL;
+      device_param->hip_function_decompress    = NULL;
+      device_param->hip_function_aux1          = NULL;
+      device_param->hip_function_aux2          = NULL;
+      device_param->hip_function_aux3          = NULL;
+      device_param->hip_function_aux4          = NULL;
     }
 
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (device_param->metal_d_pws_buf)              hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_pws_buf);
-      if (device_param->metal_d_pws_amp_buf)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_pws_amp_buf);
-      if (device_param->metal_d_pws_comp_buf)         hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_pws_comp_buf);
-      if (device_param->metal_d_pws_idx)              hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_pws_idx);
-      if (device_param->metal_d_rules)                hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_rules);
-      if (device_param->metal_d_rules_c)              hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_rules_c);
-      if (device_param->metal_d_combs)                hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_combs);
-      if (device_param->metal_d_combs_c)              hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_combs_c);
-      if (device_param->metal_d_bfs)                  hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bfs);
-      if (device_param->metal_d_bfs_c)                hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bfs_c);
-      if (device_param->metal_d_bitmap_s1_a)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s1_a);
-      if (device_param->metal_d_bitmap_s1_b)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s1_b);
-      if (device_param->metal_d_bitmap_s1_c)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s1_c);
-      if (device_param->metal_d_bitmap_s1_d)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s1_d);
-      if (device_param->metal_d_bitmap_s2_a)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s2_a);
-      if (device_param->metal_d_bitmap_s2_b)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s2_b);
-      if (device_param->metal_d_bitmap_s2_c)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s2_c);
-      if (device_param->metal_d_bitmap_s2_d)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_bitmap_s2_d);
-      if (device_param->metal_d_plain_bufs)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_plain_bufs);
-      if (device_param->metal_d_digests_buf)          hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_digests_buf);
-      if (device_param->metal_d_digests_shown)        hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_digests_shown);
-      if (device_param->metal_d_salt_bufs)            hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_salt_bufs);
-      if (device_param->metal_d_esalt_bufs)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_esalt_bufs);
-      if (device_param->metal_d_tmps)                 hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_tmps);
-      if (device_param->metal_d_hooks)                hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_hooks);
-      if (device_param->metal_d_result)               hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_result);
-      if (device_param->metal_d_extra0_buf)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_extra0_buf);
-      if (device_param->metal_d_extra1_buf)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_extra1_buf);
-      if (device_param->metal_d_extra2_buf)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_extra2_buf);
-      if (device_param->metal_d_extra3_buf)           hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_extra3_buf);
-      if (device_param->metal_d_root_css_buf)         hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_root_css_buf);
-      if (device_param->metal_d_markov_css_buf)       hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_markov_css_buf);
-      if (device_param->metal_d_tm_c)                 hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_tm_c);
-      if (device_param->metal_d_st_digests_buf)       hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_st_digests_buf);
-      if (device_param->metal_d_st_salts_buf)         hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_st_salts_buf);
-      if (device_param->metal_d_st_esalts_buf)        hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_st_esalts_buf);
-      if (device_param->metal_d_kernel_param)         hc_mtlReleaseMemObject (hashcat_ctx, device_param->metal_d_kernel_param);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_pws_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_pws_amp_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_pws_comp_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_pws_idx);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_rules);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_rules_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_combs);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_combs_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bfs);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bfs_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s1_a);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s1_b);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s1_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s1_d);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s2_a);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s2_b);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s2_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_bitmap_s2_d);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_plain_bufs);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_digests_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_digests_shown);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_salt_bufs);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_esalt_bufs);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_tmps);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_hooks);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_result);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_extra0_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_extra1_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_extra2_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_extra3_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_root_css_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_markov_css_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_tm_c);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_st_digests_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_st_salts_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_st_esalts_buf);
+      hc_mtlReleaseMemObject (hashcat_ctx, &device_param->metal_d_kernel_param);
 
-      if (device_param->metal_function1)              hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function1);
-      if (device_param->metal_function12)             hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function12);
-      if (device_param->metal_function2p)             hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function2p);
-      if (device_param->metal_function2)              hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function2);
-      if (device_param->metal_function2e)             hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function2e);
-      if (device_param->metal_function23)             hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function23);
-      if (device_param->metal_function3)              hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function3);
-      if (device_param->metal_function4)              hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function4);
-      if (device_param->metal_function_init2)         hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_init2);
-      if (device_param->metal_function_loop2p)        hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_loop2p);
-      if (device_param->metal_function_loop2)         hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_loop2);
-      if (device_param->metal_function_mp)            hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_mp);
-      if (device_param->metal_function_mp_l)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_mp_l);
-      if (device_param->metal_function_mp_r)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_mp_r);
-      if (device_param->metal_function_tm)            hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_tm);
-      if (device_param->metal_function_amp)           hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_amp);
-      if (device_param->metal_function_memset)        hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_memset);
-      if (device_param->metal_function_bzero)         hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_bzero);
-      if (device_param->metal_function_atinit)        hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_atinit);
-      if (device_param->metal_function_utf8toutf16le) hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_utf8toutf16le);
-      if (device_param->metal_function_decompress)    hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_decompress);
-      if (device_param->metal_function_aux1)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_aux1);
-      if (device_param->metal_function_aux2)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_aux2);
-      if (device_param->metal_function_aux3)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_aux3);
-      if (device_param->metal_function_aux4)          hc_mtlReleaseFunction (hashcat_ctx, device_param->metal_function_aux4);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function1);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function12);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function2p);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function2);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function2e);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function23);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function3);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function4);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_init2);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_loop2p);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_loop2);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_mp);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_mp_l);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_mp_r);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_tm);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_amp);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_memset);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_bzero);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_atinit);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_utf8toutf16le);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_decompress);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_aux1);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_aux2);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_aux3);
+      hc_mtlReleaseFunction  (hashcat_ctx, &device_param->metal_function_aux4);
 
-      if (device_param->metal_library)                hc_mtlReleaseLibrary (hashcat_ctx, device_param->metal_library);
-      if (device_param->metal_library_mp)             hc_mtlReleaseLibrary (hashcat_ctx, device_param->metal_library_mp);
-      if (device_param->metal_library_amp)            hc_mtlReleaseLibrary (hashcat_ctx, device_param->metal_library_amp);
-      if (device_param->metal_library_shared)         hc_mtlReleaseLibrary (hashcat_ctx, device_param->metal_library_shared);
+      hc_mtlReleaseLibrary   (hashcat_ctx, &device_param->metal_library);
+      hc_mtlReleaseLibrary   (hashcat_ctx, &device_param->metal_library_mp);
+      hc_mtlReleaseLibrary   (hashcat_ctx, &device_param->metal_library_amp);
+      hc_mtlReleaseLibrary   (hashcat_ctx, &device_param->metal_library_shared);
 
-      //if (device_param->metal_command_queue)          hc_mtlReleaseCommandQueue (hashcat_ctx, device_param->metal_command_queue);
+      //if (device_param->metal_command_queue) hc_mtlReleaseCommandQueue (hashcat_ctx, device_param->metal_command_queue);
+      //if (device_param->metal_device)    hc_mtlReleaseDevice (hashcat_ctx, device_param->metal_device);
 
-      //if (device_param->metal_device)                 hc_mtlReleaseDevice (hashcat_ctx, device_param->metal_device);
-
-      device_param->metal_d_pws_buf              = NULL;
-      device_param->metal_d_pws_amp_buf          = NULL;
-      device_param->metal_d_pws_comp_buf         = NULL;
-      device_param->metal_d_pws_idx              = NULL;
-      device_param->metal_d_rules                = NULL;
-      device_param->metal_d_rules_c              = NULL;
-      device_param->metal_d_combs                = NULL;
-      device_param->metal_d_combs_c              = NULL;
-      device_param->metal_d_bfs                  = NULL;
-      device_param->metal_d_bfs_c                = NULL;
-      device_param->metal_d_bitmap_s1_a          = NULL;
-      device_param->metal_d_bitmap_s1_b          = NULL;
-      device_param->metal_d_bitmap_s1_c          = NULL;
-      device_param->metal_d_bitmap_s1_d          = NULL;
-      device_param->metal_d_bitmap_s2_a          = NULL;
-      device_param->metal_d_bitmap_s2_b          = NULL;
-      device_param->metal_d_bitmap_s2_c          = NULL;
-      device_param->metal_d_bitmap_s2_d          = NULL;
-      device_param->metal_d_plain_bufs           = NULL;
-      device_param->metal_d_digests_buf          = NULL;
-      device_param->metal_d_digests_shown        = NULL;
-      device_param->metal_d_salt_bufs            = NULL;
-      device_param->metal_d_esalt_bufs           = NULL;
-      device_param->metal_d_tmps                 = NULL;
-      device_param->metal_d_hooks                = NULL;
-      device_param->metal_d_result               = NULL;
-      device_param->metal_d_extra0_buf           = NULL;
-      device_param->metal_d_extra1_buf           = NULL;
-      device_param->metal_d_extra2_buf           = NULL;
-      device_param->metal_d_extra3_buf           = NULL;
-      device_param->metal_d_root_css_buf         = NULL;
-      device_param->metal_d_markov_css_buf       = NULL;
-      device_param->metal_d_tm_c                 = NULL;
-      device_param->metal_d_st_digests_buf       = NULL;
-      device_param->metal_d_st_salts_buf         = NULL;
-      device_param->metal_d_st_esalts_buf        = NULL;
-      device_param->metal_d_kernel_param         = NULL;
-      device_param->metal_function1              = NULL;
-      device_param->metal_function12             = NULL;
-      device_param->metal_function2p             = NULL;
-      device_param->metal_function2              = NULL;
-      device_param->metal_function2e             = NULL;
-      device_param->metal_function23             = NULL;
-      device_param->metal_function3              = NULL;
-      device_param->metal_function4              = NULL;
-      device_param->metal_function_init2         = NULL;
-      device_param->metal_function_loop2p        = NULL;
-      device_param->metal_function_loop2         = NULL;
-      device_param->metal_function_mp            = NULL;
-      device_param->metal_function_mp_l          = NULL;
-      device_param->metal_function_mp_r          = NULL;
-      device_param->metal_function_tm            = NULL;
-      device_param->metal_function_amp           = NULL;
-      device_param->metal_function_memset        = NULL;
-      device_param->metal_function_bzero         = NULL;
-      device_param->metal_function_atinit        = NULL;
-      device_param->metal_function_utf8toutf16le = NULL;
-      device_param->metal_function_decompress    = NULL;
-      device_param->metal_function_aux1          = NULL;
-      device_param->metal_function_aux2          = NULL;
-      device_param->metal_function_aux3          = NULL;
-      device_param->metal_function_aux4          = NULL;
-      device_param->metal_library                = NULL;
-      device_param->metal_library_mp             = NULL;
-      device_param->metal_library_amp            = NULL;
-      device_param->metal_library_shared         = NULL;
-      //device_param->metal_command_queue          = NULL;
-      //device_param->metal_device                 = NULL;
+      //device_param->metal_command_queue  = NULL;
+      //device_param->metal_device         = NULL;
     }
     #endif // __APPLE__
 
     if (device_param->is_opencl == true)
     {
-      if (device_param->opencl_d_pws_buf)        hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_pws_buf);
-      if (device_param->opencl_d_pws_amp_buf)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_pws_amp_buf);
-      if (device_param->opencl_d_pws_comp_buf)   hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_pws_comp_buf);
-      if (device_param->opencl_d_pws_idx)        hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_pws_idx);
-      if (device_param->opencl_d_rules)          hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_rules);
-      if (device_param->opencl_d_rules_c)        hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_rules_c);
-      if (device_param->opencl_d_combs)          hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_combs);
-      if (device_param->opencl_d_combs_c)        hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_combs_c);
-      if (device_param->opencl_d_bfs)            hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bfs);
-      if (device_param->opencl_d_bfs_c)          hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bfs_c);
-      if (device_param->opencl_d_bitmap_s1_a)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s1_a);
-      if (device_param->opencl_d_bitmap_s1_b)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s1_b);
-      if (device_param->opencl_d_bitmap_s1_c)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s1_c);
-      if (device_param->opencl_d_bitmap_s1_d)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s1_d);
-      if (device_param->opencl_d_bitmap_s2_a)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s2_a);
-      if (device_param->opencl_d_bitmap_s2_b)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s2_b);
-      if (device_param->opencl_d_bitmap_s2_c)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s2_c);
-      if (device_param->opencl_d_bitmap_s2_d)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_bitmap_s2_d);
-      if (device_param->opencl_d_plain_bufs)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_plain_bufs);
-      if (device_param->opencl_d_digests_buf)    hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_digests_buf);
-      if (device_param->opencl_d_digests_shown)  hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_digests_shown);
-      if (device_param->opencl_d_salt_bufs)      hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_salt_bufs);
-      if (device_param->opencl_d_esalt_bufs)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_esalt_bufs);
-      if (device_param->opencl_d_tmps)           hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_tmps);
-      if (device_param->opencl_d_hooks)          hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_hooks);
-      if (device_param->opencl_d_result)         hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_result);
-      if (device_param->opencl_d_extra0_buf)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_extra0_buf);
-      if (device_param->opencl_d_extra1_buf)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_extra1_buf);
-      if (device_param->opencl_d_extra2_buf)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_extra2_buf);
-      if (device_param->opencl_d_extra3_buf)     hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_extra3_buf);
-      if (device_param->opencl_d_root_css_buf)   hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_root_css_buf);
-      if (device_param->opencl_d_markov_css_buf) hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_markov_css_buf);
-      if (device_param->opencl_d_tm_c)           hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_tm_c);
-      if (device_param->opencl_d_st_digests_buf) hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_st_digests_buf);
-      if (device_param->opencl_d_st_salts_buf)   hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_st_salts_buf);
-      if (device_param->opencl_d_st_esalts_buf)  hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_st_esalts_buf);
-      if (device_param->opencl_d_kernel_param)   hc_clReleaseMemObject (hashcat_ctx, device_param->opencl_d_kernel_param);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_pws_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_pws_amp_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_pws_comp_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_pws_idx);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_rules);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_rules_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_combs);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_combs_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bfs);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bfs_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s1_a);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s1_b);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s1_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s1_d);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s2_a);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s2_b);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s2_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_bitmap_s2_d);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_plain_bufs);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_digests_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_digests_shown);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_salt_bufs);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_esalt_bufs);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_tmps);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_hooks);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_result);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_extra0_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_extra1_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_extra2_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_extra3_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_root_css_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_markov_css_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_tm_c);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_st_digests_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_st_salts_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_st_esalts_buf);
+      hc_clReleaseMemObjectPtr  (hashcat_ctx, &device_param->opencl_d_kernel_param);
 
-      if (device_param->opencl_kernel1)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel1);
-      if (device_param->opencl_kernel12)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel12);
-      if (device_param->opencl_kernel2p)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2p);
-      if (device_param->opencl_kernel2)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2);
-      if (device_param->opencl_kernel2e)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel2e);
-      if (device_param->opencl_kernel23)         hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel23);
-      if (device_param->opencl_kernel3)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel3);
-      if (device_param->opencl_kernel4)          hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel4);
-      if (device_param->opencl_kernel_init2)     hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_init2);
-      if (device_param->opencl_kernel_loop2p)    hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_loop2p);
-      if (device_param->opencl_kernel_loop2)     hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_loop2);
-      if (device_param->opencl_kernel_mp)        hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_mp);
-      if (device_param->opencl_kernel_mp_l)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_mp_l);
-      if (device_param->opencl_kernel_mp_r)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_mp_r);
-      if (device_param->opencl_kernel_tm)        hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_tm);
-      if (device_param->opencl_kernel_amp)       hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_amp);
-      if (device_param->opencl_kernel_memset)    hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_memset);
-      if (device_param->opencl_kernel_bzero)     hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_bzero);
-      if (device_param->opencl_kernel_atinit)    hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_atinit);
-      if (device_param->opencl_kernel_utf8toutf16le) hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_utf8toutf16le);
-      if (device_param->opencl_kernel_decompress)hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_decompress);
-      if (device_param->opencl_kernel_aux1)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_aux1);
-      if (device_param->opencl_kernel_aux2)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_aux2);
-      if (device_param->opencl_kernel_aux3)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_aux3);
-      if (device_param->opencl_kernel_aux4)      hc_clReleaseKernel (hashcat_ctx, device_param->opencl_kernel_aux4);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel1);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel12);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel2p);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel2);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel2e);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel23);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel3);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel4);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_init2);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_loop2p);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_loop2);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_mp);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_mp_l);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_mp_r);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_tm);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_amp);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_memset);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_bzero);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_atinit);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_utf8toutf16le);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_decompress);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_aux1);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_aux2);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_aux3);
+      hc_clReleaseKernelPtr     (hashcat_ctx, &device_param->opencl_kernel_aux4);
 
-      if (device_param->opencl_program)          hc_clReleaseProgram (hashcat_ctx, device_param->opencl_program);
-      if (device_param->opencl_program_mp)       hc_clReleaseProgram (hashcat_ctx, device_param->opencl_program_mp);
-      if (device_param->opencl_program_amp)      hc_clReleaseProgram (hashcat_ctx, device_param->opencl_program_amp);
-      if (device_param->opencl_program_shared)   hc_clReleaseProgram (hashcat_ctx, device_param->opencl_program_shared);
+      hc_clReleaseProgramPtr    (hashcat_ctx, &device_param->opencl_program);
+      hc_clReleaseProgramPtr    (hashcat_ctx, &device_param->opencl_program_mp);
+      hc_clReleaseProgramPtr    (hashcat_ctx, &device_param->opencl_program_amp);
+      hc_clReleaseProgramPtr    (hashcat_ctx, &device_param->opencl_program_shared);
 
-      //if (device_param->opencl_command_queue)    hc_clReleaseCommandQueue (hashcat_ctx, device_param->opencl_command_queue);
+      //if (device_param->opencl_command_queue) hc_clReleaseCommandQueue (hashcat_ctx, device_param->opencl_command_queue);
+      //if (device_param->opencl_context)  hc_clReleaseContext (hashcat_ctx, device_param->opencl_context);
 
-      //if (device_param->opencl_context)          hc_clReleaseContext (hashcat_ctx, device_param->opencl_context);
-
-      device_param->opencl_d_pws_buf           = NULL;
-      device_param->opencl_d_pws_amp_buf       = NULL;
-      device_param->opencl_d_pws_comp_buf      = NULL;
-      device_param->opencl_d_pws_idx           = NULL;
-      device_param->opencl_d_rules             = NULL;
-      device_param->opencl_d_rules_c           = NULL;
-      device_param->opencl_d_combs             = NULL;
-      device_param->opencl_d_combs_c           = NULL;
-      device_param->opencl_d_bfs               = NULL;
-      device_param->opencl_d_bfs_c             = NULL;
-      device_param->opencl_d_bitmap_s1_a       = NULL;
-      device_param->opencl_d_bitmap_s1_b       = NULL;
-      device_param->opencl_d_bitmap_s1_c       = NULL;
-      device_param->opencl_d_bitmap_s1_d       = NULL;
-      device_param->opencl_d_bitmap_s2_a       = NULL;
-      device_param->opencl_d_bitmap_s2_b       = NULL;
-      device_param->opencl_d_bitmap_s2_c       = NULL;
-      device_param->opencl_d_bitmap_s2_d       = NULL;
-      device_param->opencl_d_plain_bufs        = NULL;
-      device_param->opencl_d_digests_buf       = NULL;
-      device_param->opencl_d_digests_shown     = NULL;
-      device_param->opencl_d_salt_bufs         = NULL;
-      device_param->opencl_d_esalt_bufs        = NULL;
-      device_param->opencl_d_tmps              = NULL;
-      device_param->opencl_d_hooks             = NULL;
-      device_param->opencl_d_result            = NULL;
-      device_param->opencl_d_extra0_buf        = NULL;
-      device_param->opencl_d_extra1_buf        = NULL;
-      device_param->opencl_d_extra2_buf        = NULL;
-      device_param->opencl_d_extra3_buf        = NULL;
-      device_param->opencl_d_root_css_buf      = NULL;
-      device_param->opencl_d_markov_css_buf    = NULL;
-      device_param->opencl_d_tm_c              = NULL;
-      device_param->opencl_d_st_digests_buf    = NULL;
-      device_param->opencl_d_st_salts_buf      = NULL;
-      device_param->opencl_d_st_esalts_buf     = NULL;
-      device_param->opencl_d_kernel_param      = NULL;
-      device_param->opencl_kernel1             = NULL;
-      device_param->opencl_kernel12            = NULL;
-      device_param->opencl_kernel2p            = NULL;
-      device_param->opencl_kernel2             = NULL;
-      device_param->opencl_kernel2e            = NULL;
-      device_param->opencl_kernel23            = NULL;
-      device_param->opencl_kernel3             = NULL;
-      device_param->opencl_kernel4             = NULL;
-      device_param->opencl_kernel_init2        = NULL;
-      device_param->opencl_kernel_loop2p       = NULL;
-      device_param->opencl_kernel_loop2        = NULL;
-      device_param->opencl_kernel_mp           = NULL;
-      device_param->opencl_kernel_mp_l         = NULL;
-      device_param->opencl_kernel_mp_r         = NULL;
-      device_param->opencl_kernel_tm           = NULL;
-      device_param->opencl_kernel_amp          = NULL;
-      device_param->opencl_kernel_memset       = NULL;
-      device_param->opencl_kernel_bzero        = NULL;
-      device_param->opencl_kernel_atinit       = NULL;
-      device_param->opencl_kernel_utf8toutf16le = NULL;
-      device_param->opencl_kernel_decompress   = NULL;
-      device_param->opencl_kernel_aux1         = NULL;
-      device_param->opencl_kernel_aux2         = NULL;
-      device_param->opencl_kernel_aux3         = NULL;
-      device_param->opencl_kernel_aux4         = NULL;
-      device_param->opencl_program             = NULL;
-      device_param->opencl_program_mp          = NULL;
-      device_param->opencl_program_amp         = NULL;
-      device_param->opencl_program_shared      = NULL;
-      //device_param->opencl_command_queue       = NULL;
-      //device_param->opencl_context             = NULL;
+      //device_param->opencl_command_queue = NULL;
+      //device_param->opencl_context       = NULL;
     }
 
     device_param->h_tmps              = NULL;
@@ -17639,15 +17426,15 @@ int backend_session_update_mp (hashcat_ctx_t *hashcat_ctx)
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_root_css_buf,   0, mask_ctx->root_css_buf,   device_param->size_root_css)   == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_markov_css_buf, 0, mask_ctx->markov_css_buf, device_param->size_markov_css) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_root_css_buf,   0, mask_ctx->root_css_buf,   device_param->size_root_css)   == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_markov_css_buf, 0, mask_ctx->markov_css_buf, device_param->size_markov_css) == -1) return -1;
     }
     #endif
 
     if (device_param->is_opencl == true)
     {
-      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_FALSE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
-      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_TRUE,  0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
+      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_TRUE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
+      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_TRUE, 0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
 
       if (hc_clFlush (hashcat_ctx, device_param->opencl_command_queue) == -1) return -1;
     }
@@ -17695,15 +17482,15 @@ int backend_session_update_mp_rl (hashcat_ctx_t *hashcat_ctx, const u32 css_cnt_
     #if defined (__APPLE__)
     if (device_param->is_metal == true)
     {
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_root_css_buf,   0, mask_ctx->root_css_buf,   device_param->size_root_css)   == -1) return -1;
-      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_command_queue, device_param->metal_d_markov_css_buf, 0, mask_ctx->markov_css_buf, device_param->size_markov_css) == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_root_css_buf,   0, mask_ctx->root_css_buf,   device_param->size_root_css)   == -1) return -1;
+      if (hc_mtlMemcpyHtoD (hashcat_ctx, device_param->metal_device, device_param->metal_command_queue, device_param->metal_d_markov_css_buf, 0, mask_ctx->markov_css_buf, device_param->size_markov_css) == -1) return -1;
     }
     #endif
 
     if (device_param->is_opencl == true)
     {
-      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_FALSE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
-      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_TRUE,  0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
+      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_root_css_buf,   CL_TRUE, 0, device_param->size_root_css,   mask_ctx->root_css_buf,   0, NULL, NULL) == -1) return -1;
+      if (hc_clEnqueueWriteBuffer (hashcat_ctx, device_param->opencl_command_queue, device_param->opencl_d_markov_css_buf, CL_TRUE, 0, device_param->size_markov_css, mask_ctx->markov_css_buf, 0, NULL, NULL) == -1) return -1;
 
       if (hc_clFlush (hashcat_ctx, device_param->opencl_command_queue) == -1) return -1;
     }

@@ -23,8 +23,9 @@ typedef struct
 
   // output
 
-  u32 out_buf[64];
-  u32 out_len;
+  u32 out_buf[32][64];
+  u32 out_len[32];
+  u32 out_cnt;
 
 } generic_io_tmp_t;
 
@@ -58,22 +59,27 @@ KERNEL_FQ KERNEL_FA void m73000_comp (KERN_ATTR_TMPS (generic_io_tmp_t))
 
   if (gid >= GID_CNT) return;
 
-  md4_ctx_t ctx0;
+  int out_cnt = tmps[gid].out_cnt;
 
-  md4_init (&ctx0);
+  for (int i = 0; i < out_cnt; i++)
+  {
+    md4_ctx_t ctx0;
 
-  md4_update_global (&ctx0, tmps[gid].out_buf, tmps[gid].out_len);
+    md4_init (&ctx0);
 
-  md4_final (&ctx0);
+    md4_update_global (&ctx0, tmps[gid].out_buf[i], tmps[gid].out_len[i]);
 
-  const u32 r0 = ctx0.h[0];
-  const u32 r1 = ctx0.h[1];
-  const u32 r2 = ctx0.h[2];
-  const u32 r3 = ctx0.h[3];
+    md4_final (&ctx0);
 
-  #define il_pos 0
+    const u32 r0 = ctx0.h[0];
+    const u32 r1 = ctx0.h[1];
+    const u32 r2 = ctx0.h[2];
+    const u32 r3 = ctx0.h[3];
 
-  #ifdef KERNEL_STATIC
-  #include COMPARE_M
-  #endif
+    #define il_pos 0
+
+    #ifdef KERNEL_STATIC
+    #include COMPARE_M
+    #endif
+  }
 }

@@ -154,12 +154,13 @@ const char *scrypt_module_extra_tuningdb_block (MAYBE_UNUSED const hashconfig_t 
       {
         for (tmto = 0; tmto < 2; tmto++) // results in tmto = 2
         {
-          if (device_param->device_host_unified_memory == 1) break; // do not touch
-
           if ((device_param->opencl_device_vendor_id == VENDOR_ID_AMD)
            || (device_param->opencl_device_vendor_id == VENDOR_ID_AMD_USE_HIP))
           {
-            if (tmto == 0) continue; // at least 1
+            if (device_param->device_host_unified_memory == 0) // This special rule only affects dGPUs not iGPU
+            {
+              if (tmto == 0) continue; // at least 1
+            }
           }
 
           const u64 size_per_accel_tmto = size_per_accel >> tmto;

@@ -487,7 +487,7 @@ static void main_potfile_all_cracked (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, M
   if (user_options->quiet == true) return;
 
   event_log_info (hashcat_ctx, "INFO: All hashes found as potfile and/or empty entries! Use --show to display them.");
-  event_log_info (hashcat_ctx, "For more information, see https://hashcat.net/faq/potfile");
+  event_log_info (hashcat_ctx, "      For more information, see https://hashcat.net/faq/potfile");
   event_log_info (hashcat_ctx, NULL);
 }
 
@@ -804,11 +804,14 @@ static void main_monitor_throttle3 (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAY
 
 static void main_monitor_performance_hint (MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx, MAYBE_UNUSED const void *buf, MAYBE_UNUSED const size_t len)
 {
+  const backend_ctx_t        *backend_ctx        = hashcat_ctx->backend_ctx;
   const hashconfig_t         *hashconfig         = hashcat_ctx->hashconfig;
   const user_options_t       *user_options       = hashcat_ctx->user_options;
   const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
 
   if (user_options->quiet == true) return;
+
+  if (backend_ctx->kernel_power_final > 0) return;
 
   if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
   {

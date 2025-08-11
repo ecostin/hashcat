@@ -870,6 +870,24 @@ DECLSPEC u64x hl32_to_64 (const u32x a, const u32x b)
   return r;
 }
 
+DECLSPEC u32 u16_bin_to_u32_hex_lsn (const u32 v)
+{
+  const u32 v0 = (v >> 0) & 15;
+  const u32 v1 = (v >> 4) & 15;
+
+  return ((v0 < 10) ? '0' + v0 : 'a' - 10 + v0) << 8
+       | ((v1 < 10) ? '0' + v1 : 'a' - 10 + v1) << 0;
+}
+
+DECLSPEC u32 u16_bin_to_u32_hex_msn (const u32 v)
+{
+  const u32 v0 = (v >> 4) & 15;
+  const u32 v1 = (v >> 0) & 15;
+
+  return ((v0 < 10) ? '0' + v0 : 'a' - 10 + v0) << 8
+       | ((v1 < 10) ? '0' + v1 : 'a' - 10 + v1) << 0;
+}
+
 // bit rotates
 //
 // For HC_CPU_OPENCL_EMU_H we dont need to care about vector functions
@@ -1089,10 +1107,39 @@ DECLSPEC u32x hc_swap32 (const u32x v)
                  rotate (v, make_u32x ( 8)),
                             make_u32x (0x00ff00ff));
   #else
-  r = ((v & make_u32x (0xff000000)) >> 24)
-    | ((v & make_u32x (0x00ff0000)) >>  8)
-    | ((v & make_u32x (0x0000ff00)) <<  8)
-    | ((v & make_u32x (0x000000ff)) << 24);
+
+  #if VECT_SIZE == 1
+  r = hc_swap32_S (v);
+  #endif
+
+  #if VECT_SIZE >= 2
+  r.s0 = hc_swap32_S (v.s0);
+  r.s1 = hc_swap32_S (v.s1);
+  #endif
+
+  #if VECT_SIZE >= 4
+  r.s2 = hc_swap32_S (v.s2);
+  r.s3 = hc_swap32_S (v.s3);
+  #endif
+
+  #if VECT_SIZE >= 8
+  r.s4 = hc_swap32_S (v.s4);
+  r.s5 = hc_swap32_S (v.s5);
+  r.s6 = hc_swap32_S (v.s6);
+  r.s7 = hc_swap32_S (v.s7);
+  #endif
+
+  #if VECT_SIZE >= 16
+  r.s8 = hc_swap32_S (v.s8);
+  r.s9 = hc_swap32_S (v.s9);
+  r.sa = hc_swap32_S (v.sa);
+  r.sb = hc_swap32_S (v.sb);
+  r.sc = hc_swap32_S (v.sc);
+  r.sd = hc_swap32_S (v.sd);
+  r.se = hc_swap32_S (v.se);
+  r.sf = hc_swap32_S (v.sf);
+  #endif
+
   #endif
 
   #endif
@@ -1887,11 +1934,11 @@ DECLSPEC u32 hc_bytealign_S (const u32 a, const u32 b, const int c)
   return r;
 }
 #else
-DECLSPEC u32 hc_bytealign_be (const u32x a, const u32x b, const int c)
+DECLSPEC u32x hc_bytealign_be (const u32x a, const u32x b, const int c)
 {
   const int c_mod_4 = c & 3;
 
-  const u32 r = hc_byte_perm (b, a, (0x76543210 >> (c_mod_4 * 4)) & 0xffff);
+  const u32x r = hc_byte_perm (b, a, (0x76543210 >> (c_mod_4 * 4)) & 0xffff);
 
   return r;
 }
@@ -2424,13 +2471,6 @@ DECLSPEC int hc_enc_next (PRIVATE_AS hc_enc_t *hc_enc, PRIVATE_AS const u32 *src
   PRIVATE_AS       u8 *dst_ptr = (PRIVATE_AS       u8 *) dst_buf;
 
   int src_pos = hc_enc->pos;
-
-  #if VENDOR_ID == 8
-  // Work around segmentation fault in Intel JiT
-  // Tested with 2021.12.6.0.19_160000
-  volatile
-  #endif
-
   int dst_pos = hc_enc->clen;
 
   dst_buf[0] = hc_enc->cbuf;
@@ -2442,29 +2482,30 @@ DECLSPEC int hc_enc_next (PRIVATE_AS hc_enc_t *hc_enc, PRIVATE_AS const u32 *src
   {
     const u8 c = src_ptr[src_pos];
 
-    int extraBytesToRead = 0;
+    int extraBytesToRead = -1;
 
-    if (c >= 0xfc)
+    if (c <= 0x7f)
     {
-      // old version, doesnt work with https://github.com/hashcat/hashcat/issues/3592
-      //extraBytesToRead = 5;
+      extraBytesToRead = 0;
     }
-    else if (c >= 0xf8)
+    else if ((c >= 0xc2) && (c <= 0xdf))
     {
-      // old version, doesnt work with https://github.com/hashcat/hashcat/issues/3592
-      //extraBytesToRead = 4;
+      extraBytesToRead = 1;
     }
-    else if (c >= 0xf0)
-    {
-      extraBytesToRead = 3;
-    }
-    else if (c >= 0xe0)
+    else if ((c == 0xe0) || (c == 0xec) || (c == 0xed) || (c == 0xef))
     {
       extraBytesToRead = 2;
     }
-    else if (c >= 0xc0)
+    else if ((c == 0xf0) || (c == 0xf3) || (c == 0xf4))
     {
-      extraBytesToRead = 1;
+      extraBytesToRead = 3;
+    }
+
+    if (extraBytesToRead == -1)
+    {
+      hc_enc->pos = src_len;
+
+      return -1;
     }
 
     if ((src_pos + extraBytesToRead) >= src_sz)
@@ -2575,13 +2616,6 @@ DECLSPEC int hc_enc_next_global (PRIVATE_AS hc_enc_t *hc_enc, GLOBAL_AS const u3
   PRIVATE_AS       u8 *dst_ptr = (PRIVATE_AS       u8 *) dst_buf;
 
   int src_pos = hc_enc->pos;
-
-  #if VENDOR_ID == 8
-  // Work around segmentation fault in Intel JiT
-  // Tested with 2021.12.6.0.19_160000
-  volatile
-  #endif
-
   int dst_pos = hc_enc->clen;
 
   dst_buf[0] = hc_enc->cbuf;
@@ -2593,29 +2627,30 @@ DECLSPEC int hc_enc_next_global (PRIVATE_AS hc_enc_t *hc_enc, GLOBAL_AS const u3
   {
     const u8 c = src_ptr[src_pos];
 
-    int extraBytesToRead = 0;
+    int extraBytesToRead = -1;
 
-    if (c >= 0xfc)
+    if (c <= 0x7f)
     {
-      // old version, doesnt work with https://github.com/hashcat/hashcat/issues/3592
-      //extraBytesToRead = 5;
+      extraBytesToRead = 0;
     }
-    else if (c >= 0xf8)
+    else if ((c >= 0xc2) && (c <= 0xdf))
     {
-      // old version, doesnt work with https://github.com/hashcat/hashcat/issues/3592
-      //extraBytesToRead = 4;
+      extraBytesToRead = 1;
     }
-    else if (c >= 0xf0)
-    {
-      extraBytesToRead = 3;
-    }
-    else if (c >= 0xe0)
+    else if ((c == 0xe0) || (c == 0xec) || (c == 0xed) || (c == 0xef))
     {
       extraBytesToRead = 2;
     }
-    else if (c >= 0xc0)
+    else if ((c == 0xf0) || (c == 0xf3) || (c == 0xf4))
     {
-      extraBytesToRead = 1;
+      extraBytesToRead = 3;
+    }
+
+    if (extraBytesToRead == -1)
+    {
+      hc_enc->pos = src_len;
+
+      return -1;
     }
 
     if ((src_pos + extraBytesToRead) >= src_sz)
@@ -2699,8 +2734,6 @@ DECLSPEC int hc_enc_next_global (PRIVATE_AS hc_enc_t *hc_enc, GLOBAL_AS const u3
 
       if ((dst_pos + 2) == dst_sz)
       {
-        // this section seems to break intel opencl runtime but is unknown why
-
         dst_ptr[dst_pos++] = (a >> 0) & 0xff;
         dst_ptr[dst_pos++] = (a >> 8) & 0xff;
 

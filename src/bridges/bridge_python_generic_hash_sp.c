@@ -151,8 +151,9 @@ typedef struct
 
   // output
 
-  u32 out_buf[64];
-  u32 out_len;
+  u32 out_buf[32][64];
+  u32 out_len[32];
+  u32 out_cnt;
 
 } generic_io_tmp_t;
 
@@ -1057,17 +1058,41 @@ bool launch_loop (MAYBE_UNUSED void *platform_context, MAYBE_UNUSED hc_device_pa
 
   for (Py_ssize_t i = 0; i < retsz; i++)
   {
-    PyObject *hash = python->PyList_GetItem (pReturn, i);
+    PyObject *userval = python->PyList_GetItem (pReturn, i);
 
     Py_ssize_t len;
 
-    const char *s = python->PyUnicode_AsUTF8AndSize (hash, &len);
+    const char *s = python->PyUnicode_AsUTF8AndSize (userval, &len);
 
     if (s)
     {
-      memcpy (generic_io_tmp->out_buf, s, len);
+      memcpy (generic_io_tmp->out_buf[0], s, len);
 
-      generic_io_tmp->out_len = len;
+      generic_io_tmp->out_len[0] = len;
+
+      generic_io_tmp->out_cnt = 1;
+    }
+    else
+    {
+      Py_ssize_t arrsz = python->PyList_Size (userval);
+
+      for (Py_ssize_t j = 0; j < arrsz; j++)
+      {
+        PyObject *hash = python->PyList_GetItem (userval, j);
+
+        Py_ssize_t len;
+
+        const char *s = python->PyUnicode_AsUTF8AndSize (hash, &len);
+
+        if (s)
+        {
+          memcpy (generic_io_tmp->out_buf[j], s, len);
+
+          generic_io_tmp->out_len[j] = len;
+        }
+      }
+
+      generic_io_tmp->out_cnt = arrsz;
     }
 
     generic_io_tmp++;

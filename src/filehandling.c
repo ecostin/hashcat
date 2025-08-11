@@ -76,6 +76,8 @@ bool hc_fopen (HCFILE *fp, const char *path, const char *mode)
   fp->path     = NULL;
   fp->mode     = NULL;
 
+  fp->uncompressed_size = 0;
+
   int oflag = -1;
 
   int fmode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH;
@@ -84,7 +86,7 @@ bool hc_fopen (HCFILE *fp, const char *path, const char *mode)
   {
     oflag = O_WRONLY | O_CREAT | O_APPEND;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "ab", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -93,7 +95,7 @@ bool hc_fopen (HCFILE *fp, const char *path, const char *mode)
     oflag = O_RDONLY;
     fmode = -1;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "rb", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -101,7 +103,7 @@ bool hc_fopen (HCFILE *fp, const char *path, const char *mode)
   {
     oflag = O_WRONLY | O_CREAT | O_TRUNC;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "wb", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -313,7 +315,7 @@ bool hc_fopen_raw (HCFILE *fp, const char *path, const char *mode)
   {
     oflag = O_WRONLY | O_CREAT | O_APPEND;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "ab", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -322,7 +324,7 @@ bool hc_fopen_raw (HCFILE *fp, const char *path, const char *mode)
     oflag = O_RDONLY;
     fmode = -1;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "rb", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -330,7 +332,7 @@ bool hc_fopen_raw (HCFILE *fp, const char *path, const char *mode)
   {
     oflag = O_WRONLY | O_CREAT | O_TRUNC;
 
-    #if defined(MSDOS) || defined(OS2) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__)
+    #if defined (MSDOS) || defined (OS2) || defined (WIN32) || defined (_WIN32) || defined (__CYGWIN__)
     if (strncmp (mode, "wb", 2) == 0) oflag |= O_BINARY;
     #endif
   }
@@ -421,13 +423,15 @@ size_t hc_fread (void *ptr, size_t size, size_t nmemb, HCFILE *fp)
         return (size_t) -1;
       }
     }
+
+    fp->uncompressed_size += n;
   }
   else if (fp->ufp)
   {
     u64 len = (u64) size * nmemb;
     u64 pos = 0;
 
-    #if defined(_WIN) && !defined(_WIN64)
+    #if defined (_WIN) && !defined (_WIN64)
     /* check 2 GB limit with 32 bit build */
     if (len >= INT32_MAX) return n;
     #endif
@@ -458,7 +462,7 @@ size_t hc_fread (void *ptr, size_t size, size_t nmemb, HCFILE *fp)
     SRes res = SZ_OK;
     xzfile_t *xfp = fp->xfp;
 
-    #if defined(_WIN) && !defined(_WIN64)
+    #if defined (_WIN) && !defined (_WIN64)
     /* check 2 GB limit with 32 bit build */
     if (outLen >= INT32_MAX) return n;
     #endif
@@ -669,11 +673,20 @@ int hc_fstat (HCFILE *fp, struct stat *buf)
 
   if (fp->gfp)
   {
-    /* TODO: For compressed files hc_ftell() reports uncompressed bytes, but hc_fstat() reports compressed bytes */
+    if (fp->uncompressed_size > 0)
+    {
+      buf->st_size = fp->uncompressed_size;
+    }
   }
   else if (fp->ufp)
   {
-    /* TODO: For compressed files hc_ftell() reports uncompressed bytes, but hc_fstat() reports compressed bytes */
+    unz_file_info file_info;
+
+    // Get metadata about the current file
+    if (unzGetCurrentFileInfo(fp->ufp, &file_info, NULL, 0, NULL, 0, NULL, 0) == UNZ_OK)
+    {
+      buf->st_size = (off_t) file_info.uncompressed_size;
+    }
   }
   else if (fp->xfp)
   {

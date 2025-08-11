@@ -71,10 +71,7 @@ bool uiStartFileExtract(const wchar *FileName,bool Extract,bool Test,bool Skip)
 
 void uiExtractProgress(int64 CurFileSize,int64 TotalFileSize,int64 CurSize,int64 TotalSize)
 {
-  // We set the total size to 0 to update only the current progress and keep
-  // the total progress intact in WinRAR. Unlike WinRAR, console RAR has only
-  // the total progress and updates it with current values in such case.
-  int CurPercent=TotalSize!=0 ? ToPercent(CurSize,TotalSize) : ToPercent(CurFileSize,TotalFileSize);
+  int CurPercent=ToPercent(CurSize,TotalSize);
   mprintf(L"\b\b\b\b%3d%%",CurPercent);
 }
 
@@ -250,9 +247,6 @@ void uiMsgStore::Msg()
       mprintf(L"\n"); // Needed when called from CmdExtract::ExtractCurrentFile.
       break;
 #ifndef SFX_MODULE
-    case UIERROR_OPFAILED:
-      Log(NULL,St(MOpFailed));
-      break;
     case UIERROR_NEWRARFORMAT:
       Log(Str[0],St(MNewRarFormat));
       break;
@@ -262,7 +256,6 @@ void uiMsgStore::Msg()
       break;
     case UIERROR_MISSINGVOL:
       Log(Str[0],St(MAbsNextVol),Str[0]);
-      mprintf(L"     "); // For progress percent.
       break;
 #ifndef SFX_MODULE
     case UIERROR_NEEDPREVVOL:
@@ -336,13 +329,6 @@ void uiMsgStore::Msg()
     case UIERROR_DIRNAMEEXISTS:
       Log(NULL,St(MDirNameExists));
       break;
-    case UIERROR_TRUNCPSW:
-      eprintf(St(MTruncPsw),Num[0]);
-      eprintf(L"\n");
-      break;
-    case UIERROR_ADJUSTVALUE:
-      Log(NULL,St(MAdjustValue),Str[0],Str[1]);
-      break;
 
 #ifndef SFX_MODULE
     case UIMSG_STRING:
@@ -383,9 +369,6 @@ void uiMsgStore::Msg()
       mprintf(St(MFAT32Size));
       mprintf(L"     "); // For progress percent.
       break;
-    case UIMSG_SKIPENCARC:
-      Log(NULL,St(MSkipEncArc),Str[0]);
-      break;
 
 
 
@@ -396,8 +379,7 @@ void uiMsgStore::Msg()
 }
 
 
-bool uiGetPassword(UIPASSWORD_TYPE Type,const wchar *FileName,
-                   SecPassword *Password,CheckPassword *CheckPwd)
+bool uiGetPassword(UIPASSWORD_TYPE Type,const wchar *FileName,SecPassword *Password)
 {
   // Unlike GUI we cannot provide Cancel button here, so we use the empty
   // password to abort. Otherwise user not knowing a password would need to

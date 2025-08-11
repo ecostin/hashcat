@@ -145,9 +145,12 @@ static const char *const USAGE_BIG_PRE_HASHMODES[] =
   " -8, --custom-charset8          | CS   | User-defined charset ?8                              |",
   "     --identify                 |      | Shows all supported algorithms for input hashes      | --identify my.hash",
   " -i, --increment                |      | Enable mask increment mode                           |",
+  " -ii,--increment-inverse        |      | Increment from right-to-left                         |",
   "     --increment-min            | Num  | Start mask incrementing at X                         | --increment-min=4",
   "     --increment-max            | Num  | Stop mask incrementing at X                          | --increment-max=8",
   " -S, --slow-candidates          |      | Enable slower (but advanced) candidate generators    |",
+  "     --bypass-delay             | Num  | Seconds delay between checking bypass threshold      | --bypass-delay=5",
+  "     --bypass-threshold         | Num  | Minimum amount of founds to avoid being bypassed     | --bypass-threshold=5",
   #ifdef WITH_BRAIN
   "     --brain-server             |      | Enable brain server                                  |",
   "     --brain-server-timer       | Num  | Update the brain server dump each X seconds (min:60) | --brain-server-timer=300",

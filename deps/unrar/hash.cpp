@@ -26,7 +26,7 @@ void HashValue::Init(HASH_TYPE Type)
 }
 
 
-bool HashValue::operator == (const HashValue &cmp) const
+bool HashValue::operator == (const HashValue &cmp)
 {
   if (Type==HASH_NONE || cmp.Type==HASH_NONE)
     return true;

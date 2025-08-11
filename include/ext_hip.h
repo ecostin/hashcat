@@ -650,6 +650,11 @@ typedef hc_hip_lib_t HIP_PTR;
 int  hip_init                   (void *hashcat_ctx);
 void hip_close                  (void *hashcat_ctx);
 
+int hc_hipEventDestroyPtr       (void *hashcat_ctx, hipEvent_t *hEvent);
+int hc_hipMemFreePtr            (void *hashcat_ctx, hipDeviceptr_t *dptr);
+int hc_hipModuleUnloadPtr       (void *hashcat_ctx, hipModule_t *hmod);
+int hc_hipStreamDestroyPtr      (void *hashcat_ctx, hipStream_t *hStream);
+
   // deprecated
 int hc_hipCtxCreate             (void *hashcat_ctx, hipCtx_t *pctx, unsigned int flags, hipDevice_t dev);
   // deprecated

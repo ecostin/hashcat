@@ -97,7 +97,8 @@ using namespace metal;
  */
 
 #if   VENDOR_ID == (1 << 0)
-#define IS_AMD
+//#define IS_AMD
+#define IS_GENERIC
 #elif VENDOR_ID == (1 << 1)
 #define IS_APPLE
 #define IS_GENERIC
@@ -184,13 +185,6 @@ using namespace metal;
 #ifdef IS_HIP
 #define USE_BITSELECT
 #define USE_ROTATE
-#endif
-
-#ifdef IS_INTEL_SDK
-#ifdef IS_CPU
-#define USE_BITSELECT
-#define USE_ROTATE
-#endif
 #endif
 
 #ifdef IS_OPENCL

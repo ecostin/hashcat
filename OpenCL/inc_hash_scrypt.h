@@ -28,7 +28,8 @@
 // should be safe, because in backend.c we use:
 //    u64 size_extra_buffer1 = 4096;
 //  size_extra_buffer1 += base_chunk_size;
-#define ALIGN_PTR_1k(p) ((GLOBAL_AS hc_uint4_t *) (((u64) (p) + 1023) & ~1023UL))
+// could be useless, pointers seem to be page aligned
+//#define ALIGN_PTR_1k(p) ((GLOBAL_AS hc_uint4_t *) (((u64) (p) + 1023) & ~1023UL))
 
 #if defined IS_INTEL_SDK
 

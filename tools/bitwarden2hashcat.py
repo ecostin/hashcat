@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Utility to extract Bitwarden hash for hashcat from Google Chrome / Firefox / Desktop local data"""
 
 #

@@ -37,4 +37,3 @@ In case you want to play around in the docker, run:
 ```bash
 docker run --rm -it hashcat-binaries /bin/bash
 ```
-

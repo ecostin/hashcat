@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # Converts gitea PBKDF2-HMAC-SHA256 hashes into a format hashcat can use
 # written by unix-ninja
 

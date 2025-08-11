@@ -200,9 +200,9 @@ bool salt_prepare (void *platform_context, MAYBE_UNUSED hashconfig_t *hashconfig
   {
     unit_t *unit_buf = &bridge_scrypt_jane->units_buf[unit_idx];
 
-    unit_buf->V = hcmalloc_aligned (largest_V, 64);
-    //unit_buf->X = hcmalloc_aligned (largest_X, 64);
-    unit_buf->Y = hcmalloc_aligned (largest_Y, 64);
+    unit_buf->V = hcmalloc_bridge_aligned (largest_V, 64);
+    //unit_buf->X = hcmalloc_bridge_aligned (largest_X, 64);
+    unit_buf->Y = hcmalloc_bridge_aligned (largest_Y, 64);
   }
 
   return true;
@@ -216,9 +216,9 @@ void salt_destroy (void *platform_context, MAYBE_UNUSED hashconfig_t *hashconfig
   {
     unit_t *unit_buf = &bridge_scrypt_jane->units_buf[unit_idx];
 
-    hcfree_aligned (unit_buf->V);
-    //hcfree_aligned (unit_buf->X);
-    hcfree_aligned (unit_buf->Y);
+    hcfree_bridge_aligned (unit_buf->V);
+    //hcfree_bridge_aligned (unit_buf->X);
+    hcfree_bridge_aligned (unit_buf->Y);
   }
 }
 

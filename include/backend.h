@@ -71,11 +71,11 @@ int run_hip_kernel_memset32                 (hashcat_ctx_t *hashcat_ctx, hc_devi
 int run_hip_kernel_bzero                    (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, hipDeviceptr_t buf, const u64 size);
 
 #if defined (__APPLE__)
-int run_metal_kernel_atinit                 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 num);
-int run_metal_kernel_utf8toutf16le          (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 num);
-int run_metal_kernel_memset                 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 offset, const u8  value, const u64 size);
-int run_metal_kernel_memset32               (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 offset, const u32 value, const u64 size);
-int run_metal_kernel_bzero                  (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem buf, const u64 size);
+int run_metal_kernel_atinit                 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t buf, const u64 num);
+int run_metal_kernel_utf8toutf16le          (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t buf, const u64 num);
+int run_metal_kernel_memset                 (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t buf, const u64 offset, const u8  value, const u64 size);
+int run_metal_kernel_memset32               (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t buf, const u64 offset, const u32 value, const u64 size);
+int run_metal_kernel_bzero                  (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, mtl_mem_t buf, const u64 size);
 #endif
 
 int run_opencl_kernel_atinit                (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, cl_mem buf, const u64 num);

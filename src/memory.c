@@ -67,7 +67,60 @@ void hcfree (void *ptr)
   free (ptr);
 }
 
-void *hcmalloc_aligned (const size_t sz, const int align)
+void *hc_alloc_aligned (size_t alignment, size_t size)
+{
+  void *ptr = NULL;
+
+  #if defined (__linux__)   || defined (__APPLE__)     || defined (__OpenBSD__) || defined (__NetBSD__) || \
+      defined (__FreeBSD__) || defined (__DragonFly__) || defined (__CYGWIN__)  || defined (__MSYS__)
+
+  if (posix_memalign (&ptr, alignment, size) != 0)
+  {
+    fprintf (stderr, "! hc_aligned_alloc: %s\n", MSG_ENOMEM);
+
+    return NULL;
+  }
+
+  #elif defined (_WIN)
+
+  ptr = _aligned_malloc (size, alignment);
+
+  if (ptr == NULL)
+  {
+    fprintf (stderr, "! hc_aligned_alloc: %s\n", MSG_ENOMEM);
+
+    return NULL;
+  }
+
+  #else
+
+  #error "Platform not supported for aligned allocation"
+
+  #endif
+
+  memset (ptr, 0, size);
+
+  return ptr;
+}
+
+void hc_free_aligned (void **ptr)
+{
+  if (ptr == NULL || *ptr == NULL) return;
+
+  #if defined (_WIN)
+
+  _aligned_free (*ptr);
+
+  #else
+
+  free (*ptr);
+
+  #endif
+
+  *ptr = NULL;
+}
+
+void *hcmalloc_bridge_aligned (const size_t sz, const int align)
 {
   uintptr_t align_mask = (uintptr_t) (align - 1);
 
@@ -86,7 +139,7 @@ void *hcmalloc_aligned (const size_t sz, const int align)
   return aligned_ptr;
 }
 
-void hcfree_aligned(void *ptr)
+void hcfree_bridge_aligned (void *ptr)
 {
   if (ptr != NULL)
   {

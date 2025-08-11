@@ -191,7 +191,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     return (PARSER_HASH_ENCODING);
   }
 
-
   /*
    * transform/convert back to the ripemd hash (reverse translate_8to5 (), i.e. translate_5to8).
    * We extend the 8 bit blocks here to 32 bit blocks (4 * 8 = 32 bits), therefore we convert
@@ -239,7 +238,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     b[i] = digest[i];
   }
 
-
   /*
    * convert 8 bit "blocks" to 5 bit blocks, translate_8to5 () (for base32, 0..31):
    */
@@ -286,7 +284,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   // note: some further t[] array items will be set after we know the checksum of this part
 
-
   /*
    * Checksum:
    */
@@ -314,7 +311,6 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   t[36] = (polymod >> 10) & 31;
   t[37] = (polymod >>  5) & 31;
   t[38] = (polymod >>  0) & 31;
-
 
   /*
    * BASE32 encode:

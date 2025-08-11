@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Based on "pyvmx-cracker" (https://github.com/axcheron/pyvmx-cracker) (MIT license)

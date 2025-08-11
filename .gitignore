@@ -35,3 +35,7 @@ test_edge*
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Generated docs are overwritten anyway
+/docs/hashcat-example_hashes.md
+/docs/hashcat-help.md

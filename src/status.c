@@ -2092,7 +2092,7 @@ char *status_get_brain_link_send_bytes_sec_dev (const hashcat_ctx_t *hashcat_ctx
 }
 #endif
 
-#if defined(__APPLE__)
+#if defined (__APPLE__)
 char *status_get_hwmon_fan_dev (const hashcat_ctx_t *hashcat_ctx)
 {
   status_ctx_t *status_ctx = hashcat_ctx->status_ctx;
@@ -2132,6 +2132,7 @@ char *status_get_hwmon_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_
   const int num_corespeed   = hm_get_corespeed_with_devices_idx   ((hashcat_ctx_t *) hashcat_ctx, backend_devices_idx);
   const int num_memoryspeed = hm_get_memoryspeed_with_devices_idx ((hashcat_ctx_t *) hashcat_ctx, backend_devices_idx);
   const int num_buslanes    = hm_get_buslanes_with_devices_idx    ((hashcat_ctx_t *) hashcat_ctx, backend_devices_idx);
+  const int64_t num_power   = hm_get_power_with_devices_idx       ((hashcat_ctx_t *) hashcat_ctx, backend_devices_idx);
 
   int output_len = 0;
 
@@ -2163,6 +2164,11 @@ char *status_get_hwmon_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_
   if (num_buslanes >= 0)
   {
     output_len += snprintf (output_buf + output_len, HCBUFSIZ_TINY - output_len, "Bus:%u ", num_buslanes);
+  }
+
+  if (num_power >= 0)
+  {
+    output_len += snprintf (output_buf + output_len, HCBUFSIZ_TINY - output_len, "Pwr:%" PRId64 "mW ", num_power);
   }
 
   if (output_len > 0)

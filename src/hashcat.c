@@ -297,6 +297,16 @@ static int inner2_loop (hashcat_ctx_t *hashcat_ctx)
   }
 
   /**
+   * Set time for --bypass-delay and start point for --bypass-threshold
+   */
+
+  if (user_options->bypass_delay_chgd == true)
+  {
+    time (&status_ctx->timer_bypass_start);
+    status_ctx->bypass_digests_done_new = hashcat_ctx->hashes->digests_done_new;
+  }
+
+  /**
    * Prepare cracking stats
    */
 
@@ -2085,7 +2095,7 @@ int hashcat_get_status (hashcat_ctx_t *hashcat_ctx, hashcat_status_t *hashcat_st
     device_info->exec_msec_dev                  = status_get_exec_msec_dev                  (hashcat_ctx, device_id);
     device_info->speed_sec_dev                  = status_get_speed_sec_dev                  (hashcat_ctx, device_id);
     device_info->guess_candidates_dev           = status_get_guess_candidates_dev           (hashcat_ctx, device_id);
-    #if defined(__APPLE__)
+    #if defined (__APPLE__)
     device_info->hwmon_fan_dev                  = status_get_hwmon_fan_dev                  (hashcat_ctx);
     #endif
     device_info->hwmon_dev                      = status_get_hwmon_dev                      (hashcat_ctx, device_id);

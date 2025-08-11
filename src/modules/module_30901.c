@@ -134,7 +134,6 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (b58check_25 (npubkey) == false) return (PARSER_HASH_ENCODING);
 
-
   for (u32 i = 0; i < 20; i++) // DGST_SIZE
   {
     digest[i] = pubkey[PUBKEY_MAXLEN - pubkey_len + i + 1];

@@ -162,10 +162,10 @@ DECLSPEC void scrypt_smix_init (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, GLOBAL_AS v
 
   switch (xm4)
   {
-    case 0: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V0); break;
-    case 1: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V1); break;
-    case 2: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V2); break;
-    case 3: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V3); break;
+    case 0: V = (GLOBAL_AS hc_uint4_t *) V0; break;
+    case 1: V = (GLOBAL_AS hc_uint4_t *) V1; break;
+    case 2: V = (GLOBAL_AS hc_uint4_t *) V2; break;
+    case 3: V = (GLOBAL_AS hc_uint4_t *) V3; break;
   }
 
   GLOBAL_AS hc_uint4_t *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);
@@ -206,10 +206,10 @@ DECLSPEC void scrypt_smix_loop (GLOBAL_AS u32 *P, PRIVATE_AS u32 *X, PRIVATE_AS 
 
   switch (xm4)
   {
-    case 0: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V0); break;
-    case 1: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V1); break;
-    case 2: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V2); break;
-    case 3: V = (GLOBAL_AS hc_uint4_t *) ALIGN_PTR_1k (V3); break;
+    case 0: V = (GLOBAL_AS hc_uint4_t *) V0; break;
+    case 1: V = (GLOBAL_AS hc_uint4_t *) V1; break;
+    case 2: V = (GLOBAL_AS hc_uint4_t *) V2; break;
+    case 3: V = (GLOBAL_AS hc_uint4_t *) V3; break;
   }
 
   GLOBAL_AS hc_uint4_t *Vx = V + (xd4 * lsz * ySIZE * zSIZE) + (lid * ySIZE * zSIZE);

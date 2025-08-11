@@ -15,9 +15,12 @@
 #include <sys/cygwin.h>
 #endif
 
-#if defined (__APPLE__)
+#if defined (__APPLE__)   || defined (__OpenBSD__)   || defined (__NetBSD__) || \
+    defined (__FreeBSD__) || defined (__DragonFly__)
 #include <sys/sysctl.h>
+#if defined (__APPLE__)
 #include <mach/mach.h>
+#endif
 #endif
 
 #if defined (_WIN)
@@ -26,7 +29,8 @@
 
 #if defined (_POSIX)
 #include <sys/utsname.h>
-#if !defined (__APPLE__)
+#if !defined (__APPLE__)   && !defined (__OpenBSD__)   && !defined (__NetBSD__) && \
+    !defined (__FreeBSD__) && !defined (__DragonFly__)
 #include <sys/sysinfo.h>
 #endif
 #endif
@@ -311,9 +315,34 @@ int hc_asprintf (char **strp, const char *fmt, ...)
 #undef __WINDOWS__
 #endif
 
+#if defined (__OpenBSD__)
+static void *qsort_r_context;
+
+static int qsort_r_comparator (const void *a, const void *b)
+{
+    typedef int (*compare_fn_t) (const void *, const void *, void *);
+
+    compare_fn_t cmp = (compare_fn_t) qsort_r_context;
+
+    return cmp (a, b, NULL);
+}
+#endif
+
 void hc_qsort_r (void *base, size_t nmemb, size_t size, int (*compar) (const void *, const void *, void *), void *arg)
 {
+  #if defined (__OpenBSD__)
+
+  (void) arg; // unused, make compiler happy
+
+  qsort_r_context = (void *) compar;
+
+  qsort (base, nmemb, size, qsort_r_comparator);
+
+  #else
+
   sort_r (base, nmemb, size, compar, arg);
+
+  #endif
 }
 
 void *hc_bsearch_r (const void *key, const void *base, size_t nmemb, size_t size, int (*compar) (const void *, const void *, void *), void *arg)
@@ -940,11 +969,12 @@ int select_read_timeout (int sockfd, const int sec)
   fd_set fds;
 
   FD_ZERO (&fds);
-#if defined(_WIN)
+
+  #if defined (_WIN)
   FD_SET ((SOCKET)sockfd, &fds);
-#else
+  #else
   FD_SET (sockfd, &fds);
-#endif
+  #endif
 
   return select (sockfd + 1, &fds, NULL, NULL, &tv);
 }
@@ -959,11 +989,12 @@ int select_write_timeout (int sockfd, const int sec)
   fd_set fds;
 
   FD_ZERO (&fds);
-#if defined(_WIN)
+
+  #if defined (_WIN)
   FD_SET ((SOCKET)sockfd, &fds);
-#else
+  #else
   FD_SET (sockfd, &fds);
-#endif
+  #endif
 
   return select (sockfd + 1, NULL, &fds, NULL, &tv);
 }
@@ -1710,17 +1741,98 @@ bool get_free_memory (u64 *free_mem)
 
   return true;
 
-  #else
+  #elif defined (__OpenBSD__)
 
-  struct sysinfo info;
+  struct uvmexp uvmexp;
 
-  if (sysinfo (&info) != 0) return false;
+  size_t size = sizeof (uvmexp);
 
-  *free_mem = (u64) info.freeram * info.mem_unit;
+  int mib[2] = {CTL_VM, VM_UVMEXP};
+
+  if (sysctl (mib, 2, &uvmexp, &size, NULL, 0) == -1) return false;
+
+  *free_mem = (uint64_t)(uvmexp.free * uvmexp.pagesize);
 
   return true;
 
+  #elif defined (__FreeBSD__) || defined (__NetBSD__) || defined (__DragonFly__)
+
+  size_t len;
+
+  u64 pagesize = 0, free_pages = 0, cache_pages = 0, inactive_pages = 0;
+
+  len = sizeof (pagesize);
+
+  if (sysctlbyname ("hw.pagesize", &pagesize, &len, NULL, 0) == -1) return false;
+
+  len = sizeof (free_pages);
+
+  if (sysctlbyname ("vm.stats.vm.v_free_count", &free_pages, &len, NULL, 0) == -1) return false;
+
+  #if defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__DragonFly__)
+
+  len = sizeof (cache_pages);
+
+  if (sysctlbyname ("vm.stats.vm.v_cache_count", &cache_pages, &len, NULL, 0) == -1) return false;
+
+  #endif // __OpenBSD__ || __FreeBSD__ || __DragonFly__
+
+  len = sizeof (inactive_pages);
+
+  if (sysctlbyname ("vm.stats.vm.v_inactive_count", &inactive_pages, &len, NULL, 0) == -1) return false;
+
+  u64 total_pages = free_pages + cache_pages + inactive_pages;
+
+  *free_mem = (u64) (total_pages * pagesize);
+
+  return true;
+
+  #else
+
+  // Get MemAvailable from /proc/meminfo instead of sysinfo()
+
+  FILE *fp = fopen ("/proc/meminfo", "r");
+
+  if (fp == NULL)
+  {
+    // fallback
+
+    struct sysinfo info;
+
+    if (sysinfo (&info) != 0) return false;
+
+    const unsigned long freeram = info.freeram;
+    const unsigned long bufferram = info.bufferram;
+    const unsigned long sharedram = info.sharedram;
+
+    const unsigned long totamram = freeram + bufferram + sharedram;
+
+    *free_mem = (u64) totamram * info.mem_unit;
+
+    return true;
+  }
+
+  char line[256] = { 0 };
+
+  u64 memAvailable_kb = 0;
+
+  while (fgets (line, sizeof (line) - 1, fp))
+  {
+    if (sscanf (line, "MemAvailable: %" SCNu64 " kB", &memAvailable_kb) == 1)
+    {
+      fclose (fp);
+
+      *free_mem = (memAvailable_kb * 1024);
+
+      return true;
+    }
+  }
+
+  fclose (fp);
+
   #endif
+
+  return false;
 }
 
 u32 previous_power_of_two (const u32 x)

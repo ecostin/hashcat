@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Construct a hash for use with hashcat mode 22100
 # Usage: python3 bitlocker2hashcat.py <bitlocker_image> -o <bitlocker_partition_offset>
 # Hashcat supports modes $bitlocker$0$ and $bitlocker$1$ and therefore this script will output hashes that relate to a VMK protected by a user password only.

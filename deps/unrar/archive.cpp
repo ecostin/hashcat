@@ -3,15 +3,15 @@
 #include "arccmt.cpp"
 
 
-Archive::Archive(CommandData *InitCmd)
+Archive::Archive(RAROptions *InitCmd)
 {
   Cmd=NULL; // Just in case we'll have an exception in 'new' below.
 
   DummyCmd=(InitCmd==NULL);
-  Cmd=DummyCmd ? (new CommandData):InitCmd;
+  Cmd=DummyCmd ? (new RAROptions):InitCmd;
 
   OpenShared=Cmd->OpenShared;
-  Format=RARFMT_NONE;
+  Format=RARFMT15;
   Solid=false;
   Volume=false;
   MainComment=false;
@@ -31,9 +31,9 @@ Archive::Archive(CommandData *InitCmd)
   NextBlockPos=0;
 
 
-  MainHead.Reset();
-  CryptHead={};
-  EndArcHead.Reset();
+  memset(&MainHead,0,sizeof(MainHead));
+  memset(&CryptHead,0,sizeof(CryptHead));
+  memset(&EndArcHead,0,sizeof(EndArcHead));
 
   VolNumber=0;
   VolWrite=0;
@@ -231,7 +231,7 @@ bool Archive::IsArchive(bool EnableBroken)
   // first file header to set "comment" flag when reading service header.
   // Unless we are in silent mode, we need to know about presence of comment
   // immediately after IsArchive call.
-  if (HeadersLeft && (!SilentOpen || !Encrypted) && IsSeekable())
+  if (HeadersLeft && (!SilentOpen || !Encrypted))
   {
     int64 SavePos=Tell();
     int64 SaveCurBlockPos=CurBlockPos,SaveNextBlockPos=NextBlockPos;

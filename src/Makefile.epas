@@ -7,7 +7,7 @@ LDFLAGS                 := -Wl,-rpath,/epas/utilities/epas-opencl/lib -Wl,-rpath
 SHARED                  ?= 0
 DEBUG                   := 0
 PRODUCTION              := 1
-PRODUCTION_VERSION      := v6.2.6-epas
+PRODUCTION_VERSION      := v7.0.0-epas
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1
 ENABLE_UNRAR            ?= 1
@@ -17,6 +17,7 @@ USE_SYSTEM_OPENCL       ?= 0
 USE_SYSTEM_XXHASH       ?= 0
 ## do not change, requires some hacks
 USE_SYSTEM_UNRAR        ?= 0
+MAINTAINER_MODE         ?= 0
 
 ##
 ## Detect Operating System
@@ -32,7 +33,7 @@ UNAME                   := $(patsubst MSYS_NT-%,MSYS2,$(UNAME))
 UNAME                   := $(patsubst MINGW32_NT-%,MSYS2,$(UNAME))
 UNAME                   := $(patsubst MINGW64_NT-%,MSYS2,$(UNAME))
 
-ifeq (,$(filter $(UNAME),Linux FreeBSD NetBSD Darwin CYGWIN MSYS2))
+ifeq (,$(filter $(UNAME),Linux OpenBSD FreeBSD NetBSD DragonFly Darwin CYGWIN MSYS2))
 $(error "! Your Operating System ($(UNAME)) is not supported by this Makefile")
 endif
 
@@ -92,9 +93,15 @@ endif
 IS_AARCH64              := $(shell [ "$$(arch 2>/dev/null)" = "aarch64" ] && echo 1 || echo 0)
 IS_ARM                  := $(or $(filter 1,$(IS_APPLE_SILICON)),$(filter 1,$(IS_AARCH64)))
 
-ifneq (,$(filter $(UNAME),FreeBSD NetBSD))
+ifneq (,$(filter $(UNAME),FreeBSD NetBSD DragonFly))
 CC                      := cc
 CXX                     := c++
+SED                     := gsed
+endif
+
+ifneq (,$(filter $(UNAME),OpenBSD))
+CC                      := egcc
+CXX                     := eg++
 SED                     := gsed
 endif
 
@@ -237,7 +244,9 @@ ifeq ($(UNAME),Darwin)
 CFLAGS_UNRAR            += -std=c++14
 endif
 ifneq ($(CC),clang)
+ifneq ($(UNAME),FreeBSD)
 CFLAGS_UNRAR            += -Wno-class-memaccess
+endif
 CFLAGS_UNRAR            += -Wno-misleading-indentation
 CFLAGS_UNRAR            += -Wno-format-overflow
 else
@@ -332,7 +341,11 @@ endif
 # unrar
 ifeq ($(ENABLE_UNRAR),1)
 CFLAGS                  += -I$(DEPS_UNRAR_PATH)
+ifeq ($(UNAME),OpenBSD)
+LFLAGS                  += -lc++
+else
 LFLAGS                  += -lstdc++
+endif
 endif
 
 ##
@@ -349,20 +362,38 @@ LFLAGS_NATIVE           += -lrt
 LFLAGS_NATIVE           += -lm
 endif # Linux
 
-ifeq ($(UNAME),FreeBSD)
+ifneq (,$(filter $(UNAME),FreeBSD DragonFly))
 ifndef PORTNAME
 CFLAGS_NATIVE           := $(CFLAGS)
 LFLAGS_NATIVE           := $(LFLAGS)
+LFLAGS_NATIVE           += -L /usr/local/lib
 LFLAGS_NATIVE           += -lpthread
 LFLAGS_NATIVE           += -lm
 LFLAGS_NATIVE           += -liconv
 endif
 endif # FreeBSD
 
+ifeq ($(UNAME),OpenBSD)
+ifndef PORTNAME
+CFLAGS_NATIVE           := $(CFLAGS)
+#CFLAGS_NATIVE           += -I /ram/usr/local/include
+CFLAGS_NATIVE           += -I /usr/local/include
+LFLAGS_NATIVE           := $(LFLAGS)
+#LFLAGS_NATIVE           += -L /ram/usr/local/lib
+LFLAGS_NATIVE           += -L /usr/local/lib
+LFLAGS_NATIVE           += -lpthread
+LFLAGS_NATIVE           += -lm
+LFLAGS_NATIVE           += -liconv
+endif
+endif # OpenBSD
+
 ifeq ($(UNAME),NetBSD)
 CFLAGS_NATIVE           := $(CFLAGS)
+CFLAGS_NATIVE           += -I /usr/pkg/include
 LFLAGS_NATIVE           := $(LFLAGS)
+LFLAGS_NATIVE           += -L /usr/pkg/lib
 LFLAGS_NATIVE           += -lpthread
+LFLAGS_NATIVE           += -liconv
 endif # NetBSD
 
 ifeq ($(UNAME),Darwin)
@@ -380,6 +411,7 @@ LFLAGS_NATIVE           += -framework CoreGraphics
 LFLAGS_NATIVE           += -framework Foundation
 LFLAGS_NATIVE           += -framework IOKit
 LFLAGS_NATIVE           += -framework Metal
+LFLAGS_NATIVE           += -lIOReport
 LFLAGS_NATIVE           += -lpthread
 LFLAGS_NATIVE           += -liconv
 
@@ -432,12 +464,12 @@ CXXFLAGS                :=
 ##
 
 EMU_OBJS_ALL            := emu_general emu_inc_common emu_inc_platform emu_inc_scalar emu_inc_simd
-EMU_OBJS_ALL            += emu_inc_rp emu_inc_rp_optimized
+EMU_OBJS_ALL            += emu_inc_rp_common emu_inc_rp emu_inc_rp_optimized
 EMU_OBJS_ALL            += emu_inc_hash_md4 emu_inc_hash_md5 emu_inc_hash_ripemd160 emu_inc_hash_sha1 emu_inc_hash_sha256 emu_inc_hash_sha384 emu_inc_hash_sha512 emu_inc_hash_streebog256 emu_inc_hash_streebog512 emu_inc_ecc_secp256k1 emu_inc_bignum_operations
 EMU_OBJS_ALL            += emu_inc_cipher_aes emu_inc_cipher_camellia emu_inc_cipher_des emu_inc_cipher_kuznyechik emu_inc_cipher_serpent emu_inc_cipher_twofish
 EMU_OBJS_ALL            += emu_inc_hash_base58
 
-OBJS_ALL                := affinity autotune backend benchmark bitmap bitops bridges combinator common convert cpt cpu_crc32 debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_hip ext_nvapi ext_nvml ext_nvrtc ext_hiprtc ext_OpenCL ext_sysfs_amdgpu ext_sysfs_cpu ext_iokit ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
+OBJS_ALL                := affinity autotune backend benchmark bitmap bitops bridges combinator common convert cpt cpu_crc32 debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_hip ext_nvapi ext_nvml ext_nvrtc ext_hiprtc ext_OpenCL ext_sysfs_amdgpu ext_sysfs_intelgpu ext_sysfs_cpu ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
 
 ifeq ($(ENABLE_BRAIN),1)
 OBJS_ALL                += brain
@@ -448,7 +480,7 @@ LINUX_OBJS              := $(foreach OBJ,$(OBJS_ALL),obj/$(OBJ).LINUX.o)
 WIN_OBJS                := $(foreach OBJ,$(OBJS_ALL),obj/$(OBJ).WIN.o)
 
 ifeq ($(UNAME),Darwin)
-OBJS_METAL              := ext_metal
+OBJS_METAL              := ext_metal ext_iokit
 
 NATIVE_OBJS             += $(foreach OBJ,$(OBJS_METAL),obj/$(OBJ).METAL.NATIVE.o)
 endif
@@ -488,6 +520,13 @@ LINUX_OBJS              += $(foreach OBJ,$(OBJS_UNRAR),obj/$(OBJ).UNRAR.LINUX.o)
 WIN_OBJS                += $(foreach OBJ,$(OBJS_UNRAR),obj/$(OBJ).UNRAR.WIN.o)
 endif
 endif
+
+##
+## Tools
+##
+
+TOOLS                   += $(wildcard tools/*hashcat.pl)
+TOOLS                   += $(wildcard tools/*hashcat.py)
 
 ##
 ## Targets: Native Compilation
@@ -537,10 +576,10 @@ distclean: clean
 # allow (whitelist) "make install" only on unix-based systems (also disallow cygwin/msys)
 
 ifneq ($(findstring install,$(MAKECMDGOALS)),)
-  ifeq (,$(filter $(UNAME),Linux FreeBSD Darwin NetBSD))
+  ifeq (,$(filter $(UNAME),Linux FreeBSD OpenBSD NetBSD DragonFly Darwin))
     define ERROR_INSTALL_DISALLOWED
 ! The 'install' target is not allowed on this operating system ($(UNAME)). \
-Only Linux, FreeBSD, NetBSD and Darwin can use the 'install' target
+Only Linux, FreeBSD, OpenBSD, NetBSD, DragonFly and Darwin can use the 'install' target
     endef
 
     $(error $(ERROR_INSTALL_DISALLOWED))
@@ -549,9 +588,9 @@ endif
 
 .PHONY: install
 ifeq ($(SHARED),1)
-install: install_docs install_shared install_library install_library_dev install_tunings install_kernels install_modules install_bridges install_hashcat
+install: install_docs install_shared install_tools install_library install_library_dev install_tunings install_kernels install_modules install_bridges install_hashcat
 else
-install: install_docs install_shared                                     install_tunings install_kernels install_modules install_bridges install_hashcat
+install: install_docs install_shared install_tools                                     install_tunings install_kernels install_modules install_bridges install_hashcat
 endif
 
 # we need this extra target to make sure that for parallel builds (i.e. 2+ Makefile targets could possible run at the same time)
@@ -575,7 +614,6 @@ install_docs: install_make_shared_root
 	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(DOCUMENT_FOLDER)/rules
 	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(DOCUMENT_FOLDER)/extra
 	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(DOCUMENT_FOLDER)/extra/tab_completion
-	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(DOCUMENT_FOLDER)/tools
 	$(INSTALL) -m 644 example.dict                                          $(DESTDIR)$(DOCUMENT_FOLDER)/
 	$(INSTALL) -m 644 example0.hash                                         $(DESTDIR)$(DOCUMENT_FOLDER)/
 	$(INSTALL) -m 644 example400.hash                                       $(DESTDIR)$(DOCUMENT_FOLDER)/
@@ -596,7 +634,6 @@ install_docs: install_make_shared_root
 	$(FIND) masks/    -type f -exec $(INSTALL) -m 644 {}                    $(DESTDIR)$(DOCUMENT_FOLDER)/{} \;
 	$(FIND) rules/    -type d -exec $(INSTALL) -m 755 -d                    $(DESTDIR)$(DOCUMENT_FOLDER)/{} \;
 	$(FIND) rules/    -type f -exec $(INSTALL) -m 644 {}                    $(DESTDIR)$(DOCUMENT_FOLDER)/{} \;
-	$(FIND) tools/    -type f -name '*cat.p[ly]' -exec $(INSTALL) -m 755 {} $(DESTDIR)$(DOCUMENT_FOLDER)/{} \;
 	$(SED) $(SED_IN_PLACE) 's/\.\/hashcat/hashcat/'                         $(DESTDIR)$(DOCUMENT_FOLDER)/example0.sh
 	$(SED) $(SED_IN_PLACE) 's/\.\/hashcat/hashcat/'                         $(DESTDIR)$(DOCUMENT_FOLDER)/example400.sh
 	$(SED) $(SED_IN_PLACE) 's/\.\/hashcat/hashcat/'                         $(DESTDIR)$(DOCUMENT_FOLDER)/example500.sh
@@ -646,9 +683,15 @@ install_hashcat: $(HASHCAT_FRONTEND)
 	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(INSTALL_FOLDER)
 	$(INSTALL) -m 755 $(HASHCAT_FRONTEND)                                   $(DESTDIR)$(INSTALL_FOLDER)/
 
+.PHONY: install_tools
+install_tools:
+	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(INSTALL_FOLDER)
+	$(INSTALL) -m 755 ${TOOLS}                                              $(DESTDIR)$(INSTALL_FOLDER)/
+
 .PHONY: uninstall
 uninstall:
 	$(RM) -f  $(DESTDIR)$(INSTALL_FOLDER)/$(HASHCAT_FRONTEND)
+	$(RM) -f  $(addprefix $(DESTDIR)$(INSTALL_FOLDER)/,$(notdir ${TOOLS}))
 	$(RM) -f  $(DESTDIR)$(LIBRARY_FOLDER)/$(HASHCAT_LIBRARY)
 	$(RM) -rf $(DESTDIR)$(LIBRARY_DEV_FOLDER)
 	$(RM) -rf $(DESTDIR)$(SHARED_FOLDER)

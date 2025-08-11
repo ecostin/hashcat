@@ -315,67 +315,79 @@ typedef enum kern_run_mp
 
 typedef enum rule_functions
 {
-  RULE_OP_MANGLE_NOOP            = ':',
-  RULE_OP_MANGLE_LREST           = 'l',
-  RULE_OP_MANGLE_UREST           = 'u',
-  RULE_OP_MANGLE_LREST_UFIRST    = 'c',
-  RULE_OP_MANGLE_UREST_LFIRST    = 'C',
-  RULE_OP_MANGLE_TREST           = 't',
-  RULE_OP_MANGLE_TOGGLE_AT       = 'T',
-  RULE_OP_MANGLE_TOGGLE_AT_SEP   = '3',
-  RULE_OP_MANGLE_REVERSE         = 'r',
-  RULE_OP_MANGLE_DUPEWORD        = 'd',
-  RULE_OP_MANGLE_DUPEWORD_TIMES  = 'p',
-  RULE_OP_MANGLE_REFLECT         = 'f',
-  RULE_OP_MANGLE_ROTATE_LEFT     = '{',
-  RULE_OP_MANGLE_ROTATE_RIGHT    = '}',
-  RULE_OP_MANGLE_APPEND          = '$',
-  RULE_OP_MANGLE_PREPEND         = '^',
-  RULE_OP_MANGLE_DELETE_FIRST    = '[',
-  RULE_OP_MANGLE_DELETE_LAST     = ']',
-  RULE_OP_MANGLE_DELETE_AT       = 'D',
-  RULE_OP_MANGLE_EXTRACT         = 'x',
-  RULE_OP_MANGLE_OMIT            = 'O',
-  RULE_OP_MANGLE_INSERT          = 'i',
-  RULE_OP_MANGLE_OVERSTRIKE      = 'o',
-  RULE_OP_MANGLE_TRUNCATE_AT     = '\'',
-  RULE_OP_MANGLE_REPLACE         = 's',
-  RULE_OP_MANGLE_PURGECHAR       = '@',
-  RULE_OP_MANGLE_TOGGLECASE_REC  = 'a',
-  RULE_OP_MANGLE_DUPECHAR_FIRST  = 'z',
-  RULE_OP_MANGLE_DUPECHAR_LAST   = 'Z',
-  RULE_OP_MANGLE_DUPECHAR_ALL    = 'q',
-  RULE_OP_MANGLE_EXTRACT_MEMORY  = 'X',
-  RULE_OP_MANGLE_APPEND_MEMORY   = '4',
-  RULE_OP_MANGLE_PREPEND_MEMORY  = '6',
-  RULE_OP_MANGLE_TITLE_SEP       = 'e',
+  RULE_OP_MANGLE_NOOP              = ':',
+  RULE_OP_MANGLE_LREST             = 'l',
+  RULE_OP_MANGLE_UREST             = 'u',
+  RULE_OP_MANGLE_LREST_UFIRST      = 'c',
+  RULE_OP_MANGLE_UREST_LFIRST      = 'C',
+  RULE_OP_MANGLE_TREST             = 't',
+  RULE_OP_MANGLE_TOGGLE_AT         = 'T',
+  RULE_OP_MANGLE_TOGGLE_AT_SEP     = '3',
+  RULE_OP_MANGLE_REVERSE           = 'r',
+  RULE_OP_MANGLE_DUPEWORD          = 'd',
+  RULE_OP_MANGLE_DUPEWORD_TIMES    = 'p',
+  RULE_OP_MANGLE_REFLECT           = 'f',
+  RULE_OP_MANGLE_ROTATE_LEFT       = '{',
+  RULE_OP_MANGLE_ROTATE_RIGHT      = '}',
+  RULE_OP_MANGLE_APPEND            = '$',
+  RULE_OP_MANGLE_PREPEND           = '^',
+  RULE_OP_MANGLE_DELETE_FIRST      = '[',
+  RULE_OP_MANGLE_DELETE_LAST       = ']',
+  RULE_OP_MANGLE_DELETE_AT         = 'D',
+  RULE_OP_MANGLE_EXTRACT           = 'x',
+  RULE_OP_MANGLE_OMIT              = 'O',
+  RULE_OP_MANGLE_INSERT            = 'i',
+  RULE_OP_MANGLE_OVERSTRIKE        = 'o',
+  RULE_OP_MANGLE_TRUNCATE_AT       = '\'',
+  RULE_OP_MANGLE_REPLACE           = 's',
+  RULE_OP_MANGLE_PURGECHAR         = '@',
+  RULE_OP_MANGLE_TOGGLECASE_REC    = 'a',
+  RULE_OP_MANGLE_DUPECHAR_FIRST    = 'z',
+  RULE_OP_MANGLE_DUPECHAR_LAST     = 'Z',
+  RULE_OP_MANGLE_DUPECHAR_ALL      = 'q',
+  RULE_OP_MANGLE_EXTRACT_MEMORY    = 'X',
+  RULE_OP_MANGLE_APPEND_MEMORY     = '4',
+  RULE_OP_MANGLE_PREPEND_MEMORY    = '6',
+  RULE_OP_MANGLE_TITLE_SEP         = 'e',
 
-  RULE_OP_MEMORIZE_WORD          = 'M',
+  RULE_OP_MEMORIZE_WORD            = 'M',
 
-  RULE_OP_REJECT_LESS            = '<',
-  RULE_OP_REJECT_GREATER         = '>',
-  RULE_OP_REJECT_EQUAL           = '_',
-  RULE_OP_REJECT_CONTAIN         = '!',
-  RULE_OP_REJECT_NOT_CONTAIN     = '/',
-  RULE_OP_REJECT_EQUAL_FIRST     = '(',
-  RULE_OP_REJECT_EQUAL_LAST      = ')',
-  RULE_OP_REJECT_EQUAL_AT        = '=',
-  RULE_OP_REJECT_CONTAINS        = '%',
-  RULE_OP_REJECT_MEMORY          = 'Q',
-  RULE_LAST_REJECTED_SAVED_POS   = 'p',
+  RULE_OP_REJECT_LESS              = '<',
+  RULE_OP_REJECT_GREATER           = '>',
+  RULE_OP_REJECT_EQUAL             = '_',
+  RULE_OP_REJECT_CONTAIN           = '!',
+  RULE_OP_REJECT_NOT_CONTAIN       = '/',
+  RULE_OP_REJECT_EQUAL_FIRST       = '(',
+  RULE_OP_REJECT_EQUAL_LAST        = ')',
+  RULE_OP_REJECT_EQUAL_AT          = '=',
+  RULE_OP_REJECT_CONTAINS          = '%',
+  RULE_OP_REJECT_MEMORY            = 'Q',
+  RULE_LAST_REJECTED_SAVED_POS     = 'p',
 
-  RULE_OP_MANGLE_SWITCH_FIRST    = 'k',
-  RULE_OP_MANGLE_SWITCH_LAST     = 'K',
-  RULE_OP_MANGLE_SWITCH_AT       = '*',
-  RULE_OP_MANGLE_CHR_SHIFTL      = 'L',
-  RULE_OP_MANGLE_CHR_SHIFTR      = 'R',
-  RULE_OP_MANGLE_CHR_INCR        = '+',
-  RULE_OP_MANGLE_CHR_DECR        = '-',
-  RULE_OP_MANGLE_REPLACE_NP1     = '.',
-  RULE_OP_MANGLE_REPLACE_NM1     = ',',
-  RULE_OP_MANGLE_DUPEBLOCK_FIRST = 'y',
-  RULE_OP_MANGLE_DUPEBLOCK_LAST  = 'Y',
-  RULE_OP_MANGLE_TITLE           = 'E',
+  RULE_OP_MANGLE_SWITCH_FIRST      = 'k',
+  RULE_OP_MANGLE_SWITCH_LAST       = 'K',
+  RULE_OP_MANGLE_SWITCH_AT         = '*',
+  RULE_OP_MANGLE_CHR_SHIFTL        = 'L',
+  RULE_OP_MANGLE_CHR_SHIFTR        = 'R',
+  RULE_OP_MANGLE_CHR_INCR          = '+',
+  RULE_OP_MANGLE_CHR_DECR          = '-',
+  RULE_OP_MANGLE_REPLACE_NP1       = '.',
+  RULE_OP_MANGLE_REPLACE_NM1       = ',',
+  RULE_OP_MANGLE_DUPEBLOCK_FIRST   = 'y',
+  RULE_OP_MANGLE_DUPEBLOCK_LAST    = 'Y',
+  RULE_OP_MANGLE_TITLE             = 'E',
+
+  /* using character classes */
+  RULE_OP_CLASS_BASED              = '~',
+  RULE_OP_MANGLE_REPLACE_CLASS     = 0x01,
+  RULE_OP_MANGLE_PURGECHAR_CLASS   = 0x02,
+  RULE_OP_MANGLE_TITLE_SEP_CLASS   = 0x03,
+  RULE_OP_REJECT_CONTAIN_CLASS     = 0x04,
+  RULE_OP_REJECT_NOT_CONTAIN_CLASS = 0x05,
+  RULE_OP_REJECT_EQUAL_FIRST_CLASS = 0x06,
+  RULE_OP_REJECT_EQUAL_LAST_CLASS  = 0x07,
+  RULE_OP_REJECT_EQUAL_AT_CLASS    = 0x08,
+  RULE_OP_REJECT_CONTAINS_CLASS    = 0x09,
 
 } rule_functions_t;
 
@@ -672,6 +684,12 @@ typedef enum progress_mode
 
 } progress_mode_t;
 
+typedef enum increment {
+  INCREMENT_NONE      = 0,
+  INCREMENT_NORMAL    = 1,
+  INCREMENT_INVERSED  = 2,
+} increment_t;
+
 typedef enum user_options_defaults
 {
   ADVICE                   = true,
@@ -712,7 +730,8 @@ typedef enum user_options_defaults
   HEX_WORDLIST             = false,
   HOOK_THREADS             = 0,
   IDENTIFY                 = false,
-  INCREMENT                = false,
+  INCREMENT                = INCREMENT_NONE,
+  INCREMENT_INVERSE        = false,
   INCREMENT_MAX            = PW_MAX,
   INCREMENT_MIN            = 1,
   KEEP_GUESSING            = false,
@@ -813,6 +832,8 @@ typedef enum user_options_map
   IDX_BRAIN_SESSION             = 0xff0f,
   IDX_BRAIN_SESSION_WHITELIST   = 0xff10,
   #endif
+  IDX_BYPASS_THRESHOLD          = 0xff84,
+  IDX_BYPASS_DELAY              = 0xff85,
   IDX_COLOR_CRACKED             = 0xff59,
   IDX_BRIDGE_PARAMETER1         = 0xff80,
   IDX_BRIDGE_PARAMETER2         = 0xff81,
@@ -846,6 +867,7 @@ typedef enum user_options_map
   IDX_HOOK_THREADS              = 0xff1f,
   IDX_IDENTIFY                  = 0xff20,
   IDX_INCREMENT                 = 'i',
+  IDX_INCREMENT_INVERSE         = 0xff61,
   IDX_INCREMENT_MAX             = 0xff21,
   IDX_INCREMENT_MIN             = 0xff22,
   IDX_INDUCTION_DIR             = 0xff23,
@@ -1213,6 +1235,8 @@ typedef struct hc_fp
   const char *mode;
   const char *path;
 
+  off_t       uncompressed_size;
+
 } HCFILE;
 
 #include "ext_nvrtc.h"
@@ -1496,9 +1520,10 @@ typedef struct hc_device_param
 
   // Some more attributes
 
+  bool    use_opencl11;
   bool    use_opencl12;
   bool    use_opencl20;
-  bool    use_opencl21;
+  bool    use_opencl30;
 
   // AMD
   bool    has_vadd;
@@ -1816,43 +1841,43 @@ typedef struct hc_device_param
   mtl_pipeline      metal_pipeline_aux3;
   mtl_pipeline      metal_pipeline_aux4;
 
-  mtl_mem           metal_d_pws_buf;
-  mtl_mem           metal_d_pws_amp_buf;
-  mtl_mem           metal_d_pws_comp_buf;
-  mtl_mem           metal_d_pws_idx;
-  mtl_mem           metal_d_rules;
-  mtl_mem           metal_d_rules_c;
-  mtl_mem           metal_d_combs;
-  mtl_mem           metal_d_combs_c;
-  mtl_mem           metal_d_bfs;
-  mtl_mem           metal_d_bfs_c;
-  mtl_mem           metal_d_tm_c;
-  mtl_mem           metal_d_bitmap_s1_a;
-  mtl_mem           metal_d_bitmap_s1_b;
-  mtl_mem           metal_d_bitmap_s1_c;
-  mtl_mem           metal_d_bitmap_s1_d;
-  mtl_mem           metal_d_bitmap_s2_a;
-  mtl_mem           metal_d_bitmap_s2_b;
-  mtl_mem           metal_d_bitmap_s2_c;
-  mtl_mem           metal_d_bitmap_s2_d;
-  mtl_mem           metal_d_plain_bufs;
-  mtl_mem           metal_d_digests_buf;
-  mtl_mem           metal_d_digests_shown;
-  mtl_mem           metal_d_salt_bufs;
-  mtl_mem           metal_d_esalt_bufs;
-  mtl_mem           metal_d_tmps;
-  mtl_mem           metal_d_hooks;
-  mtl_mem           metal_d_result;
-  mtl_mem           metal_d_extra0_buf;
-  mtl_mem           metal_d_extra1_buf;
-  mtl_mem           metal_d_extra2_buf;
-  mtl_mem           metal_d_extra3_buf;
-  mtl_mem           metal_d_root_css_buf;
-  mtl_mem           metal_d_markov_css_buf;
-  mtl_mem           metal_d_st_digests_buf;
-  mtl_mem           metal_d_st_salts_buf;
-  mtl_mem           metal_d_st_esalts_buf;
-  mtl_mem           metal_d_kernel_param;
+  mtl_mem_t         metal_d_pws_buf;
+  mtl_mem_t         metal_d_pws_amp_buf;
+  mtl_mem_t         metal_d_pws_comp_buf;
+  mtl_mem_t         metal_d_pws_idx;
+  mtl_mem_t         metal_d_rules;
+  mtl_mem_t         metal_d_rules_c;
+  mtl_mem_t         metal_d_combs;
+  mtl_mem_t         metal_d_combs_c;
+  mtl_mem_t         metal_d_bfs;
+  mtl_mem_t         metal_d_bfs_c;
+  mtl_mem_t         metal_d_tm_c;
+  mtl_mem_t         metal_d_bitmap_s1_a;
+  mtl_mem_t         metal_d_bitmap_s1_b;
+  mtl_mem_t         metal_d_bitmap_s1_c;
+  mtl_mem_t         metal_d_bitmap_s1_d;
+  mtl_mem_t         metal_d_bitmap_s2_a;
+  mtl_mem_t         metal_d_bitmap_s2_b;
+  mtl_mem_t         metal_d_bitmap_s2_c;
+  mtl_mem_t         metal_d_bitmap_s2_d;
+  mtl_mem_t         metal_d_plain_bufs;
+  mtl_mem_t         metal_d_digests_buf;
+  mtl_mem_t         metal_d_digests_shown;
+  mtl_mem_t         metal_d_salt_bufs;
+  mtl_mem_t         metal_d_esalt_bufs;
+  mtl_mem_t         metal_d_tmps;
+  mtl_mem_t         metal_d_hooks;
+  mtl_mem_t         metal_d_result;
+  mtl_mem_t         metal_d_extra0_buf;
+  mtl_mem_t         metal_d_extra1_buf;
+  mtl_mem_t         metal_d_extra2_buf;
+  mtl_mem_t         metal_d_extra3_buf;
+  mtl_mem_t         metal_d_root_css_buf;
+  mtl_mem_t         metal_d_markov_css_buf;
+  mtl_mem_t         metal_d_st_digests_buf;
+  mtl_mem_t         metal_d_st_salts_buf;
+  mtl_mem_t         metal_d_st_esalts_buf;
+  mtl_mem_t         metal_d_kernel_param;
 
   #endif // __APPLE__
 
@@ -2006,6 +2031,7 @@ typedef struct backend_ctx
   bool                need_nvml;
   bool                need_nvapi;
   bool                need_sysfs_amdgpu;
+  bool                need_sysfs_intelgpu;
   bool                need_sysfs_cpu;
   bool                need_iokit;
 
@@ -2066,17 +2092,19 @@ typedef enum kernel_workload
 #include "ext_nvapi.h"
 #include "ext_nvml.h"
 #include "ext_sysfs_amdgpu.h"
+#include "ext_sysfs_intelgpu.h"
 #include "ext_sysfs_cpu.h"
 #include "ext_iokit.h"
 
 typedef struct hm_attrs
 {
-  HM_ADAPTER_ADL          adl;
-  HM_ADAPTER_NVML         nvml;
-  HM_ADAPTER_NVAPI        nvapi;
-  HM_ADAPTER_SYSFS_AMDGPU sysfs_amdgpu;
-  HM_ADAPTER_SYSFS_CPU    sysfs_cpu;
-  HM_ADAPTER_IOKIT        iokit;
+  HM_ADAPTER_ADL            adl;
+  HM_ADAPTER_NVML           nvml;
+  HM_ADAPTER_NVAPI          nvapi;
+  HM_ADAPTER_SYSFS_AMDGPU   sysfs_amdgpu;
+  HM_ADAPTER_SYSFS_INTELGPU sysfs_intelgpu;
+  HM_ADAPTER_SYSFS_CPU      sysfs_cpu;
+  HM_ADAPTER_IOKIT          iokit;
 
   int od_version;
 
@@ -2091,6 +2119,7 @@ typedef struct hm_attrs
   bool throttle_get_supported;
   bool utilization_get_supported;
   bool memoryused_get_supported;
+  bool power_get_supported;
 
 } hm_attrs_t;
 
@@ -2102,6 +2131,7 @@ typedef struct hwmon_ctx
   void *hm_nvml;
   void *hm_nvapi;
   void *hm_sysfs_amdgpu;
+  void *hm_sysfs_intelgpu;
   void *hm_sysfs_cpu;
   void *hm_iokit;
 
@@ -2401,6 +2431,8 @@ typedef struct user_options
   bool         brain_password_chgd;
   bool         brain_server_timer_chgd;
   #endif
+  bool         bypass_delay_chgd;
+  bool         bypass_threshold_chgd;
   bool         hash_mode_chgd;
   bool         hccapx_message_pair_chgd;
   bool         identify;
@@ -2443,7 +2475,7 @@ typedef struct user_options
   bool         hex_charset;
   bool         hex_salt;
   bool         hex_wordlist;
-  bool         increment;
+  increment_t  increment;
   bool         keep_guessing;
   bool         keyspace;
   bool         total_candidates;
@@ -2535,6 +2567,8 @@ typedef struct user_options
   u32          brain_session;
   u32          brain_attack;
   #endif
+  u32          bypass_delay;
+  u32          bypass_threshold;
   u32          debug_mode;
   u32          hwmon_temp_abort;
   u32          hash_info;
@@ -2893,12 +2927,17 @@ typedef struct status_ctx
   u64 *words_progress_rejected; // progress number of words rejected per salt
   u64 *words_progress_restored; // progress number of words restored per salt
 
+  int bypass_digests_done_new;  // --bypass-threshold cracked counter
+
   /**
    * timer
    */
 
   time_t runtime_start;
   time_t runtime_stop;
+
+  time_t timer_bypass_start;
+  time_t timer_bypass_cur;
 
   hc_timer_t timer_running;     // timer on current dict
   hc_timer_t timer_paused;      // timer on current dict
@@ -3214,7 +3253,6 @@ typedef struct hc_token
 
 typedef enum hash_category
 {
-  HASH_CATEGORY_UNDEFINED               = 0,
   HASH_CATEGORY_RAW_HASH                = 1,
   HASH_CATEGORY_RAW_HASH_SALTED         = 2,
   HASH_CATEGORY_RAW_HASH_AUTHENTICATED  = 3,
@@ -3238,7 +3276,8 @@ typedef enum hash_category
   HASH_CATEGORY_IMS                     = 21,
   HASH_CATEGORY_CRYPTOCURRENCY_WALLET   = 22,
   HASH_CATEGORY_FBE                     = 23,
-  HASH_CATEGORY_APPLICATION_DATABASE    = 24
+  HASH_CATEGORY_APPLICATION_DATABASE    = 24,
+  HASH_CATEGORY_UNDEFINED               = -1,
 } hash_category_t;
 
 // hash specific

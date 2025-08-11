@@ -16,17 +16,19 @@
 #include <windows.h>
 #else
 #include <termios.h>
-#if defined (__APPLE__)
+#if defined (__APPLE__)   || defined (__OpenBSD__)   || defined (__NetBSD__) || \
+    defined (__FreeBSD__) || defined (__DragonFly__)
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
-#endif // __APPLE__
+#endif
 #endif // _WIN
 
 #if defined (_POSIX)
 #include <sys/utsname.h>
-#if !defined (__APPLE__)
+#if !defined (__APPLE__)   && !defined (__OpenBSD__)   && !defined (__NetBSD__) && \
+    !defined (__FreeBSD__) && !defined (__DragonFly__)
 #include <sys/sysinfo.h>
-#endif // ! __APPLE__
+#endif
 #endif // _POSIX
 
 void welcome_screen (hashcat_ctx_t *hashcat_ctx, const char *version_tag);

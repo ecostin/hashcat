@@ -1260,6 +1260,11 @@ typedef hc_cuda_lib_t CUDA_PTR;
 int  cuda_init                 (void *hashcat_ctx);
 void cuda_close                (void *hashcat_ctx);
 
+int hc_cuEventDestroyPtr       (void *hashcat_ctx, CUevent *hEvent);
+int hc_cuMemFreePtr            (void *hashcat_ctx, CUdeviceptr *dptr);
+int hc_cuModuleUnloadPtr       (void *hashcat_ctx, CUmodule *hmod);
+int hc_cuStreamDestroyPtr      (void *hashcat_ctx, CUstream *hStream);
+
 int hc_cuCtxCreate             (void *hashcat_ctx, CUcontext *pctx, unsigned int flags, CUdevice dev);
 int hc_cuCtxDestroy            (void *hashcat_ctx, CUcontext ctx);
 int hc_cuCtxSetCurrent         (void *hashcat_ctx, CUcontext ctx);

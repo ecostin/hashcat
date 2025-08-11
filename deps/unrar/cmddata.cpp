@@ -26,10 +26,9 @@ void CommandData::Init()
   FileArgs.Reset();
   ExclArgs.Reset();
   InclArgs.Reset();
-  ArcNames.Reset();
   StoreArgs.Reset();
-  Password.Clean();
-  NextVolSizes.clear();
+  ArcNames.Reset();
+  NextVolSizes.Reset();
 }
 
 
@@ -109,11 +108,6 @@ void CommandData::ParseArg(wchar *Arg)
       // 'S' can contain SFX name, which case is important in Unix.
       if (*Command!='I' && *Command!='S')
         wcsupper(Command);
-      if (*Command=='P') // Enforce -idq for print command.
-      {
-        MsgStream=MSG_ERRONLY;
-        SetConsoleMsgStream(MSG_ERRONLY);
-      }
     }
     else
       if (*ArcName==0)
@@ -315,21 +309,6 @@ void CommandData::ProcessSwitch(const wchar *Switch)
         case 'I':
           IgnoreGeneralAttr=true;
           break;
-        case 'M':
-          switch(toupperw(Switch[2]))
-          {
-            case 0:
-            case 'S':
-              ArcMetadata=ARCMETA_SAVE;
-              break;
-            case 'R':
-              ArcMetadata=ARCMETA_RESTORE;
-              break;
-            default:
-              BadSwitch(Switch);
-              break;
-          }
-          break;
         case 'N': // Reserved for archive name.
           break;
         case 'O':
@@ -394,9 +373,6 @@ void CommandData::ProcessSwitch(const wchar *Switch)
             case '3':
               ExclPath=EXCL_ABSPATH;
               break;
-            case '4':
-              wcsncpyz(ExclArcPath,Switch+3,ASIZE(ExclArcPath));
-              break;
           }
           break;
         default:
@@ -423,15 +399,13 @@ void CommandData::ProcessSwitch(const wchar *Switch)
           EncryptHeaders=true;
           if (Switch[2]!=0)
           {
-            if (wcslen(Switch+2)>=MAXPASSWORD)
-              uiMsg(UIERROR_TRUNCPSW,MAXPASSWORD-1);
             Password.Set(Switch+2);
             cleandata((void *)Switch,wcslen(Switch)*sizeof(Switch[0]));
           }
           else
             if (!Password.IsSet())
             {
-              uiGetPassword(UIPASSWORD_GLOBAL,NULL,&Password,NULL);
+              uiGetPassword(UIPASSWORD_GLOBAL,NULL,&Password);
               eprintf(L"\n");
             }
           break;
@@ -587,10 +561,6 @@ void CommandData::ProcessSwitch(const wchar *Switch)
           break;
         case 'D':
           break;
-        case 'E':
-          if (toupperw(Switch[2])=='S' && Switch[3]==0)
-            SkipEncrypted=true;
-          break;
         case 'S':
           {
             wchar StoreNames[1024];
@@ -678,10 +648,6 @@ void CommandData::ProcessSwitch(const wchar *Switch)
             AllowIncompatNames=true;
           break;
 #endif
-        case 'P':
-          wcsncpyz(ExtrPath,Switch+2,ASIZE(ExtrPath));
-          AddEndSlash(ExtrPath,ASIZE(ExtrPath));
-          break;
         case 'R':
           Overwrite=OVERWRITE_AUTORENAME;
           break;
@@ -701,13 +667,11 @@ void CommandData::ProcessSwitch(const wchar *Switch)
     case 'P':
       if (Switch[1]==0)
       {
-        uiGetPassword(UIPASSWORD_GLOBAL,NULL,&Password,NULL);
+        uiGetPassword(UIPASSWORD_GLOBAL,NULL,&Password);
         eprintf(L"\n");
       }
       else
       {
-        if (wcslen(Switch+1)>=MAXPASSWORD)
-          uiMsg(UIERROR_TRUNCPSW,MAXPASSWORD-1);
         Password.Set(Switch+1);
         cleandata((void *)Switch,wcslen(Switch)*sizeof(Switch[0]));
       }
@@ -787,10 +751,6 @@ void CommandData::ProcessSwitch(const wchar *Switch)
             break;
           case 'D':
             Solid|=SOLID_VOLUME_DEPENDENT;
-            break;
-          case 'I':
-            ProhibitConsoleInput();
-            wcsncpyz(UseStdin,Switch[2] ? Switch+2:L"stdin",ASIZE(UseStdin));
             break;
           case 'L':
             if (IsDigit(Switch[2]))
@@ -975,7 +935,7 @@ void CommandData::ProcessCommand()
       wcsncpyz(ArcName,Name,ASIZE(ArcName));
   }
 
-  if (wcschr(L"AFUMD",*Command)==NULL && *UseStdin==0)
+  if (wcschr(L"AFUMD",*Command)==NULL)
   {
     if (GenerateArcName)
     {
