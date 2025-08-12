@@ -8,9 +8,15 @@
 
 - Added hash-mode: AS/400 DES
 - Added hash-mode: AS/400 SSHA1
+- Added hash-mode: Blockchain, My Wallet, Legacy Wallets
 - Added hash-mode: Cisco-ISE Hashed Password (SHA256)
+- Added hash-mode: Keepass4
 - Added hash-mode: SAP CODVN H (PWDSALTEDHASH) isSHA512
 - Added hash-mode: sm3crypt $sm3$, SM3 (Unix)
+
+## Primitives, KDFs, Libraries
+
+- Added hash-mode: MD6 (256)
 
 ## Constructs
 
@@ -68,6 +74,7 @@
 ##
 
 - Fix broken JSON formatting when using the --status-json flag
+- Fix issue where -k single rules were ignored when used with -a 1 -S
 
 * changes v6.2.6 -> v7.0.0
 
