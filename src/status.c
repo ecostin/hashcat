@@ -866,8 +866,8 @@ char *status_get_guess_candidates_dev (const hashcat_ctx_t *hashcat_ctx, const i
   const u64 outerloop_first = 0;
   const u64 outerloop_last  = device_param->outerloop_left - 1;
 
-  const u32 innerloop_first = 0;
-  const u32 innerloop_last  = device_param->innerloop_left - 1;
+  const u64 innerloop_first = 0;
+  const u64 innerloop_last  = device_param->innerloop_left - 1;
 
   plain_t plain1 = { outerloop_first, innerloop_first, 0, 0, 0, 0, 0 };
   plain_t plain2 = { outerloop_last,  innerloop_last,  0, 0, 0, 0, 0 };
@@ -1129,7 +1129,7 @@ char *status_get_time_estimated_absolute (const hashcat_ctx_t *hashcat_ctx)
 
   char *etc;
 
-  if (overflow_check_u64_add (now, sec_etc) == false)
+  if (overflow_check_u64_add (now, sec_etc) == true)
   {
     etc = (char *) ETA_ABSOLUTE_MAX_EXCEEDED;
   }
@@ -1835,33 +1835,33 @@ int status_get_salt_pos_dev (const hashcat_ctx_t *hashcat_ctx, const int backend
   return salt_pos;
 }
 
-int status_get_innerloop_pos_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_devices_idx)
+u64 status_get_innerloop_pos_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_devices_idx)
 {
   const backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
 
   hc_device_param_t *device_param = &backend_ctx->devices_param[backend_devices_idx];
 
-  int innerloop_pos = 0;
+  u64 innerloop_pos = 0;
 
   if ((device_param->skipped == false) && (device_param->skipped_warning == false))
   {
-    innerloop_pos = (int) device_param->innerloop_pos;
+    innerloop_pos = device_param->innerloop_pos;
   }
 
   return innerloop_pos;
 }
 
-int status_get_innerloop_left_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_devices_idx)
+u64 status_get_innerloop_left_dev (const hashcat_ctx_t *hashcat_ctx, const int backend_devices_idx)
 {
   const backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
 
   hc_device_param_t *device_param = &backend_ctx->devices_param[backend_devices_idx];
 
-  int innerloop_left = 0;
+  u64 innerloop_left = 0;
 
   if ((device_param->skipped == false) && (device_param->skipped_warning == false))
   {
-    innerloop_left = (int) device_param->innerloop_left;
+    innerloop_left = device_param->innerloop_left;
   }
 
   return innerloop_left;

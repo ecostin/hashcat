@@ -212,9 +212,6 @@ KERNEL_FQ KERNEL_FA void m03200_loop (KERN_ATTR_TMPS (bcrypt_tmp_t))
    * main loop
    */
 
-  u32 L0;
-  u32 R0;
-
   for (u32 i = 0; i < LOOP_CNT; i++)
   {
     for (u32 i = 0; i < 18; i++)
@@ -222,48 +219,7 @@ KERNEL_FQ KERNEL_FA void m03200_loop (KERN_ATTR_TMPS (bcrypt_tmp_t))
       P[i] ^= E[i];
     }
 
-    L0 = 0;
-    R0 = 0;
-
-    for (u32 i = 0; i < 9; i++)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      P[i * 2 + 0] = L0;
-      P[i * 2 + 1] = R0;
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S0, i + 0, L0);
-      SET_KEY32 (S0, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S1, i + 0, L0);
-      SET_KEY32 (S1, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S2, i + 0, L0);
-      SET_KEY32 (S2, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S3, i + 0, L0);
-      SET_KEY32 (S3, i + 1, R0);
-    }
+    blowfish_encrypt (P, S0, S1, S2, S3);
 
     P[ 0] ^= salt_buf[0];
     P[ 1] ^= salt_buf[1];
@@ -284,48 +240,7 @@ KERNEL_FQ KERNEL_FA void m03200_loop (KERN_ATTR_TMPS (bcrypt_tmp_t))
     P[16] ^= salt_buf[0];
     P[17] ^= salt_buf[1];
 
-    L0 = 0;
-    R0 = 0;
-
-    for (u32 i = 0; i < 9; i++)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      P[i * 2 + 0] = L0;
-      P[i * 2 + 1] = R0;
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S0, i + 0, L0);
-      SET_KEY32 (S0, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S1, i + 0, L0);
-      SET_KEY32 (S1, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S2, i + 0, L0);
-      SET_KEY32 (S2, i + 1, R0);
-    }
-
-    for (u32 i = 0; i < 256; i += 2)
-    {
-      BF_ENCRYPT (L0, R0);
-
-      SET_KEY32 (S3, i + 0, L0);
-      SET_KEY32 (S3, i + 1, R0);
-    }
+    blowfish_encrypt (P, S0, S1, S2, S3);
   }
 
   // store

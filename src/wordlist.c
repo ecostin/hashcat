@@ -522,7 +522,7 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
 
       if (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)
       {
-        if (overflow_check_u64_mul (keyspace, straight_ctx->kernel_rules_cnt) == false) return -1;
+        if (overflow_check_u64_mul (keyspace, straight_ctx->kernel_rules_cnt) == true) return -1;
 
         keyspace *= straight_ctx->kernel_rules_cnt;
       }
@@ -530,13 +530,13 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
       {
         if (((hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL) == 0) && (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          if (overflow_check_u64_mul (keyspace, mask_ctx->bfs_cnt) == false) return -1;
+          if (overflow_check_u64_mul (keyspace, mask_ctx->bfs_cnt) == true) return -1;
 
           keyspace *= mask_ctx->bfs_cnt;
         }
         else
         {
-          if (overflow_check_u64_mul (keyspace, combinator_ctx->combs_cnt) == false) return -1;
+          if (overflow_check_u64_mul (keyspace, combinator_ctx->combs_cnt) == true) return -1;
 
           keyspace *= combinator_ctx->combs_cnt;
         }
@@ -569,12 +569,12 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
   u64 cnt2 = 0;
 
   while (!hc_feof (fp))
-  {   
+  {
     if (load_segment (hashcat_ctx, fp) == -1)
     {
       return -2;
     }
-    
+
     comp += wl_data->cnt;
 
     u64 i = 0;
@@ -633,7 +633,7 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
 
       if (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)
       {
-        if (overflow_check_u64_add (cnt, straight_ctx->kernel_rules_cnt) == false) return -1;
+        if (overflow_check_u64_add (cnt, straight_ctx->kernel_rules_cnt) == true) return -1;
 
         cnt += straight_ctx->kernel_rules_cnt;
       }
@@ -641,13 +641,13 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
       {
         if (((hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL) == 0) && (user_options->attack_mode == ATTACK_MODE_HYBRID2))
         {
-          if (overflow_check_u64_add (cnt, mask_ctx->bfs_cnt) == false) return -1;
+          if (overflow_check_u64_add (cnt, mask_ctx->bfs_cnt) == true) return -1;
 
           cnt += mask_ctx->bfs_cnt;
         }
         else
         {
-          if (overflow_check_u64_add (cnt, combinator_ctx->combs_cnt) == false) return -1;
+          if (overflow_check_u64_add (cnt, combinator_ctx->combs_cnt) == true) return -1;
 
           cnt += combinator_ctx->combs_cnt;
         }

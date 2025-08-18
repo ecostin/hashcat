@@ -1,4 +1,21 @@
-* changes v7.0.0 -> v7.x.X
+* changes v7.1.0 -> v7.1.1
+
+##
+## Improvements
+##
+
+Docker: Add initial support for AMD GPUs when running Hashcat inside Docker using HIP and OpenCL
+Hardware Monitor: Suppress fan speed warnings for unified memory setups (typically internal GPUs)
+Testing Framework: Enable hardware monitor to improve testing of memory-heavy algorithms
+Unit tests: Updated install_modules.sh to use an external module for Digest::MD6
+
+##
+## Bugs
+##
+
+- Fixed multi-hash handling in LUKS2 and KeePass (KDBX4), while single-hash remained unaffected
+
+* changes v7.0.0 -> v7.1.0
 
 ##
 ## New Algorithms
@@ -16,65 +33,67 @@
 
 ## Primitives, KDFs, Libraries
 
+- Added hash-mode: BLAKE2b-256
 - Added hash-mode: MD6 (256)
 
 ## Constructs
 
+- Added hash-mode: BLAKE2b-256($pass.$salt)
+- Added hash-mode: BLAKE2b-256($salt.$pass)
 - Added hash-mode: sha224($pass.$salt)
 - Added hash-mode: sha224($salt.$pass)
 - Added hash-mode: sha224(sha1($pass))
 - Added hash-mode: sha224(sha224($pass))
 
 ##
-## Features
-##
-
-## Docker Support
-
-- Add initial support for running hashcat inside Docker
-
-## Developer Features
-
-- Argon2: Add argon2_init() wrappers to support private address space
-- Building: Add MAINTAINER_MODE flag to disable hardcoded CPU optimization flags
-- Kernel: Move common code from kernels to inc_cipher_blowfish.c/.h
-- Kernel: Move common code from kernels to inc_cipher_des.c/.h
-
-##
 ## Improvements
 ##
 
-## User Interaction Improvements
-
-- Change hash-category for hash-modes 25600, 25800, 28400 and 30600 to HASH_CATEGORY_RAW_HASH_SALTED
-- Update default benchmark selection for --benchmark and tools/benchmark_deep.pl
-- Warn instead of waiting on high GPU memory usage
-- Suppress optimization advice in final approach mode
-- Add early syntax check for -j and -k rules
-
-## Existing Plugin and Crypto Library Improvements
-
-- LUKS2: Add support for Argon2i KDF type
-
-##
-## Technical
-##
-
-- Backend: Move common functions from blowfish modules to blowfish_common.c
-- Backend: Split backend_session_begin() into smaller compute-runtime specific functions
-- Backend: Switch AMD OpenCL path to generic fallback and add HIP device check for Windows
-- Backend: Work around JiT compiler issue in AMD OpenCL on Windows in UTF8->UTF16 conversion
-- Dependencies: Downgraded unrar source from 6.2.7 to 6.0.5
+- Attack-Modes: Use 64-bit counters for amplifier keyspace
+- Host Memory: Update method to query free host memory using /proc/meminfo when available
+- Docker: Add initial support for running hashcat inside Docker
+- Device Memory: Warn instead of waiting on high GPU memory usage
+- Backends: Enhanced AMD Windows OpenCL and HIP compatibility for legacy models
+- Rules: Add early syntax check for -j and -k rules
 - Device Memory: Do not disable hwmon interface by default in speed-only and progress-only mode
-- Host Memory: Update method to query free memory on Linux, NetBSD and FreeBSD using /proc/meminfo
-- Host: Add initial support for OpenBSD and DragonflyBSD
+- JSON output: Refactor Bridge unit reporting for clarity
+- Backends: Ignore devices from Microsoft OpenCL D3D12 platform
+- Building: Add MAINTAINER_MODE flag to disable hardcoded CPU optimization flags
+- Bash: Add missing parameters to bash completion script
+- Dependencies: Downgraded unrar source from 6.2.7 to 6.0.5
+- Benchmark: Update default hash-mode selection
+- Libraries: DES and Blowfish restructure
+- Building: Add initial support for OpenBSD and DragonflyBSD
 
 ##
 ## Bugs
 ##
 
 - Fix broken JSON formatting when using the --status-json flag
-- Fix issue where -k single rules were ignored when used with -a 1 -S
+- Fix issue where -k single rules were ignored when used with -a 1 and -S
+
+##
+## Python Bridge
+##
+
+- Fix unsalted hashlist support
+- Fix the esalt structure, it was too large
+- Improve support from 1:1 password-to-hash to 1:N password-to-hashes
+- Improve stand-alone debugging of Python Bridge stubs
+- Improve salt/esalt debugging of Python Bridge stubs
+- Enable potfile output by default for -m 73000 and 72000
+
+##
+## Other changes
+##
+
+- Argon2: Add argon2_init() wrappers to support private address space
+- Change hash-category for hash-modes 25600, 25800, 28400 and 30600 to HASH_CATEGORY_RAW_HASH_SALTED
+- Suppress optimization advice in final approach mode
+- Backend: Split backend_session_begin() into smaller compute-runtime specific functions
+- Sanity check: Abort if a custom-charset is defined on the command line and a mask file is used
+- Building: Disable Argon2 optimized path on RISC-V
+- Shared: improved 32-bit and 64-bit add and multiply overflow helper functions
 
 * changes v6.2.6 -> v7.0.0
 

@@ -37,8 +37,8 @@ typedef struct
 typedef struct
 {
   void *V;
-	//void *X;
-	void *Y;
+  //void *X;
+  void *Y;
 
   // implementation specific
 
@@ -236,15 +236,15 @@ bool launch_loop (MAYBE_UNUSED void *platform_context, MAYBE_UNUSED hc_device_pa
 
   scrypt_tmp_t *scrypt_tmp = (scrypt_tmp_t *) device_param->h_tmps;
 
-	scrypt_mix_word_t *V = unit_buf->V;
-	//scrypt_mix_word_t *X = unit_buf->X;
-	scrypt_mix_word_t *Y = unit_buf->Y;
+  scrypt_mix_word_t *V = unit_buf->V;
+  //scrypt_mix_word_t *X = unit_buf->X;
+  scrypt_mix_word_t *Y = unit_buf->Y;
 
-	const u32 N = salt_buf->scrypt_N;
-	const u32 r = salt_buf->scrypt_r;
-	const u32 p = salt_buf->scrypt_p;
+  const u32 N = salt_buf->scrypt_N;
+  const u32 r = salt_buf->scrypt_r;
+  const u32 p = salt_buf->scrypt_p;
 
-	const size_t chunk_bytes = 64 * 2 * r;
+  const size_t chunk_bytes = 64 * 2 * r;
 
   // hashcat guarantees h_tmps[] is 64 byte aligned
 

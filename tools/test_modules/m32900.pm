@@ -43,7 +43,7 @@ sub module_generate_hash
   my $hash_buf = encode_base64 ($digest, "");
 
   my $salt_buf = encode_base64 ($salt_decoded, "");
-  
+
   my $hash = sprintf ("PBKDF1:sha1:%i:%s:%s", $iter, $salt_buf, $hash_buf);
 
   return $hash;
@@ -52,7 +52,7 @@ sub module_generate_hash
 sub module_verify_hash
 {
   my $line = shift;
-  
+
   my ($signature, $primitive, $iter, $salt, $hash, $word) = split (':', $line);
 
   return unless defined $signature;

@@ -111,7 +111,7 @@ my $current_section = '';
 
   # Decode using the encoding detected
   $file_info = decode($enc->name, $file_info);
-  
+
   # Split lines, handling both Unix and Windows line endings
   my @lines = split /\r?\n/, $file_info;
 
@@ -125,7 +125,7 @@ my $current_section = '';
         if ($current_section) {
             push @sections, $current_section;
         }
-        
+
         # Start a new section with the header
         $current_section = "$line\n";
     }

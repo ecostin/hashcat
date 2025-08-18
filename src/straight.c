@@ -132,7 +132,7 @@ int straight_ctx_update_loop (hashcat_ctx_t *hashcat_ctx)
 
         return -1;
       }
-      
+
       if (rc == -2)
       {
         event_log_error (hashcat_ctx, "Error reading wordlist: %s", combinator_ctx->dict1);

@@ -2912,6 +2912,20 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
 
           //return -1;
         }
+
+        if ((user_options->custom_charset_1)
+         || (user_options->custom_charset_2)
+         || (user_options->custom_charset_3)
+         || (user_options->custom_charset_4)
+         || (user_options->custom_charset_5)
+         || (user_options->custom_charset_6)
+         || (user_options->custom_charset_7)
+         || (user_options->custom_charset_8))
+        {
+          event_log_error (hashcat_ctx, "Using --custom-charsetX with mask files is misleading. Put custom charsets in the mask file instead.");
+
+          return -1;
+        }
       }
     }
   }
@@ -2956,6 +2970,20 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
 
           //return -1;
         }
+
+        if ((user_options->custom_charset_1)
+         || (user_options->custom_charset_2)
+         || (user_options->custom_charset_3)
+         || (user_options->custom_charset_4)
+         || (user_options->custom_charset_5)
+         || (user_options->custom_charset_6)
+         || (user_options->custom_charset_7)
+         || (user_options->custom_charset_8))
+        {
+          event_log_error (hashcat_ctx, "Using --custom-charsetX with mask files is misleading. Put custom charsets in the mask file instead.");
+
+          return -1;
+        }
       }
     }
   }
@@ -2999,6 +3027,20 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
           event_log_warning (hashcat_ctx, "%s: Byte Order Mark (BOM) was detected", maskfile);
 
           //return -1;
+        }
+
+        if ((user_options->custom_charset_1)
+         || (user_options->custom_charset_2)
+         || (user_options->custom_charset_3)
+         || (user_options->custom_charset_4)
+         || (user_options->custom_charset_5)
+         || (user_options->custom_charset_6)
+         || (user_options->custom_charset_7)
+         || (user_options->custom_charset_8))
+        {
+          event_log_error (hashcat_ctx, "Using --custom-charsetX with mask files is misleading. Put custom charsets in the mask file instead.");
+
+          return -1;
         }
       }
     }

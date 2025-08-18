@@ -133,7 +133,7 @@ KERNEL_FQ KERNEL_FA void m34700_mxx (KERN_ATTR_BASIC ())
 
     sha1_hmac_ctx_t sha1_hmac_ctx;
 
-    sha1_hmac_init_global (&sha1_hmac_ctx, c, pw_len + comb_len);
+    sha1_hmac_init (&sha1_hmac_ctx, c, pw_len + comb_len);
 
     u32 w0[4];
     u32 w1[4];
@@ -381,7 +381,7 @@ KERNEL_FQ KERNEL_FA void m34700_sxx (KERN_ATTR_BASIC ())
 
     sha1_hmac_ctx_t sha1_hmac_ctx;
 
-    sha1_hmac_init_global (&sha1_hmac_ctx, c, pw_len + comb_len);
+    sha1_hmac_init (&sha1_hmac_ctx, c, pw_len + comb_len);
 
     u32 w0[4];
     u32 w1[4];

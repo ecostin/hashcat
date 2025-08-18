@@ -158,54 +158,28 @@ int sort_by_stringptr (const void *p1, const void *p2)
   return strcmp (*s1, *s2);
 }
 
-static inline int get_msb32 (const u32 v)
-{
-  int i;
-
-  for (i = 32; i > 0; i--) if ((v >> (i - 1)) & 1) break;
-
-  return i;
-}
-
-static inline int get_msb64 (const u64 v)
-{
-  int i;
-
-  for (i = 64; i > 0; i--) if ((v >> (i - 1)) & 1) break;
-
-  return i;
-}
-
 bool overflow_check_u32_add (const u32 a, const u32 b)
 {
-  const int a_msb = get_msb32 (a);
-  const int b_msb = get_msb32 (b);
-
-  return ((a_msb < 32) && (b_msb < 32));
+  return a > (UINT32_MAX - b);
 }
 
 bool overflow_check_u32_mul (const u32 a, const u32 b)
 {
-  const int a_msb = get_msb32 (a);
-  const int b_msb = get_msb32 (b);
+  if (a == 0 || b == 0) return false;
 
-  return ((a_msb + b_msb) < 32);
+  return a > (UINT32_MAX / b);
 }
 
 bool overflow_check_u64_add (const u64 a, const u64 b)
 {
-  const int a_msb = get_msb64 (a);
-  const int b_msb = get_msb64 (b);
-
-  return ((a_msb < 64) && (b_msb < 64));
+  return a > (UINT64_MAX - b);
 }
 
 bool overflow_check_u64_mul (const u64 a, const u64 b)
 {
-  const int a_msb = get_msb64 (a);
-  const int b_msb = get_msb64 (b);
+  if (a == 0 || b == 0) return false;
 
-  return ((a_msb + b_msb) < 64);
+  return a > (UINT64_MAX / b);
 }
 
 bool is_power_of_2 (const u32 v)

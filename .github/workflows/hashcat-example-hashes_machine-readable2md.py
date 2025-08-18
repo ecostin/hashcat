@@ -26,8 +26,9 @@ EXAMPLE_HASH_REPLACEMENTS = {
     "29543": "https://hashcat.net/misc/example_hashes/hashcat_luks_ripemd160_twofish_cbc-plain64_128.txt",
 }
 
-OPENCL_DIR = "OpenCL"
-MODULES_DIR = "src/modules"
+OPENCL_DIR = "../../OpenCL"
+MODULES_DIR = "../../src/modules"
+TESTS_DIR = "../../tools/test_modules"
 
 OPENCL_ABBREV = {
     "_a0-pure": "a0p",
@@ -60,7 +61,7 @@ def find_opencl(zfilled_key, visited=None):
             if zfilled_key in filename:
                 for key, abbr in OPENCL_ABBREV.items():
                     if key in filename:
-                        link = f"[{abbr}](/OpenCL/{filename})"
+                        link = f"[{abbr}](/{OPENCL_DIR}/{filename})"
                         kernels.append(link)
                         break
     if kernels:
@@ -76,6 +77,71 @@ def find_opencl(zfilled_key, visited=None):
                     redirect_key = str(m.group(1)).zfill(5)
                     return find_opencl(redirect_key, visited)
     return ""
+
+def find_test(zfilled_key):
+    """Return markdown links for Perl tests"""
+    # List of TrueCrypt modes which have test containers
+    TC_MODES = [
+        "6211", "6212", "6213",
+        "6221", "6222", "6223",
+        "6231", "6232", "6233",
+        "6241", "6242", "6243",
+        "29311", "29312", "29313",
+        "29321", "29322", "29323",
+        "29331", "29332", "29333",
+        "29341", "29342", "29343"
+    ]
+
+    # List of VeraCrypt modes which have test containers
+    VC_MODES = [
+        "13711", "13712", "13713",
+        "13721", "13722", "13723",
+        "13731", "13732", "13733",
+        "13741", "13742", "13743",
+        "13751", "13752", "13753",
+        "13761", "13762", "13763",
+        "13771", "13772", "13773",
+        "13781", "13782", "13783",
+        "29411", "29412", "29413",
+        "29421", "29422", "29423",
+        "29431", "29432", "29433",
+        "29441", "29442", "29443",
+        "29451", "29452", "29453",
+        "29461", "29462", "29463",
+        "29471", "29472", "29473",
+        "29481", "29482", "29483"
+    ]
+
+    # List of LUKS modes which have test containers
+    LUKS_MODES = [
+        "14600",
+        "29511", "29512", "29513",
+        "29521", "29522", "29523",
+        "29531", "29532", "29533",
+        "29541", "29542", "29543"
+    ]
+
+    # Cryptoloop mode which have test containers
+    CL_MODES = [
+        "14511", "14512", "14513",
+        "14521", "14522", "14523",
+        "14531", "14532", "14533",
+        "14541", "14542", "14543",
+        "14551", "14552", "14553"
+    ]
+
+    ALL_MODES = TC_MODES + VC_MODES + LUKS_MODES + CL_MODES
+
+    if zfilled_key in [m.zfill(5) for m in ALL_MODES]:
+        return f"[:white_check_mark:](/tools/test.sh)"
+
+    if os.path.isdir(TESTS_DIR):
+        for filename in os.listdir(TESTS_DIR):
+            if zfilled_key in filename:
+                return f"[:white_check_mark:](/{TESTS_DIR}/{filename})"
+
+    #test not found
+    return ":x:"
 
 def main():
     input_data = sys.stdin.read()
@@ -105,10 +171,15 @@ def main():
                 footnote_counter += 1
             footnote = f"[^{footnote_map[example_pass]}]"
 
-        zkey = key.zfill(5)
-        opencl_links = find_opencl(zkey)
+        zfilled_key = key.zfill(5)
+        opencl_links = find_opencl(zfilled_key)
+        test_link = find_test(zfilled_key)
 
-        row = f"| [`{key}`](/src/modules/module_{zkey}.c) | `{name}`{footnote} | <sup> {opencl_links} </sup> | `{example_hash}` |"
+        # Make sure we refer to root for display
+        opencl_links = opencl_links.replace('/../../', '/')
+        test_link = test_link.replace('/../../', '/')
+
+        row = f"| [`{key}`](/src/modules/module_{zfilled_key}.c) | `{name}`{footnote} | <sup> {opencl_links} </sup> | {test_link} | `{example_hash}` |"
         table_rows.append(row)
 
     # Print the table
@@ -122,12 +193,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# to convert the markdown to docuwiki formatting for https://hashcat.net/wiki/doku.php?id=example_hashes you can use:
-#  cat docs/hashcat-example-hashes.md | sed -E 's/\[\^(.+)\]/<sup>\1<\/sup>/g' | sed 's/| hash-Mode | hash-Name | Example |/\^ hash-Mode \^ hash-Name \^ Example \^/g' | grep -Fv '|:-----------|:-----------|:---------------|' | sed 's/`//g' | sed -E 's/\[([0-9]+)\]\(\/src\/modules\/module_([0-9]{5})\.c\)/[[\1|https:\/\/github.com\/hashcat\/hashcat\/tree\/master\/src\/modules\/module_\2.c]]/'
-# replaces footnotes
-# replaces header
-# removes un-necessary table style
-# removes backticks
-# replaces urls

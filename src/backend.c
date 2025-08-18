@@ -4187,8 +4187,8 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
 
     // iteration type
 
-    u32 innerloop_step = 0;
-    u32 innerloop_cnt  = 0;
+    u64 innerloop_step = 0;
+    u64 innerloop_cnt  = 0;
 
     if (user_options->slow_candidates == true)
     {
@@ -4201,30 +4201,30 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
 
       if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)
       {
-        if ((combinator_ctx->combs_cnt >> 32) != 0) return -1;
+        //if ((combinator_ctx->combs_cnt >> 32) != 0) return -1;
       }
       else if (user_options_extra->attack_kern == ATTACK_KERN_BF)
       {
-        if ((mask_ctx->bfs_cnt >> 32) != 0) return -1;
+        //if ((mask_ctx->bfs_cnt >> 32) != 0) return -1;
       }
 
       if   (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL) innerloop_step = device_param->kernel_loops;
       else                                                        innerloop_step = 1;
 
       if      (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)  innerloop_cnt = straight_ctx->kernel_rules_cnt;
-      else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)     innerloop_cnt = (u32) combinator_ctx->combs_cnt;
-      else if (user_options_extra->attack_kern == ATTACK_KERN_BF)        innerloop_cnt = (u32) mask_ctx->bfs_cnt;
+      else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)     innerloop_cnt = combinator_ctx->combs_cnt;
+      else if (user_options_extra->attack_kern == ATTACK_KERN_BF)        innerloop_cnt = mask_ctx->bfs_cnt;
     }
 
     // innerloops
 
-    for (u32 innerloop_pos = 0; innerloop_pos < innerloop_cnt; innerloop_pos += innerloop_step)
+    for (u64 innerloop_pos = 0; innerloop_pos < innerloop_cnt; innerloop_pos += innerloop_step)
     {
       while (status_ctx->devices_status == STATUS_PAUSED) sleep (1);
 
       u32 fast_iteration = 0;
 
-      u32 innerloop_left = innerloop_cnt - innerloop_pos;
+      u64 innerloop_left = innerloop_cnt - innerloop_pos;
 
       if (innerloop_left > innerloop_step)
       {
@@ -4297,7 +4297,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
             {
               char *line_buf = device_param->scratch_buf;
 
-              u32 i = 0;
+              u64 i = 0;
 
               while (i < innerloop_left)
               {
@@ -4392,7 +4392,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
                 i++;
               }
 
-              for (u32 j = i; j < innerloop_left; j++)
+              for (u64 j = i; j < innerloop_left; j++)
               {
                 memset (&device_param->combs_buf[j], 0, sizeof (pw_t));
               }
@@ -4488,7 +4488,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
             {
               char *line_buf = device_param->scratch_buf;
 
-              u32 i = 0;
+              u64 i = 0;
 
               while (i < innerloop_left)
               {
@@ -4585,7 +4585,7 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
                 i++;
               }
 
-              for (u32 j = i; j < innerloop_left; j++)
+              for (u64 j = i; j < innerloop_left; j++)
               {
                 memset (&device_param->combs_buf[j], 0, sizeof (pw_t));
               }
@@ -9282,7 +9282,7 @@ void backend_ctx_devices_kernel_loops (hashcat_ctx_t *hashcat_ctx)
 
     if (device_param->kernel_loops_min < device_param->kernel_loops_max)
     {
-      u32 innerloop_cnt = 0;
+      u64 innerloop_cnt = 0;
 
       if (hashconfig->attack_exec == ATTACK_EXEC_INSIDE_KERNEL)
       {
@@ -9292,9 +9292,9 @@ void backend_ctx_devices_kernel_loops (hashcat_ctx_t *hashcat_ctx)
         }
         else
         {
-          if      (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)  innerloop_cnt = MIN (KERNEL_RULES, (u32) straight_ctx->kernel_rules_cnt);
-          else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)     innerloop_cnt = MIN (KERNEL_COMBS, (u32) combinator_ctx->combs_cnt);
-          else if (user_options_extra->attack_kern == ATTACK_KERN_BF)        innerloop_cnt = MIN (KERNEL_BFS,   (u32) mask_ctx->bfs_cnt);
+          if      (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)  innerloop_cnt = MIN (KERNEL_RULES, straight_ctx->kernel_rules_cnt);
+          else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)     innerloop_cnt = MIN (KERNEL_COMBS, combinator_ctx->combs_cnt);
+          else if (user_options_extra->attack_kern == ATTACK_KERN_BF)        innerloop_cnt = MIN (KERNEL_BFS,   mask_ctx->bfs_cnt);
         }
       }
       else

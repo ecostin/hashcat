@@ -3,6 +3,8 @@
  * License.....: MIT
  */
 
+#define NEW_SIMD_CODE
+
 #ifdef KERNEL_STATIC
 #include M2S(INCLUDE_PATH/inc_vendor.h)
 #include M2S(INCLUDE_PATH/inc_types.h)
@@ -10,6 +12,7 @@
 #include M2S(INCLUDE_PATH/inc_common.cl)
 #include M2S(INCLUDE_PATH/inc_hash_blake2b.cl)
 #include M2S(INCLUDE_PATH/inc_hash_argon2.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #include M2S(INCLUDE_PATH/inc_hash_sha256.cl)
 #include M2S(INCLUDE_PATH/inc_hash_sha512.cl)
@@ -60,8 +63,6 @@ typedef enum hc_luks_cipher_mode
 
 typedef struct luks
 {
-  argon2_options_t options;
-
   int hash_type;   // hc_luks_hash_type_t
   int key_size;    // hc_luks_key_size_t
   int cipher_type; // hc_luks_cipher_type_t
@@ -102,7 +103,17 @@ typedef struct luks_tmp
 
 #define MAX_ENTROPY 7.0
 
-KERNEL_FQ void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
+typedef struct merged_options
+{
+  argon2_options_t argon2_options;
+
+  luks_t luks;
+
+} merged_options_t;
+
+#define MAX_ENTROPY 7.0
+
+KERNEL_FQ void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
 
@@ -121,14 +132,14 @@ KERNEL_FQ void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
     case 3: V = d_extra3_buf; break;
   }
 
-  const argon2_options_t options = esalt_bufs[DIGESTS_OFFSET_HOST].options;
+  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
 
-  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&options, V, gd4);
+  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, gd4);
 
-  argon2_init_gg (&pws[gid], &salt_bufs[SALT_POS_HOST], &options, argon2_block);
+  argon2_init_gg (&pws[gid], &salt_bufs[SALT_POS_HOST], &argon2_options, argon2_block);
 }
 
-KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
+KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
   const u64 bid = get_group_id (0);
@@ -163,17 +174,17 @@ KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
     case 3: V = d_extra3_buf; break;
   }
 
-  argon2_options_t options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].options;
+  argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
 
   #ifdef IS_APPLE
   // it doesn't work on Apple, so we won't set it up
   #else
   #ifdef ARGON2_PARALLELISM
-  options.parallelism = ARGON2_PARALLELISM;
+  argon2_options.parallelism = ARGON2_PARALLELISM;
   #endif
   #endif
 
-  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&options, V, bd4);
+  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, bd4);
 
   argon2_pos_t pos;
 
@@ -182,9 +193,9 @@ KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   for (u32 i = 0; i < LOOP_CNT; i++)
   {
-    for (pos.lane = lid; pos.lane < options.parallelism; pos.lane += lsz)
+    for (pos.lane = lid; pos.lane < argon2_options.parallelism; pos.lane += lsz)
     {
-      argon2_fill_segment (argon2_block, &options, &pos, shuffle_buf, argon2_thread, argon2_lsz);
+      argon2_fill_segment (argon2_block, &argon2_options, &pos, shuffle_buf, argon2_thread, argon2_lsz);
     }
 
     SYNC_THREADS ();
@@ -199,7 +210,7 @@ KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
   }
 }
 
-KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
+KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
@@ -271,13 +282,13 @@ KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
     case 3: V = d_extra3_buf; break;
   }
 
-  argon2_options_t options = esalt_bufs[DIGESTS_OFFSET_HOST].options;
+  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
 
-  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&options, V, gd4);
+  GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, gd4);
 
   u32 out[16];
 
-  argon2_final (argon2_block, &options, out);
+  argon2_final (argon2_block, &argon2_options, out);
 
   for (u32 i = 0; i < 16; i++) tmps[gid].out32[i] = hc_swap32_S (out[i]);
 
@@ -287,7 +298,7 @@ KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, luks_t))
 
   u32 pt_buf[128];
 
-  luks_af_sha256_then_aes_decrypt (&esalt_bufs[DIGESTS_OFFSET_HOST], &tmps[gid], pt_buf, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4);
+  luks_af_sha256_then_aes_decrypt (&esalt_bufs[DIGESTS_OFFSET_HOST].luks, &tmps[gid], pt_buf, s_te0, s_te1, s_te2, s_te3, s_te4, s_td0, s_td1, s_td2, s_td3, s_td4);
 
   // check entropy
 

@@ -40,7 +40,7 @@ typedef struct
 typedef struct
 {
   void *V;
-	void *XY;
+  void *XY;
 
   // implementation specific
 

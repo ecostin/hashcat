@@ -340,7 +340,7 @@ static int monitor (hashcat_ctx_t *hashcat_ctx)
     if (user_options->bypass_delay_chgd == true)
     {
       time (&status_ctx->timer_bypass_cur);
-      
+
       if (status_ctx->devices_status == STATUS_RUNNING)
       {
         // --bypass-delay check

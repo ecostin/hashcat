@@ -610,3 +610,49 @@ DECLSPEC void blowfish_set_key_salt (PRIVATE_AS u32 *E, PRIVATE_AS u32 E_dim_siz
     SET_KEY32 (S3, i + 3, R0);
   }
 }
+
+DECLSPEC void blowfish_encrypt (PRIVATE_AS u32 *P, LOCAL_AS u32 *S0, LOCAL_AS u32 *S1, LOCAL_AS u32 *S2, LOCAL_AS u32 *S3)
+{
+  u32 L0 = 0;
+  u32 R0 = 0;
+
+  for (u32 i = 0; i < 9; i++)
+  {
+    BF_ENCRYPT (L0, R0);
+
+    P[i * 2 + 0] = L0;
+    P[i * 2 + 1] = R0;
+  }
+
+  for (u32 i = 0; i < 256; i += 2)
+  {
+    BF_ENCRYPT (L0, R0);
+
+    SET_KEY32 (S0, i + 0, L0);
+    SET_KEY32 (S0, i + 1, R0);
+  }
+
+  for (u32 i = 0; i < 256; i += 2)
+  {
+    BF_ENCRYPT (L0, R0);
+
+    SET_KEY32 (S1, i + 0, L0);
+    SET_KEY32 (S1, i + 1, R0);
+  }
+
+  for (u32 i = 0; i < 256; i += 2)
+  {
+    BF_ENCRYPT (L0, R0);
+
+    SET_KEY32 (S2, i + 0, L0);
+    SET_KEY32 (S2, i + 1, R0);
+  }
+
+  for (u32 i = 0; i < 256; i += 2)
+  {
+    BF_ENCRYPT (L0, R0);
+
+    SET_KEY32 (S3, i + 0, L0);
+    SET_KEY32 (S3, i + 1, R0);
+  }
+}

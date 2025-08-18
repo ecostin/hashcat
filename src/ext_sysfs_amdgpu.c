@@ -95,6 +95,17 @@ char *hm_SYSFS_AMDGPU_get_syspath_hwmon (void *hashcat_ctx, const int backend_de
 
 int hm_SYSFS_AMDGPU_get_fan_speed_current (void *hashcat_ctx, const int backend_device_idx, int *val)
 {
+  backend_ctx_t *backend_ctx = ((hashcat_ctx_t *) hashcat_ctx)->backend_ctx;
+
+  hc_device_param_t *device_param = &backend_ctx->devices_param[backend_device_idx];
+
+  if (device_param->device_host_unified_memory == 1)
+  {
+    *val = 0;
+
+    return 0;
+  }
+
   char *syspath = hm_SYSFS_AMDGPU_get_syspath_hwmon (hashcat_ctx, backend_device_idx);
 
   if (syspath == NULL) return -1;

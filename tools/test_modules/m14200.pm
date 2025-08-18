@@ -48,57 +48,64 @@ sub prepare_hmac_key
 
 sub prepare_aes_key
 {
-	my $mem_fac = (2 << (shift() - 1)) / 32; 
-	my $rep_fac = shift;
-	my $hmac_key = shift;
-	my $data_hex = shift;
+  my $mem_fac = (2 << (shift() - 1)) / 32;
+  my $rep_fac = shift;
+  my $hmac_key = shift;
+  my $data_hex = shift;
 
-	my $msg = pack ("H32", $data_hex) . pack('N', $mem_fac) . pack('N', 1);
-	my $mem_buf = "";
+  my $msg = pack ("H32", $data_hex) . pack('N', $mem_fac) . pack('N', 1);
+  my $mem_buf = "";
 
-	# step 1: proprietary PBKDF2-HMAC-SHA256 (prepare $mem_buf)
-	
-	for my $n (0 .. $mem_fac - 1) {
-	
-		my $u_current = hmac_sha256($msg, $hmac_key);
-		my $f_res = $u_current;
-		my $h_prev = $u_current;
+  # step 1: proprietary PBKDF2-HMAC-SHA256 (prepare $mem_buf)
 
-		# recalc hmac
-		for my $i (0 .. $rep_fac * 100 - 2) {
-			$h_prev = $u_current;
-			$u_current = hmac_sha256($u_current, $hmac_key);
-  	  my $f_res_tmp = '';
-			for my $j (0 .. length($f_res) - 1) {
-			    $f_res_tmp .= chr(ord(substr($f_res, $j, 1)) ^ ord(substr($u_current, $j, 1)));
-			}
-			$f_res = $f_res_tmp;
-		}
+  for my $n (0 .. $mem_fac - 1)
+  {
+    my $u_current = hmac_sha256($msg, $hmac_key);
+    my $f_res = $u_current;
+    my $h_prev = $u_current;
 
-		$msg = substr ($h_prev, 0, 16) . $f_res . pack('N', 1);
-		$mem_buf .= $f_res
-	}
+    # recalc hmac
+    for my $i (0 .. $rep_fac * 100 - 2)
+    {
+      $h_prev = $u_current;
 
-	
-	# step 2: mem_buf substitutions
+      $u_current = hmac_sha256($u_current, $hmac_key);
 
-	# Set new HMAC key (last block from mem_buf)
-	my $mem_buf_len = length ($mem_buf);
-	$hmac_key = substr ($mem_buf, $mem_buf_len - 32, 32);
-	
-	# Substitutions
-	for my $n (0 .. $mem_fac - 1) {
-		my $n_key = unpack ('N', substr ($hmac_key, 28, 4) ) & ($mem_fac - 1);
-		my $mem_buf_blk = substr ($mem_buf, $n_key * 32, 32) . pack('N', 1);
-		
-		$mem_buf_blk = hmac_sha256($mem_buf_blk, $hmac_key);
-		$mem_buf = substr ($mem_buf, 0, $n * 32) . $mem_buf_blk . substr ($mem_buf, ($n+1) * 32, $mem_buf_len - ($n+1) * 32);
-		$hmac_key = $mem_buf_blk;
-	}
+      my $f_res_tmp = '';
 
-	# step 3: PBKDF2-HMAC-SHA256(mem_buf, hmac_key, rep_fac)
+      for my $j (0 .. length($f_res) - 1)
+      {
+        $f_res_tmp .= chr(ord(substr($f_res, $j, 1)) ^ ord(substr($u_current, $j, 1)));
+      }
 
-	my $pbkdf2 = Crypt::PBKDF2->new
+      $f_res = $f_res_tmp;
+    }
+
+    $msg = substr ($h_prev, 0, 16) . $f_res . pack('N', 1);
+    $mem_buf .= $f_res
+  }
+
+
+  # step 2: mem_buf substitutions
+
+  # Set new HMAC key (last block from mem_buf)
+  my $mem_buf_len = length ($mem_buf);
+  $hmac_key = substr ($mem_buf, $mem_buf_len - 32, 32);
+
+  # Substitutions
+  for my $n (0 .. $mem_fac - 1)
+  {
+    my $n_key = unpack ('N', substr ($hmac_key, 28, 4) ) & ($mem_fac - 1);
+    my $mem_buf_blk = substr ($mem_buf, $n_key * 32, 32) . pack('N', 1);
+
+    $mem_buf_blk = hmac_sha256($mem_buf_blk, $hmac_key);
+    $mem_buf = substr ($mem_buf, 0, $n * 32) . $mem_buf_blk . substr ($mem_buf, ($n+1) * 32, $mem_buf_len - ($n+1) * 32);
+    $hmac_key = $mem_buf_blk;
+  }
+
+  # step 3: PBKDF2-HMAC-SHA256(mem_buf, hmac_key, rep_fac)
+
+  my $pbkdf2 = Crypt::PBKDF2->new
   (
     hasher     => Crypt::PBKDF2->hasher_from_algorithm ('HMACSHA2', 256),
     iterations => $rep_fac*100,
@@ -107,7 +114,7 @@ sub prepare_aes_key
   $msg = substr ($mem_buf, 0, ($mem_fac-1) * 32);
   my $aes_key = $pbkdf2->PBKDF2 ($msg, $hmac_key);
 
-  return $aes_key; 	
+  return $aes_key;
 }
 
 sub module_generate_hash
@@ -120,12 +127,12 @@ sub module_generate_hash
   my $salt_data = shift // uc random_hex_string (32);
 
   my $hmac_key = prepare_hmac_key (uc $username, $word);
-  
+
   my $aes_key = prepare_aes_key ($mem_fac, $rep_fac, $hmac_key, $salt_data);
-  
+
   my $plaint = ascii2ebcdic (substr (uc $username . " " x 8, 0, 8)) . "\x00" x 8;
   my $rijndael = Crypt::Rijndael->new($aes_key, Crypt::Rijndael::MODE_ECB());
-	my $ciphertext = $rijndael->encrypt($plaint);
+  my $ciphertext = $rijndael->encrypt($plaint);
 
   my $hash = sprintf ('$racf-kdfaes$*%s*E7D7E66D00018000%04X%04X00100010*%s*%s', uc $username, $mem_fac, $rep_fac, uc $salt_data, uc unpack("H32", $ciphertext));
 
@@ -170,6 +177,3 @@ sub module_verify_hash
 }
 
 1;
-
-
-

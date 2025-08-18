@@ -189,42 +189,41 @@ size_t exec_unhexify (const u8 *in_buf, const size_t in_len, u8 *out_buf, const 
 
 bool need_hexify (const u8 *buf, const size_t len, const char separator, bool always_ascii)
 {
-  bool rc = false;
-
   if (always_ascii == true)
   {
     if (printable_ascii (buf, len) == false)
     {
-      rc = true;
+      return true;
     }
   }
   else
   {
     if (printable_utf8 (buf, len) == false)
     {
-      rc = true;
+      return true;
     }
   }
 
-  if (rc == false)
+  if (matches_separator (buf, len, separator) == true)
   {
-    if (matches_separator (buf, len, separator) == true)
-    {
-      rc = true;
-    }
+    return true;
   }
 
   // also test if the password is of the format $HEX[]:
 
-  if (rc == false)
+  if (is_hexify (buf, len))
   {
-    if (is_hexify (buf, len))
-    {
-      rc = true;
-    }
+    return true;
   }
 
-  return rc;
+  // check if the password ends in whitespace
+
+  if (len > 0 && isspace (buf[len - 1]))
+  {
+    return true;
+  }
+
+  return false;
 }
 
 void exec_hexify (const u8 *buf, const size_t len, u8 *out)

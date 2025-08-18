@@ -212,7 +212,7 @@ int process_stdout (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param,
 
           for (u32 il_pos = 0; il_pos < il_cnt; il_pos++)
           {
-            const u32 off = device_param->innerloop_pos + il_pos;
+            const u64 off = device_param->innerloop_pos + il_pos;
 
             for (u32 i = 0; i < pw_idx->cnt; i++)
             {

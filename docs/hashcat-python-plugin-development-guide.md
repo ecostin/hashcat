@@ -53,7 +53,7 @@ The requirements are to implement the following three functions:
 ```python
 def init(ctx):
 def term(ctx):
-def kernel_loop(ctx, passwords, salt_id, is_selftest):
+def kernel_loop(ctx,passwords,salt_id,is_selftest):
 ```
 
 - `init(ctx)`: Called once during plugin startup. All salts and esalts are copied at this stage. You use it to wire up callbacks to helper modules.
@@ -243,16 +243,10 @@ In summary, while the generic mode is quick and easy, robust real-world plugins 
 ## 7. Debugging Without Hashcat
 
 You can run your plugin as a standalone script:
-
-```
-python3 generic_hash.py
-```
-
-It reads passwords from stdin and prints the result of `calc_hash()`:
-
 ```
 echo "password" | python3 generic_hash_mp.py
 ```
+It reads passwords from stdin and prints the result of `calc_hash()`.
 
-Note that you probably want to inline the correct salt value, see the `main` section in the code. TBD: Add some sample
+Note to allow use of the correct salt value, you need to dump hashcat's ctx: only hashcat knows of the hashlist containing the salt. Python doesn't have the hashlist, nor do we want to duplicate decoding the hashes. See the `main` section of `generic_hash_mp.py` how to dump the ctx (containing salts) for your hashlist.
 

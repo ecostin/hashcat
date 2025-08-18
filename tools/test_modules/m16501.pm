@@ -34,17 +34,11 @@ sub module_verify_hash
   return unless defined $hash;
   return unless defined $word;
 
-  my @data = split (/--/, $hash);
+  my $index= rindex ($hash, "--");
 
-  return unless scalar @data == 2;
+  return unless $index > 0;
 
-  my ($padded_cookie, $signature) = @data;
-
-  my $unpadded_cookie = $padded_cookie =~ s/Z*$//;
-
-  my ($cookie_name, $cookie_value) = split('=', $unpadded_cookie);
-
-  my $salt = $cookie_name . "=" . $cookie_value;
+  my $salt = substr ($hash, 0, $index);
 
   my $word_packed = pack_if_HEX_notation ($word);
 

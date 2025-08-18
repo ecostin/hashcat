@@ -311,7 +311,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   base64_encode (int_to_base64, (const u8 *) tmp_buf, (const int) metamask->ct_len+16, ct_buf);
 
   u8 *out_buf = (u8 *) line_buf;
-  
+
   if (salt->salt_iter + 1 != ROUNDS_METAMASK)
     return snprintf ((char *) out_buf, line_size, "%srounds=%d$%s$%s$%s",
       SIGNATURE_METAMASK_WALLET,

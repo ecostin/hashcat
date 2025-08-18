@@ -5,7 +5,7 @@
 
 If you want to run hashcat with your gpus inside docker you first need to install the appropriate container runtime to allow for gpu-passthrough and install usually the latest driver on the host.
 
-### NVidia ### 
+### NVidia ###
 
 To enable your docker deamon to support gpu passthrough go here https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 
@@ -18,7 +18,7 @@ Also make sure to install the latest cuda on your host system.
 For AMD go here https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
 
 
-### Intel ### 
+### Intel ###
 
 TBD
 
@@ -43,7 +43,14 @@ docker run --rm --gpus=all -it hashcat bash
 root@docker:~/hashcat# ./hashcat.bin --help
 ```
 
-   
+Here is an example for amd on ubuntu:
+
+```bash
+docker build -f docker/runtime.amd.ubuntu24.release -t hashcat .
+docker run --rm --device /dev/kfd --device /dev/dri/renderD128 --device /dev/dri/renderD129 -it hashcat bash
+rocm-user@ae67788b1d87:~/hashcat$ ./hashcat.bin --help
+```
+
 ## 2. Build the binaries yourself (TYPE=beta) (docker/runtime.PLATFORM.OS.beta)
 
 This will require the official build container to already be built (with the tag hashcat-binaries) successfully and will pull hashcat from it.
@@ -55,5 +62,14 @@ docker build -f docker/BinaryPackage.ubuntu20 -t hashcat-binaries .
 docker build -f docker/runtime.cuda.ubuntu24.beta -t hashcat .
 docker run --rm --gpus=all -it hashcat bash
 root@docker:~/hashcat# ./hashcat.bin --help
+```
+
+Here is an example for amd on ubuntu:
+
+```bash
+docker build -f docker/BinaryPackage.ubuntu20 -t hashcat-binaries .
+docker build -f docker/runtime.amd.ubuntu24.beta -t hashcat .
+docker run --rm --device /dev/kfd --device /dev/dri/renderD128 --device /dev/dri/renderD129 -it hashcat bash
+rocm-user@ae67788b1d87:~/hashcat$ ./hashcat.bin --help
 ```
 

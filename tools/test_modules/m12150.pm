@@ -35,7 +35,7 @@ sub module_generate_hash {
   for (my $i = 1; $i < $iterations; $i++) {
       $ctx = Digest::SHA->new(512);
       $ctx->add($digest);
-      $digest = $ctx->digest;        
+      $digest = $ctx->digest;
   }
 
   # Encode the final hash and salt

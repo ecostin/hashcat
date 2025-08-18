@@ -1991,9 +1991,9 @@ typedef struct kernel_param
   u32 bitmap_shift1;        // 25
   u32 bitmap_shift2;        // 26
   u32 salt_pos_host;        // 27
-  u32 loop_pos;             // 28
-  u32 loop_cnt;             // 29
-  u32 il_cnt;               // 30
+  u64 loop_pos;             // 28
+  u64 loop_cnt;             // 29
+  u64 il_cnt;               // 30
   u32 digests_cnt;          // 31
   u32 digests_offset_host;  // 32
   u32 combs_mode;           // 33
@@ -2080,7 +2080,7 @@ typedef struct bs_word
 typedef struct plain
 {
   u64  gidvid;
-  u32  il_pos;
+  u64  il_pos;
   u32  salt_pos;
   u32  digest_pos;
   u32  hash_pos;

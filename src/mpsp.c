@@ -978,7 +978,7 @@ static int sp_get_sum (u32 start, u32 stop, cs_t *root_css_buf, u64 *result)
 
   for (i = start; i < stop; i++)
   {
-    if (overflow_check_u64_mul (sum, root_css_buf[i].cs_len) == false) return -1;
+    if (overflow_check_u64_mul (sum, root_css_buf[i].cs_len) == true) return -1;
 
     sum *= root_css_buf[i].cs_len;
   }
@@ -1101,7 +1101,7 @@ static char* reverseMask (const char *mask, const char *prepend)
 {
   u32 maskLength = strlen (mask);
   u32 prependLength = strlen (prepend);
-  
+
   char *tmp_buf = (char *) hcmalloc (256);
 
   u32 i = 0;
@@ -1115,7 +1115,7 @@ static char* reverseMask (const char *mask, const char *prepend)
     }
     tmp_buf[i++] = ',';
   }
-  
+
   for (u32 j = maskLength - 1; i <= maskLength - 1 ; i++)
   {
     if (mask[i] == '?' && mask[i + 1] != '\0')
@@ -1129,7 +1129,7 @@ static char* reverseMask (const char *mask, const char *prepend)
         tmp_buf[j--] = mask[i];
     }
   }
-  
+
   return tmp_buf;
 }
 
@@ -1356,12 +1356,12 @@ int mask_ctx_update_loop (hashcat_ctx_t *hashcat_ctx)
         // do not allow modifier count > 32 bit
         // https://github.com/hashcat/hashcat/issues/2482
 
-        if (combinator_ctx->combs_cnt > 0xffffffff)
-        {
-          event_log_error (hashcat_ctx, "Integer overflow detected in keyspace of mask: %s", mask_ctx->mask);
+        // if (combinator_ctx->combs_cnt > 0xffffffff)
+        // {
+        //   event_log_error (hashcat_ctx, "Integer overflow detected in keyspace of mask: %s", mask_ctx->mask);
 
-          return -1;
-        }
+        //   return -1;
+        // }
 
         if (backend_session_update_mp (hashcat_ctx) == -1) return -1;
       }

@@ -10,6 +10,7 @@
 #include "convert.h"
 #include "shared.h"
 #include "memory.h"
+#include "argon2_common.h"
 
 #define ARGON2_VERSION_13   0x13
 #define ARGON2_TYPE_ID      2
@@ -48,6 +49,22 @@ u64         module_opts_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 u32         module_salt_type      (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return SALT_TYPE;       }
 const char *module_st_hash        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
+
+typedef struct luks_tmp
+{
+  u32 ipad32[8];
+  u64 ipad64[8];
+
+  u32 opad32[8];
+  u64 opad64[8];
+
+  u32 dgst32[32];
+  u64 dgst64[16];
+
+  u32 out32[32];
+  u64 out64[16];
+
+} luks_tmp_t;
 
 #define LUKS_STRIPES        (                                   4000)
 #define LUKS_SALT_LEN       (                                     32)
@@ -110,46 +127,15 @@ typedef struct luks
 
 } luks_t;
 
-typedef struct luks_tmp
+// this must exist so that argon2_common.c can work with correct sizes
+
+typedef struct merged_options
 {
-  u32 ipad32[8];
-  u64 ipad64[8];
-
-  u32 opad32[8];
-  u64 opad64[8];
-
-  u32 dgst32[32];
-  u64 dgst64[16];
-
-  u32 out32[32];
-  u64 out64[16];
-
-} luks_tmp_t;
-
-typedef struct argon2_tmp
-{
-  u32 state[4]; // just something
-
-} argon2_tmp_t;
-
-typedef struct argon2_options
-{
-  u32 type;
-  u32 version;
-
-  u32 iterations;
-  u32 parallelism;
-  u32 memory_usage_in_kib;
-
-  u32 segment_length;
-  u32 lane_length;
-  u32 memory_block_count;
-
-  u32 digest_len;
+  argon2_options_t argon2_options;
 
   luks_t luks;
 
-} argon2_options_t;
+} merged_options_t;
 
 #include "argon2_common.c"
 
@@ -158,7 +144,7 @@ static const char *SIGNATURE_LUKS_ARGON2ID = "$luks$2$argon2id$sha256$aes$";
 
 u64 module_esalt_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
-  const u64 esalt_size = (const u64) sizeof (argon2_options_t);
+  const u64 esalt_size = (const u64) sizeof (merged_options_t);
 
   return esalt_size;
 }
@@ -172,8 +158,11 @@ u64 module_tmp_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED c
 
 int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED void *digest_buf, MAYBE_UNUSED salt_t *salt, MAYBE_UNUSED void *esalt_buf, MAYBE_UNUSED void *hook_salt_buf, MAYBE_UNUSED hashinfo_t *hash_info, const char *line_buf, MAYBE_UNUSED const int line_len)
 {
-  argon2_options_t *options = (argon2_options_t *) esalt_buf;
-  luks_t           *luks    = &options->luks;
+  merged_options_t *merged_options = (merged_options_t *) esalt_buf;
+
+  argon2_options_t *argon2_options = &merged_options->argon2_options;
+
+  luks_t *luks = &merged_options->luks;
 
   hc_token_t token;
 
@@ -344,19 +333,19 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   const int sig_len = token.len[0];
   const u8 *sig_pos = token.buf[0];
 
-       if (memcmp (SIGNATURE_LUKS_ARGON2I,  sig_pos, sig_len) == 0) options->type = 1;
-  else if (memcmp (SIGNATURE_LUKS_ARGON2ID, sig_pos, sig_len) == 0) options->type = 2;
+       if (memcmp (SIGNATURE_LUKS_ARGON2I,  sig_pos, sig_len) == 0) argon2_options->type = 1;
+  else if (memcmp (SIGNATURE_LUKS_ARGON2ID, sig_pos, sig_len) == 0) argon2_options->type = 2;
   else
     return (PARSER_SIGNATURE_UNMATCHED);
 
-  options->version             = ARGON2_VERSION_13;
-  options->iterations          = iter;
-  options->parallelism         = par;
-  options->memory_usage_in_kib = mem;
-  options->segment_length      = MAX (2, (mem / (ARGON2_SYNC_POINTS * par)));
-  options->lane_length         = options->segment_length * ARGON2_SYNC_POINTS;
-  options->memory_block_count  = options->lane_length * par;
-  options->digest_len          = (key_size / 8);
+  argon2_options->version             = ARGON2_VERSION_13;
+  argon2_options->iterations          = iter;
+  argon2_options->parallelism         = par;
+  argon2_options->memory_usage_in_kib = mem;
+  argon2_options->segment_length      = MAX (2, (mem / (ARGON2_SYNC_POINTS * par)));
+  argon2_options->lane_length         = argon2_options->segment_length * ARGON2_SYNC_POINTS;
+  argon2_options->memory_block_count  = argon2_options->lane_length * par;
+  argon2_options->digest_len          = (key_size / 8);
 
   // af
 
@@ -383,14 +372,17 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
 int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const void *digest_buf, MAYBE_UNUSED const salt_t *salt, MAYBE_UNUSED const void *esalt_buf, MAYBE_UNUSED const void *hook_salt_buf, MAYBE_UNUSED const hashinfo_t *hash_info, char *line_buf, MAYBE_UNUSED const int line_size)
 {
-  const argon2_options_t *options = (argon2_options_t *) esalt_buf;
-  const luks_t           *luks    = &options->luks;
+  const merged_options_t *merged_options = (const merged_options_t *) esalt_buf;
+
+  const argon2_options_t *argon2_options = &merged_options->argon2_options;
+
+  const luks_t *luks = &merged_options->luks;
 
   // argon2 typ
 
   const char *signature = NULL;
 
-  switch (options->type)
+  switch (argon2_options->type)
   {
     case 1: signature = SIGNATURE_LUKS_ARGON2I;  break;
     case 2: signature = SIGNATURE_LUKS_ARGON2ID; break;
@@ -446,9 +438,9 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
     signature,
     cipher_mode,
     key_size,
-    options->memory_usage_in_kib,
-    options->iterations,
-    options->parallelism,
+    argon2_options->memory_usage_in_kib,
+    argon2_options->iterations,
+    argon2_options->parallelism,
     salt_buf,
     af_buf,
     ct_buf);

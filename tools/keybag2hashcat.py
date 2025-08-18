@@ -22,7 +22,7 @@ class Keybag:
         self.wrap = 0
         self.salt = ''
         self.iterations = 0
-        
+
 
         self._read_header(file_obj)
         self.class_keys = self._read_class_keys(file_obj)
@@ -82,7 +82,7 @@ class Keybag:
                     stop = True
         return class_keys
 
-    
+
     def print_keybag(self):
         logger.debug(f'SIZE: {self.size}')
         logger.debug(f'VERSION: {self.version}')
@@ -110,15 +110,15 @@ def main():
 
     # Add the keybag file argument
     parser.add_argument(
-        'keybag', 
-        type=str, 
+        'keybag',
+        type=str,
         help="Path to the keybag file."
     )
 
     # Add the debug flag
     parser.add_argument(
-        '--debug', 
-        action='store_true', 
+        '--debug',
+        action='store_true',
         help="Enable debug logging."
     )
 
@@ -160,13 +160,13 @@ def main():
                 class_type = class_key.get('CLAS')
                 if class_type == 1 or class_type == 33:
                     classkey1 = class_key.get('WPKY')
-        
+
         if not classkey1:
             logger.error(f'Unable to find a classkey of class NSFileProtectionComplete.')
             logger.error(f'You could try to get another class key, make sure it is ktyp 0 and wrap 3.')
             exit(1)
     print(f'$uido${uid}${kb.salt}${kb.iterations}${classkey1}')
-        
+
 
 if __name__ == "__main__":
     main()

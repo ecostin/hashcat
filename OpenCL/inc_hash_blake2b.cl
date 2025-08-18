@@ -287,6 +287,37 @@ DECLSPEC void blake2b_init (PRIVATE_AS blake2b_ctx_t *ctx)
   ctx->len = 0;
 }
 
+DECLSPEC void blake2b_256_init (PRIVATE_AS blake2b_ctx_t *ctx)
+{
+  ctx->h[0] = BLAKE2B_IV_00 ^ 0x01010020; // output length: 0x20 = 32 bytes
+  ctx->h[1] = BLAKE2B_IV_01;
+  ctx->h[2] = BLAKE2B_IV_02;
+  ctx->h[3] = BLAKE2B_IV_03;
+  ctx->h[4] = BLAKE2B_IV_04;
+  ctx->h[5] = BLAKE2B_IV_05;
+  ctx->h[6] = BLAKE2B_IV_06;
+  ctx->h[7] = BLAKE2B_IV_07;
+
+  ctx->m[ 0] = 0;
+  ctx->m[ 1] = 0;
+  ctx->m[ 2] = 0;
+  ctx->m[ 3] = 0;
+  ctx->m[ 4] = 0;
+  ctx->m[ 5] = 0;
+  ctx->m[ 6] = 0;
+  ctx->m[ 7] = 0;
+  ctx->m[ 8] = 0;
+  ctx->m[ 9] = 0;
+  ctx->m[10] = 0;
+  ctx->m[11] = 0;
+  ctx->m[12] = 0;
+  ctx->m[13] = 0;
+  ctx->m[14] = 0;
+  ctx->m[15] = 0;
+
+  ctx->len = 0;
+}
+
 DECLSPEC void blake2b_update_128 (PRIVATE_AS blake2b_ctx_t *ctx, PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w2, PRIVATE_AS u32 *w3, PRIVATE_AS u32 *w4, PRIVATE_AS u32 *w5, PRIVATE_AS u32 *w6, PRIVATE_AS u32 *w7, const int len)
 {
   if (len == 0) return;
@@ -632,6 +663,37 @@ DECLSPEC void blake2b_transform_vector (PRIVATE_AS u64x *h, PRIVATE_AS const u64
 DECLSPEC void blake2b_init_vector (PRIVATE_AS blake2b_ctx_vector_t *ctx)
 {
   ctx->h[0] = BLAKE2B_IV_00 ^ 0x01010040; // default output length: 0x40 = 64 bytes
+  ctx->h[1] = BLAKE2B_IV_01;
+  ctx->h[2] = BLAKE2B_IV_02;
+  ctx->h[3] = BLAKE2B_IV_03;
+  ctx->h[4] = BLAKE2B_IV_04;
+  ctx->h[5] = BLAKE2B_IV_05;
+  ctx->h[6] = BLAKE2B_IV_06;
+  ctx->h[7] = BLAKE2B_IV_07;
+
+  ctx->m[ 0] = 0;
+  ctx->m[ 1] = 0;
+  ctx->m[ 2] = 0;
+  ctx->m[ 3] = 0;
+  ctx->m[ 4] = 0;
+  ctx->m[ 5] = 0;
+  ctx->m[ 6] = 0;
+  ctx->m[ 7] = 0;
+  ctx->m[ 8] = 0;
+  ctx->m[ 9] = 0;
+  ctx->m[10] = 0;
+  ctx->m[11] = 0;
+  ctx->m[12] = 0;
+  ctx->m[13] = 0;
+  ctx->m[14] = 0;
+  ctx->m[15] = 0;
+
+  ctx->len = 0;
+}
+
+DECLSPEC void blake2b_256_init_vector (PRIVATE_AS blake2b_ctx_vector_t *ctx)
+{
+  ctx->h[0] = BLAKE2B_IV_00 ^ 0x01010020; // output length: 0x20 = 32 bytes
   ctx->h[1] = BLAKE2B_IV_01;
   ctx->h[2] = BLAKE2B_IV_02;
   ctx->h[3] = BLAKE2B_IV_03;

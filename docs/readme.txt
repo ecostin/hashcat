@@ -7,7 +7,7 @@
            |_____|     /___________/     |_____|  /_____/        /_______|
                  :                             :                         :
 
-hashcat v7.0.0
+hashcat v7.1.1
 ==============
 
 AMD GPUs on Linux require "AMD Radeon Software for Linux" with "ROCm"
@@ -48,6 +48,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 
 - MD4
 - MD5
+- MD6 (256)
 - SHA1
 - SHA2-224
 - SHA2-256
@@ -59,6 +60,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - SHA3-512
 - RIPEMD-160
 - RIPEMD-320
+- BLAKE2b-256
 - BLAKE2b-512
 - BLAKE2s-256
 - GOST R 34.11-2012 (Streebog) 256-bit, big-endian
@@ -71,12 +73,13 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - Keccak-512
 - ShangMi 3 (SM3)
 - Whirlpool
-- SipHash
 - md5(utf16le($pass))
 - sha1(utf16le($pass))
 - sha256(utf16le($pass))
 - sha384(utf16le($pass))
 - sha512(utf16le($pass))
+- BLAKE2b-256($pass.$salt)
+- BLAKE2b-256($salt.$pass)
 - BLAKE2b-512($pass.$salt)
 - BLAKE2b-512($salt.$pass)
 - md5($pass.$salt)
@@ -94,6 +97,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - md5(md5($pass))
 - md5(md5($pass).md5($salt))
 - md5(md5($pass.$salt))
+- md5(md5($salt).md5(md5($pass)))
 - md5(md5(md5($pass)))
 - md5(md5(md5($pass)).$salt)
 - md5(md5(md5($pass).$salt1).$salt2)
@@ -124,6 +128,10 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - sha1(sha1($pass).$salt)
 - sha1(sha1($salt.$pass.$salt))
 - sha1(utf16le($pass).$salt)
+- sha224($pass.$salt)
+- sha224($salt.$pass)
+- sha224(sha1($pass))
+- sha224(sha224($pass))
 - sha256($pass.$salt)
 - sha256($salt.$pass)
 - sha256($salt.$pass.$salt)
@@ -162,7 +170,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - HMAC-Streebog-256 (key = $salt), big-endian
 - HMAC-Streebog-512 (key = $pass), big-endian
 - HMAC-Streebog-512 (key = $salt), big-endian
-- Amazon AWS4-HMAC-SHA256
+- SipHash
 - CRC32
 - CRC32C
 - CRC64Jones
@@ -189,6 +197,12 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - PBKDF2-HMAC-SHA256
 - PBKDF2-HMAC-SHA512
 - Argon2
+- bcrypt
+- bcrypt(HMAC-SHA256($pass))
+- bcrypt(md5($pass))
+- bcrypt(sha1($pass))
+- bcrypt(sha256($pass))
+- bcrypt(sha512($pass))
 - scrypt
 - phpass
 - TACACS+
@@ -214,7 +228,6 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - CRAM-MD5
 - MS SNTP
 - JWT (JSON Web Token)
-- Radmin3
 - Kerberos 5, etype 17, TGS-REP
 - Kerberos 5, etype 17, Pre-Auth
 - Kerberos 5, etype 17, DB
@@ -231,6 +244,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - NetNTLMv2
 - NetNTLMv2 (NT)
 - Flask Session Cookie ($salt.$salt.$pass)
+- Amazon AWS Signature Version 4
 - iSCSI CHAP authentication, MD5(CHAP)
 - RACF
 - RACF KDFAES
@@ -249,17 +263,20 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - DPAPI masterkey file v2 (context 3)
 - GRUB 2
 - MS-AzureSync PBKDF2-HMAC-SHA256
+- AS/400 DES
+- AS/400 SSHA1
 - BSDi Crypt, Extended DES
 - NTLM
 - Radmin2
 - Samsung Android Password/PIN
-- Microsoft Online Account
+- Microsoft Online Account (PBKDF2-HMAC-SHA256 + AES256)
 - Windows Hello PIN/Password
 - Windows Phone 8+ PIN/password
 - Cisco-ASA MD5
 - Cisco-IOS $8$ (PBKDF2-SHA256)
 - Cisco-IOS $9$ (scrypt)
 - Cisco-IOS type 4 (SHA256)
+- Cisco-ISE Hashed Password (SHA256)
 - Cisco-PIX MD5
 - Citrix NetScaler (PBKDF2-HMAC-SHA256)
 - Citrix NetScaler (SHA1)
@@ -283,7 +300,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - descrypt, DES (Unix), Traditional DES
 - sha256crypt $5$, SHA256 (Unix)
 - sha512crypt $6$, SHA512 (Unix)
-- SQLCipher
+- sm3crypt $sm3$, SM3 (Unix)
 - MSSQL (2000)
 - MSSQL (2005)
 - MSSQL (2012, 2014)
@@ -305,6 +322,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - CRAM-MD5 Dovecot
 - SSHA-256(Base64), LDAP {SSHA256}
 - SSHA-512(Base64), LDAP {SSHA512}
+- Radmin3
 - Dahua Authentication MD5
 - RedHat 389-DS LDAP (PBKDF2-HMAC-SHA256)
 - FileZilla Server >= 0.9.55
@@ -320,6 +338,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - SAP CODVN F/G (PASSCODE)
 - SAP CODVN F/G (PASSCODE) from RFC_READ_TABLE
 - SAP CODVN H (PWDSALTEDHASH) iSSHA-1
+- SAP CODVN H (PWDSALTEDHASH) isSHA512
 - RSA Security Analytics / NetWitness (sha256)
 - Adobe AEM (SSPR, SHA-256 with Salt)
 - Adobe AEM (SSPR, SHA-512 with Salt)
@@ -388,7 +407,9 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - Password Safe v2
 - Password Safe v3
 - LastPass + LastPass sniffed
-- KeePass 1 (AES/Twofish) and KeePass 2 (AES)
+- KeePass (KDBX v2/v3)
+- KeePass (KDBX v2/v3) - keyfile only
+- KeePass (KDBX v4)
 - Bitwarden
 - Ansible Vault
 - Mozilla key3.db
@@ -416,6 +437,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - iTunes backup >= 10.0
 - mega.nz password-protected link (PBKDF2-HMAC-SHA512)
 - WBB3 (Woltlab Burning Board)
+- WBB4 (Woltlab Burning Board) [bcrypt(bcrypt($pass))]
 - PHPS
 - SMF (Simple Machines Forum) > v1.1
 - MediaWiki B type
@@ -433,12 +455,6 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - MyBB 1.2+, IPB2+ (Invision Power Board)
 - vBulletin < v3.8.5
 - vBulletin >= v3.8.5
-- bcrypt(md5($pass)) / bcryptmd5
-- bcrypt(sha1($pass)) / bcryptsha1
-- bcrypt(sha256($pass)) / bcryptsha256
-- bcrypt(sha512($pass)) / bcryptsha512
-- bcrypt-sha256 v2 bcrypt(HMAC-SHA256($pass))
-- md5(md5($salt).md5(md5($pass)))
 - osCommerce, xt:Commerce
 - TOTP (HMAC-SHA1)
 - Web2py pbkdf2-sha512
@@ -498,6 +514,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - Blockchain, My Wallet
 - Blockchain, My Wallet, V2
 - Blockchain, My Wallet, Second Password (SHA256)
+- Blockchain, My Wallet, Legacy Wallets
 - Dogechain.info Wallet
 - Stargazer Stellar Wallet XLM
 - Ethereum Pre-Sale Wallet, PBKDF2-HMAC-SHA256
@@ -511,6 +528,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - ENCsecurity Datavault (PBKDF2/keychain)
 - ENCsecurity Datavault (MD5/no keychain)
 - ENCsecurity Datavault (MD5/keychain)
+- SQLCipher
 - SecureCRT MasterPassphrase v2
 
 ##

@@ -55,10 +55,15 @@ sub module_verify_hash
   my $hash = substr ($line, 0, $index1);
   my $word = substr ($line, $index1 + 1);
 
-  my $index2 = index ($hash, "=", 24);
-  my $index3 = index ($hash, "\$", 24);
+  my $index2 = index ($hash, "r=");
 
-  my $iter = substr ($hash, $index2, $index3 - $index2);
+  return unless $index2 >= 0;
+
+  my $index3 = index ($hash, "\$", $index2);
+
+  return unless $index3 >= 0;
+
+  my $iter = substr ($hash, $index2 + 2, $index3 - $index2 - 2);
 
   my $plain_base64 = substr ($hash, $index3 + 1, 22);
 

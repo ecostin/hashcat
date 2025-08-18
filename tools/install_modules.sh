@@ -53,10 +53,12 @@ cpanm Authen::Passphrase::LANManager   \
       Crypt::DES_EDE3                  \
       Crypt::Digest::BLAKE2s_256       \
       Crypt::Digest::RIPEMD160         \
+      Crypt::Digest::RIPEMD320         \
       Crypt::Digest::Whirlpool         \
       Crypt::ECB                       \
       Crypt::Eksblowfish::Bcrypt       \
       Crypt::Mode::CBC                 \
+      Crypt::Mode::CFB                 \
       Crypt::Mode::ECB                 \
       Crypt::MySQL                     \
       Crypt::OpenSSH::ChachaPoly       \
@@ -78,7 +80,6 @@ cpanm Authen::Passphrase::LANManager   \
       Digest::Keccak                   \
       Digest::MD4                      \
       Digest::MD5                      \
-      Digest::MD6                      \
       Digest::MurmurHash3              \
       Digest::Perl::MD5                \
       Digest::SHA                      \
@@ -87,6 +88,7 @@ cpanm Authen::Passphrase::LANManager   \
       Digest::SipHash                  \
       Encode                           \
       JSON                             \
+      LWP::Simple                      \
       Math::BigInt                     \
       MIME::Base64                     \
       Module::Build                    \
@@ -105,6 +107,9 @@ cpanm https://github.com/matrix/digest-gost.git
 ERRORS=$((ERRORS+$?))
 
 cpanm https://github.com/matrix/perl-Crypt-OpenSSL-EC.git
+ERRORS=$((ERRORS+$?))
+
+cpanm https://github.com/matrix/Digest--MD6.git
 ERRORS=$((ERRORS+$?))
 
 # checks for pyenv
@@ -167,6 +172,9 @@ else
   ERRORS=$((ERRORS+$?))
 
   pip3 install setuptools
+  ERRORS=$((ERRORS+$?))
+
+  pip3 install argon2-cffi
   ERRORS=$((ERRORS+$?))
 
 fi

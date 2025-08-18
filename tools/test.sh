@@ -5,7 +5,7 @@
 ## License.....: MIT
 ##
 
-OPTS="--quiet --potfile-disable --hwmon-disable --logfile-disable"
+OPTS="--quiet --potfile-disable --logfile-disable"
 
 FORCE=0
 RUNTIME=400
@@ -26,8 +26,6 @@ LUKS_MODES="14600 29511 29512 29513 29521 29522 29523 29531 29532 29533 29541 29
 
 # Cryptoloop mode which have test containers
 CL_MODES="14511 14512 14513 14521 14522 14523 14531 14532 14533 14541 14542 14543 14551 14552 14553"
-
-# missing hash types: 5200
 
 HASH_TYPES=$(ls "${TDIR}"/test_modules/*.pm | sed -E 's/.*m0*([0-9]+).pm/\1/')
 HASH_TYPES="${HASH_TYPES} ${TC_MODES} ${VC_MODES} ${LUKS_MODES} ${CL_MODES}"

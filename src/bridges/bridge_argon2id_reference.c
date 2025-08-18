@@ -17,7 +17,12 @@
 #include "argon2.c"
 #include "core.c"
 #include "blake2/blake2b.c"
+
+#if defined(__riscv)
+#include "ref.c"
+#else
 #include "opt.c"
+#endif
 
 // good: we can use this multiplier do reduce copy overhead to increase the guessing speed,
 // bad: but we also increase the password candidate batch size.

@@ -11,36 +11,32 @@
 #include "convert.h"
 #include "shared.h"
 #include "memory.h"
-
-#define ARGON2_SYNC_POINTS  4
-#define ARGON2_BLOCK_SIZE   1024
-
-u64 argon2_module_tmp_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
-{
-  const u64 tmp_size = 0; // we'll add some later
-
-  return tmp_size;
-}
+#include "argon2_common.h"
 
 u64 get_largest_memory_block_count (MAYBE_UNUSED const hashconfig_t *hashconfig, const hashes_t *hashes)
 {
-  argon2_options_t *options    = (argon2_options_t *) hashes->esalts_buf;
-  argon2_options_t *options_st = (argon2_options_t *) hashes->st_esalts_buf;
+  merged_options_t *merged_options    = (merged_options_t *) hashes->esalts_buf;
+  merged_options_t *merged_options_st = (merged_options_t *) hashes->st_esalts_buf;
+
+  argon2_options_t *argon2_options    = &merged_options->argon2_options;
+  argon2_options_t *argon2_options_st = &merged_options_st->argon2_options;
 
   u64 largest_memory_block_count = 0;
 
-  if (((hashconfig->opts_type & OPTS_TYPE_SELF_TEST_DISABLE) == 0) && (options_st != NULL))
+  if (((hashconfig->opts_type & OPTS_TYPE_SELF_TEST_DISABLE) == 0) && (argon2_options_st != NULL))
   {
-    largest_memory_block_count = options_st->memory_block_count;
+    largest_memory_block_count = argon2_options_st->memory_block_count;
   }
   else
   {
-    largest_memory_block_count = options->memory_block_count;
+    largest_memory_block_count = argon2_options->memory_block_count;
   }
 
   for (u32 i = 0; i < hashes->salts_cnt; i++)
   {
-    largest_memory_block_count = MAX (largest_memory_block_count, options[i].memory_block_count);
+    argon2_options = &merged_options[i].argon2_options;
+
+    largest_memory_block_count = MAX (largest_memory_block_count, argon2_options->memory_block_count);
   }
 
   return largest_memory_block_count;
@@ -115,41 +111,6 @@ u64 argon2_module_extra_buffer_size (MAYBE_UNUSED const hashconfig_t *hashconfig
   return size_argon2;
 }
 
-u64 argon2_module_extra_tmp_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes)
-{
-  /*
-  argon2_options_t *options    = (argon2_options_t *) hashes->esalts_buf;
-  argon2_options_t *options_st = (argon2_options_t *) hashes->st_esalts_buf;
-
-  const u32 memory_block_count = (options->memory_block_count) ? options->memory_block_count : options_st->memory_block_count;
-  const u32 parallelism        = (options->parallelism)        ? options->parallelism        : options_st->parallelism;
-
-  for (u32 i = 1; i < hashes->salts_cnt; i++)
-  {
-    if ((memory_block_count != options[i].memory_block_count)
-     || (parallelism        != options[i].parallelism))
-    {
-      return (1ULL << 63) + i;
-    }
-  }
-
-  // now that we know they all have the same settings, we also need to check the self-test hash is different to what the user hash is using
-
-  if ((hashconfig->opts_type & OPTS_TYPE_SELF_TEST_DISABLE) == 0)
-  {
-    if ((memory_block_count != options_st->memory_block_count)
-     || (parallelism        != options_st->parallelism))
-    {
-      return (1ULL << 62);
-    }
-  }
-  */
-
-  u64 tmp_size = sizeof (argon2_tmp_t);
-
-  return tmp_size;
-}
-
 char *argon2_module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hashes_t *hashes, MAYBE_UNUSED const hc_device_param_t *device_param)
 {
   int   build_options_sz  = 1024;
@@ -172,32 +133,36 @@ char *argon2_module_jit_build_options (MAYBE_UNUSED const hashconfig_t *hashconf
 
   // We can apply some optimization logic under certain conditions
 
-  argon2_options_t *options    = (argon2_options_t *) hashes->esalts_buf;
-  argon2_options_t *options_st = (argon2_options_t *) hashes->st_esalts_buf;
+  merged_options_t *merged_options    = (merged_options_t *) hashes->esalts_buf;
+  merged_options_t *merged_options_st = (merged_options_t *) hashes->st_esalts_buf;
+
+  argon2_options_t *argon2_options    = &merged_options->argon2_options;
+  argon2_options_t *argon2_options_st = &merged_options_st->argon2_options;
 
   u64 memory_block_count = 0;
   u64 parallelism = 0;
 
-  if (((hashconfig->opts_type & OPTS_TYPE_SELF_TEST_DISABLE) == 0) && (options_st != NULL))
+  if (((hashconfig->opts_type & OPTS_TYPE_SELF_TEST_DISABLE) == 0) && (argon2_options_st != NULL))
   {
-    memory_block_count = options_st->memory_block_count;
-    parallelism        = options_st->parallelism;
+    memory_block_count = argon2_options_st->memory_block_count;
+    parallelism        = argon2_options_st->parallelism;
   }
   else
   {
-    memory_block_count = options->memory_block_count;
-    parallelism        = options->parallelism;
+    memory_block_count = argon2_options->memory_block_count;
+    parallelism        = argon2_options->parallelism;
   }
-
 
   bool all_same_memory_block_count = true;
   bool all_same_parallelism        = true;
 
   for (u32 i = 0; i < hashes->salts_cnt; i++)
   {
-    if (memory_block_count != options[i].memory_block_count) all_same_memory_block_count = false;
+    argon2_options = &merged_options[i].argon2_options;
 
-    if (parallelism != options[i].parallelism) all_same_parallelism = false;
+    if (memory_block_count != argon2_options->memory_block_count) all_same_memory_block_count = false;
+
+    if (parallelism != argon2_options->parallelism) all_same_parallelism = false;
   }
 
   if (all_same_memory_block_count == true)

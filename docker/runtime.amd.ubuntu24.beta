@@ -1,0 +1,22 @@
+FROM hashcat-binaries as build
+
+FROM rocm/rocm-terminal
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+RUN \
+sudo apt-get update && sudo apt-get upgrade -y && \
+sudo apt-get install -y curl wget unzip tar p7zip-full libjudy-dev libpcre3-dev libmhash-dev vim screen git  make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+# Install pyenv
+ENV PYENV_ROOT /home/rocm-user/.pyenv
+ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+RUN git clone --depth=1 https://github.com/pyenv/pyenv.git .pyenv
+RUN pyenv install 3.13 && pyenv global 3.13
+
+# Add hashcat
+RUN mkdir hashcat
+COPY --from=build /root/hashcat hashcat
+
+WORKDIR hashcat

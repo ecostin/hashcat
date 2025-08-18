@@ -29,7 +29,7 @@ def convert_hash(hash_string):
     if len(bytes1) > len(bytes2):
         salt_bytes = bytes2
         hash_bytes = bytes1
-    else:  
+    else:
         salt_bytes = bytes1
         hash_bytes = bytes2
 
@@ -45,7 +45,7 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""Example:
     gitea2hashcat.py <salt1>:<hash1> <hash2>|<salt2> ... or pipe input from stdin.
-        
+
     You can also dump output straight from sqlite into this script:
         sqlite3 gitea.db 'select salt,passwd from user;' | gitea2hashcat.py""")
     parser.add_argument('hashes', nargs='*', help='SALT+HASH strings to convert')

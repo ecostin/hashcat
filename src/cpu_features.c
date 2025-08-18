@@ -16,6 +16,16 @@ int cpu_supports_avx2 ()     { return 0; }
 int cpu_supports_avx512f ()  { return 0; }
 int cpu_supports_avx512vl () { return 0; }
 
+#elif defined(__riscv)
+
+// TODO: Support RVV
+int cpu_supports_sse2 ()     { return 0; }
+int cpu_supports_ssse3 ()    { return 0; }
+int cpu_supports_xop ()      { return 0; }
+int cpu_supports_avx2 ()     { return 0; }
+int cpu_supports_avx512f ()  { return 0; }
+int cpu_supports_avx512vl () { return 0; }
+
 #else
 static inline void cpuid (u32 leaf, u32 subleaf, u32 *eax, u32 *ebx, u32 *ecx, u32 *edx)
 {

@@ -2834,7 +2834,7 @@ void status_display_status_json (hashcat_ctx_t *hashcat_ctx)
 
   time_t sec_etc = status_get_sec_etc (hashcat_ctx);
 
-  if (overflow_check_u64_add (time_now, sec_etc) == false)
+  if (overflow_check_u64_add (time_now, sec_etc) == true)
   {
     end = 1;
   }
@@ -3655,7 +3655,7 @@ void status_display (hashcat_ctx_t *hashcat_ctx)
     const device_info_t *device_info = hashcat_status->device_info_buf + 0;
 
     event_log_info (hashcat_ctx,
-      "Restore.Sub.#%02u..: Salt:%u Amplifier:%u-%u Iteration:%u-%u", 0 + 1,
+      "Restore.Sub.#%02u..: Salt:%u Amplifier:%" PRIu64 "-%" PRIu64 " Iteration:%u-%u", 0 + 1,
       device_info->salt_pos_dev,
       device_info->innerloop_pos_dev,
       device_info->innerloop_pos_dev + device_info->innerloop_left_dev,
@@ -3672,7 +3672,7 @@ void status_display (hashcat_ctx_t *hashcat_ctx)
       if (device_info->skipped_warning_dev == true) continue;
 
       event_log_info (hashcat_ctx,
-        "Restore.Sub.#%02u..: Salt:%u Amplifier:%u-%u Iteration:%u-%u", device_id + 1,
+        "Restore.Sub.#%02u..: Salt:%u Amplifier:%" PRIu64 "-%" PRIu64 " Iteration:%u-%u", device_id + 1,
         device_info->salt_pos_dev,
         device_info->innerloop_pos_dev,
         device_info->innerloop_pos_dev + device_info->innerloop_left_dev,

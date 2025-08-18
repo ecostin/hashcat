@@ -129,7 +129,7 @@ ALL_ATTACKS=0
 SELF_TEST_DISABLE=1
 CLEAN_CACHE_DISABLE=0
 
-OPTS="--quiet --potfile-disable --hwmon-disable --machine-readable --logfile-disable"
+OPTS="--quiet --potfile-disable --machine-readable --logfile-disable"
 
 SKIP_HASH_TYPES="" #2000 2500 2501 16800 16801 99999 32000"
 SKIP_HASH_TYPES_METAL="21800"
