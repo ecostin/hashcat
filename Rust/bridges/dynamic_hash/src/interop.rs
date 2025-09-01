@@ -1,0 +1,163 @@
+/**
+ * Author......: See docs/credits.txt
+ * License.....: MIT
+ */
+use std::{
+    ffi::{CStr, c_char, c_int, c_void},
+    mem, ptr, slice,
+};
+
+use crate::bindings::{generic_io_t, generic_io_tmp_t, salt_t};
+use crate::dynamic_hash::{calc_hash, thread_init, thread_term};
+
+#[repr(C)]
+pub(crate) struct Context {
+    pub module_name: String,
+
+    pub salts: Vec<salt_t>,
+    pub esalts: Vec<generic_io_t>,
+
+    pub bridge_parameter1: String,
+    pub bridge_parameter2: String,
+    pub bridge_parameter3: String,
+    pub bridge_parameter4: String,
+}
+
+impl Context {
+    fn get_raw_esalt(&self, salt_id: usize) -> &generic_io_t {
+        &self.esalts[salt_id]
+    }
+}
+
+unsafe fn vec_from_raw_parts<T: Clone>(data: *const T, length: c_int) -> Vec<T> {
+    if data.is_null() {
+        vec![]
+    } else {
+        Vec::from(unsafe { slice::from_raw_parts(data, length as usize) })
+    }
+}
+
+unsafe fn string_from_ptr(ptr: *const c_char) -> String {
+    if ptr.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(ptr).to_str().unwrap_or_default().to_string() }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn new_context(
+    module_name: *const c_char,
+
+    salts_cnt: c_int,
+    salts_size: c_int,
+    salts_buf: *const c_char,
+
+    esalts_cnt: c_int,
+    esalts_size: c_int,
+    esalts_buf: *const c_char,
+
+    _st_salts_cnt: c_int,
+    _st_salts_size: c_int,
+    _st_salts_buf: *const c_char,
+
+    _st_esalts_cnt: c_int,
+    _st_esalts_size: c_int,
+    _st_esalts_buf: *const c_char,
+
+    bridge_parameter1: *const c_char,
+    bridge_parameter2: *const c_char,
+    bridge_parameter3: *const c_char,
+    bridge_parameter4: *const c_char,
+) -> *mut c_void {
+    assert!(!module_name.is_null());
+    assert!(!salts_buf.is_null());
+    assert!(!esalts_buf.is_null());
+    assert_eq!(salts_size as usize, mem::size_of::<salt_t>());
+    assert_eq!(esalts_size as usize, mem::size_of::<generic_io_t>());
+    let module_name = unsafe { string_from_ptr(module_name) };
+    let salts = unsafe { vec_from_raw_parts(salts_buf as *const salt_t, salts_cnt) };
+    let esalts = unsafe { vec_from_raw_parts(esalts_buf as *const generic_io_t, esalts_cnt) };
+
+    let bridge_parameter1 = unsafe { string_from_ptr(bridge_parameter1) };
+    let bridge_parameter2 = unsafe { string_from_ptr(bridge_parameter2) };
+    let bridge_parameter3 = unsafe { string_from_ptr(bridge_parameter3) };
+    let bridge_parameter4 = unsafe { string_from_ptr(bridge_parameter4) };
+
+    Box::into_raw(Box::new(Context {
+        module_name,
+        salts,
+        esalts,
+        bridge_parameter1,
+        bridge_parameter2,
+        bridge_parameter3,
+        bridge_parameter4,
+    })) as *mut c_void
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn drop_context(ctx: *mut c_void) {
+    assert!(!ctx.is_null());
+    unsafe {
+        drop(Box::from_raw(ctx as *mut Context));
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn init(ctx: *mut c_void) {
+    assert!(!ctx.is_null());
+    let ctx = unsafe { &mut *ctx.cast::<Context>() };
+    thread_init(ctx);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn term(ctx: *mut c_void) {
+    assert!(!ctx.is_null());
+    let ctx = unsafe { &mut *ctx.cast::<Context>() };
+    thread_term(ctx);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kernel_loop(
+    ctx: *const c_void,
+    io: *mut generic_io_tmp_t,
+    pws_cnt: u64,
+    salt_id: c_int,
+    _is_self_test: bool,
+) -> bool {
+    assert!(!ctx.is_null());
+    assert!(!io.is_null());
+    let io = unsafe { slice::from_raw_parts_mut(io, pws_cnt as usize) };
+
+    let ctx = unsafe { &*ctx.cast::<Context>() };
+
+    process_batch(ctx, io, salt_id as usize);
+
+    true
+}
+
+fn process_batch(ctx: &Context, io: &mut [generic_io_tmp_t], salt_id: usize) {
+    let esalt = ctx.get_raw_esalt(salt_id);
+    let salt = unsafe {
+        slice::from_raw_parts(
+            esalt.salt_buf.as_ptr() as *const u8,
+            esalt.salt_len as usize,
+        )
+    };
+    for in_out in io {
+        let pw = unsafe {
+            slice::from_raw_parts(in_out.pw_buf.as_ptr() as *const u8, in_out.pw_len as usize)
+        };
+        let hash = calc_hash(pw, salt);
+        assert!(hash.len() <= mem::size_of_val(&in_out.out_buf[0]));
+        in_out.out_cnt = 1;
+        unsafe {
+            ptr::copy_nonoverlapping(
+                hash.as_ptr(),
+                in_out.out_buf[0].as_mut_ptr() as *mut u8,
+                hash.len(),
+            );
+        }
+        in_out.out_len[0] = hash.len() as u32;
+    }
+}

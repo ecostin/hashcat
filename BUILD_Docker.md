@@ -3,19 +3,21 @@
 To build both Linux and Windows binaries in a clean and reproducible environment a dockerfile is available.
 It is not considered to be used as a runtime OS.
 
+Using the Ubuntu 18 docker, two versions of hashcat will be created, one compiled with gcc/mingw and the other with clang.
+
 ### Building ###
 
 ```bash
-docker build -f docker/BinaryPackage.ubuntu20 -t hashcat-binaries .
+docker build -f docker/BinaryPackage.ubuntu18 -t hashcat-binaries .
 ```
 
 This will create a Docker image with all required toolchains and dependencies.
 
-Optionally you can place custom *.patch or *.diff files into `patches/` folder. They will be applied before compiling.
+Optionally you can place custom *.patch or *.diff files into `patches/` folder (`patches/ubuntu18/` in this case). They will be applied before compiling.
 
 ### Output ###
 
-The resulting output package will be located in: `/root/xy/hashcat-<version>.7z`.
+The resulting output package will be located in: `/root/xy/hashcat-<version>-<compiler>.7z`.
 
 You can copy it to your host with this command:
 

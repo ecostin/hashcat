@@ -2683,6 +2683,9 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
   if (bridge_ctx->enabled == true)
   {
     printf ("%" PRIu64 "\t", (u64) (hashcat_status->hashes_msec_all * 1000));
+
+    // that 1000\t is for backward compatibility
+    printf ("1000\t");
   }
   else
   {
@@ -2694,11 +2697,11 @@ void status_display_machine_readable (hashcat_ctx_t *hashcat_ctx)
       if (device_info->skipped_warning_dev == true) continue;
 
       printf ("%" PRIu64 "\t", (u64) (device_info->hashes_msec_dev * 1000));
+
+      // that 1000\t is for backward compatibility
+      printf ("1000\t");
     }
   }
-
-  // that 1000\t is for backward compatibility
-  printf ("1000\t");
 
   printf ("EXEC_RUNTIME\t");
 
@@ -3056,6 +3059,7 @@ void status_display (hashcat_ctx_t *hashcat_ctx)
     "Hash.Target......: %s",
     hashcat_status->hash_target);
 
+  /* why is there a distinction between force and not ?
   if (user_options->force == true)
   {
     event_log_info (hashcat_ctx,
@@ -3085,6 +3089,17 @@ void status_display (hashcat_ctx_t *hashcat_ctx)
     hashcat_status->time_estimated_absolute,
     hashcat_status->time_estimated_relative);
   }
+  */
+
+  event_log_info (hashcat_ctx,
+  "Time.Started.....: %s (%s)",
+  hashcat_status->time_started_absolute,
+  hashcat_status->time_started_relative);
+
+  event_log_info (hashcat_ctx,
+  "Time.Estimated...: %s (%s)",
+  hashcat_status->time_estimated_absolute,
+  hashcat_status->time_estimated_relative);
 
   if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
   {
@@ -3297,6 +3312,34 @@ void status_display (hashcat_ctx_t *hashcat_ctx)
           "Guess.Charset....: %s",
           hashcat_status->guess_charset);
       }
+
+      break;
+
+    case GUESS_MODE_GENERIC:
+
+      event_log_info (hashcat_ctx,
+        "Guess.Base.......: Generic Feed");
+
+      break;
+
+    case GUESS_MODE_GENERIC_RULES_FILE:
+
+      event_log_info (hashcat_ctx,
+        "Guess.Base.......: Generic Feed");
+
+      event_log_info (hashcat_ctx,
+        "Guess.Mod........: Rules (%s)",
+        hashcat_status->guess_mod);
+
+      break;
+
+    case GUESS_MODE_GENERIC_RULES_GEN:
+
+      event_log_info (hashcat_ctx,
+        "Guess.Base.......: Generic Feed");
+
+      event_log_info (hashcat_ctx,
+        "Guess.Mod........: Rules (Generated)");
 
       break;
   }

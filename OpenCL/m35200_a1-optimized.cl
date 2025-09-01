@@ -137,9 +137,9 @@ KERNEL_FQ KERNEL_FA void m35200_m04 (KERN_ATTR_BASIC ())
     const u32x pw_len2 = pw_len * 2;
 
     switch_buffer_by_offset_le_VV (w0, w1, w2, w3, salt_len);
-    
+
     const u32x pw_salt_len = pw_len2 + salt_len;
-    
+
     w0[0] |= salt_buf0[0];
     w0[1] |= salt_buf0[1];
     w0[2] |= salt_buf0[2];

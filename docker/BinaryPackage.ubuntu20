@@ -30,6 +30,7 @@ RUN apt-get update && \
     liblzma-dev tk-dev \
     unzip \
     zstd \
+    curl \
     tar
 
 WORKDIR /root
@@ -59,7 +60,7 @@ RUN cmake \
     . && \
     make install
 
-## Ubuntu 20.04 python version 3.10 is too old, it lacks support for non-GIL mode
+## Ubuntu 20.04: Python version 3.10 is too old, it lacks support for non-GIL mode
 
 WORKDIR /root
 
@@ -75,6 +76,14 @@ RUN ./configure --prefix=/opt/linux-python && \
 
 ENV PATH="/opt/linux-python/bin:$PATH"
 
+## Ubuntu 20.04: Rust is also too old, let's fetch a fresh one
+
+WORKDIR /root
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup target add x86_64-pc-windows-gnu
+
 ## For Windows we also need python
 
 WORKDIR /root
@@ -89,7 +98,7 @@ RUN tar -xf mingw-w64-x86_64-python-3.12.10-1-any.pkg.tar
 
 WORKDIR /root
 
-COPY docker/patches/ /root/patches/
+COPY docker/patches/ubuntu20/ /root/patches/
 
 RUN git clone https://github.com/hashcat/hashcat.git
 

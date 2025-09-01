@@ -44,6 +44,7 @@
 #include "restore.h"
 #include "selftest.h"
 #include "status.h"
+#include "generic.h"
 #include "straight.h"
 #include "tuningdb.h"
 #include "user_options.h"
@@ -798,6 +799,12 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
   if (mask_ctx_init (hashcat_ctx) == -1) return -1;
 
   /**
+   * generic mode init
+   */
+
+  if (generic_ctx_init (hashcat_ctx) == -1) return -1;
+
+  /**
    * prevent the user from using --skip/--limit together with maskfile and/or multiple word lists
    */
 
@@ -900,6 +907,7 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
         hashes_destroy          (hashcat_ctx);
         mask_ctx_destroy        (hashcat_ctx);
         status_progress_destroy (hashcat_ctx);
+        generic_ctx_destroy     (hashcat_ctx);
         straight_ctx_destroy    (hashcat_ctx);
         wl_data_destroy         (hashcat_ctx);
 
@@ -1078,6 +1086,7 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx)
   hashes_destroy          (hashcat_ctx);
   mask_ctx_destroy        (hashcat_ctx);
   status_progress_destroy (hashcat_ctx);
+  generic_ctx_destroy     (hashcat_ctx);
   straight_ctx_destroy    (hashcat_ctx);
   wl_data_destroy         (hashcat_ctx);
 
@@ -1109,6 +1118,7 @@ int hashcat_init (hashcat_ctx_t *hashcat_ctx, void (*event) (const u32, struct h
   hashcat_ctx->dictstat_ctx       = (dictstat_ctx_t *)        hcmalloc (sizeof (dictstat_ctx_t));
   hashcat_ctx->event_ctx          = (event_ctx_t *)           hcmalloc (sizeof (event_ctx_t));
   hashcat_ctx->folder_config      = (folder_config_t *)       hcmalloc (sizeof (folder_config_t));
+  hashcat_ctx->generic_ctx        = (generic_ctx_t *)         hcmalloc (sizeof (generic_ctx_t));
   hashcat_ctx->hashcat_user       = (hashcat_user_t *)        hcmalloc (sizeof (hashcat_user_t));
   hashcat_ctx->hashconfig         = (hashconfig_t *)          hcmalloc (sizeof (hashconfig_t));
   hashcat_ctx->hashes             = (hashes_t *)              hcmalloc (sizeof (hashes_t));
@@ -1145,6 +1155,7 @@ void hashcat_destroy (hashcat_ctx_t *hashcat_ctx)
   hcfree (hashcat_ctx->dictstat_ctx);
   hcfree (hashcat_ctx->event_ctx);
   hcfree (hashcat_ctx->folder_config);
+  hcfree (hashcat_ctx->generic_ctx);
   hcfree (hashcat_ctx->hashcat_user);
   hcfree (hashcat_ctx->hashconfig);
   hcfree (hashcat_ctx->hashes);

@@ -768,6 +768,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
      && (user_options->attack_mode != ATTACK_MODE_BF)
      && (user_options->attack_mode != ATTACK_MODE_HYBRID1)
      && (user_options->attack_mode != ATTACK_MODE_HYBRID2)
+     && (user_options->attack_mode != ATTACK_MODE_GENERIC)
      && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION)
      && (user_options->attack_mode != ATTACK_MODE_NONE))
     {
@@ -971,6 +972,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
+  if ((user_options->increment != INCREMENT_NONE) && (user_options->attack_mode == ATTACK_MODE_GENERIC))
+  {
+    event_log_error (hashcat_ctx, "Increment is not allowed in attack mode 8 (generic).");
+
+    return -1;
+  }
+
   if ((user_options->increment != INCREMENT_NONE) && (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     event_log_error (hashcat_ctx, "Increment is not allowed in attack mode 9 (association).");
@@ -1016,9 +1024,9 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
 
   if ((user_options->rp_files_cnt > 0) || (user_options->rp_gen > 0))
   {
-    if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
+    if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_GENERIC) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
     {
-      event_log_error (hashcat_ctx, "Use of -r/--rules-file and -g/--rules-generate requires attack mode 0 or 9.");
+      event_log_error (hashcat_ctx, "Use of -r/--rules-file and -g/--rules-generate requires attack mode 0, 8 or 9.");
 
       return -1;
     }
@@ -1282,9 +1290,9 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->debug_mode > 0)
   {
-    if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
+    if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_GENERIC) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
     {
-      event_log_error (hashcat_ctx, "Parameter --debug-mode option is only allowed in attack mode 0 (straight).");
+      event_log_error (hashcat_ctx, "Parameter --debug-mode option is only allowed in attack mode 0 (straight), 8 (generic) or 9 (association).");
 
       return -1;
     }
@@ -1505,7 +1513,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
      || (user_options->custom_charset_7 != NULL)
      || (user_options->custom_charset_8 != NULL))
     {
-      if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+      if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_GENERIC) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
       {
         event_log_error (hashcat_ctx, "Custom charsets are not supported in benchmark mode.");
 
@@ -1526,7 +1534,7 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options->markov_threshold != 0) // is 0 by default
   {
-    if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_COMBI) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+    if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_COMBI) || (user_options->attack_mode == ATTACK_MODE_GENERIC) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
     {
       event_log_error (hashcat_ctx, "Option --markov-threshold is not allowed in combination with --attack mode %d", user_options->attack_mode);
 
@@ -1698,6 +1706,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       return -1;
     }
 
+    if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+    {
+      event_log_error (hashcat_ctx, "Custom charsets are not supported in attack mode 8 (generic).");
+
+      return -1;
+    }
+
     if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
     {
       event_log_error (hashcat_ctx, "Custom charsets are not supported in attack mode 9 (association).");
@@ -1850,6 +1865,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
         show_error = false;
       }
     }
+    else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+    {
+      if (user_options->hc_argc == 2)
+      {
+        show_error = false;
+      }
+    }
     else if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
     {
       if (user_options->hc_argc == 1)
@@ -1888,6 +1910,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       }
     }
     else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      if (user_options->hc_argc >= 1)
+      {
+        show_error = false;
+      }
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
     {
       if (user_options->hc_argc >= 1)
       {
@@ -1954,6 +1983,13 @@ int user_options_sanity (hashcat_ctx_t *hashcat_ctx)
       }
     }
     else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
+    {
+      if (user_options->hc_argc >= 2)
+      {
+        show_error = false;
+      }
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
     {
       if (user_options->hc_argc >= 2)
       {
@@ -2208,6 +2244,10 @@ void user_options_preprocess (hashcat_ctx_t *hashcat_ctx)
     else if (user_options->attack_mode == ATTACK_MODE_HYBRID2)
     {
       user_options->kernel_loops = KERNEL_COMBS;
+    }
+    else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+    {
+      user_options->kernel_loops = KERNEL_RULES;
     }
     else if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
     {
@@ -2540,6 +2580,7 @@ void user_options_extra_init (hashcat_ctx_t *hashcat_ctx)
     case ATTACK_MODE_BF:            user_options_extra->attack_kern = ATTACK_KERN_BF;       break;
     case ATTACK_MODE_HYBRID1:       user_options_extra->attack_kern = ATTACK_KERN_COMBI;    break;
     case ATTACK_MODE_HYBRID2:       user_options_extra->attack_kern = ATTACK_KERN_COMBI;    break;
+    case ATTACK_MODE_GENERIC:       user_options_extra->attack_kern = ATTACK_KERN_STRAIGHT; break;
     case ATTACK_MODE_ASSOCIATION:   user_options_extra->attack_kern = ATTACK_KERN_STRAIGHT; break;
   }
 
@@ -2589,7 +2630,14 @@ void user_options_extra_init (hashcat_ctx_t *hashcat_ctx)
 
   if (user_options_extra->attack_kern == ATTACK_KERN_STRAIGHT)
   {
-    user_options_extra->wordlist_mode = (user_options_extra->hc_workc >= 1) ? WL_MODE_FILE : WL_MODE_STDIN;
+    if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+    {
+      user_options_extra->wordlist_mode = WL_MODE_GENERIC;
+    }
+    else
+    {
+      user_options_extra->wordlist_mode = (user_options_extra->hc_workc >= 1) ? WL_MODE_FILE : WL_MODE_STDIN;
+    }
   }
   else if (user_options_extra->attack_kern == ATTACK_KERN_COMBI)
   {
@@ -2769,7 +2817,7 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
 
   // arguments - checks must depend on attack_mode
 
-  if (user_options->attack_mode == ATTACK_MODE_STRAIGHT)
+  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     for (int i = 0; i < user_options_extra->hc_workc; i++)
     {
@@ -3045,18 +3093,33 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
       }
     }
   }
-  else if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+  else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
   {
     for (int i = 0; i < user_options_extra->hc_workc; i++)
     {
-      char *wlfile = user_options_extra->hc_workv[i];
+      char *plugin = user_options_extra->hc_workv[i];
 
-      if (hc_path_exist (wlfile) == false)
+      if (hc_path_exist (plugin) == false)
       {
-        event_log_error (hashcat_ctx, "%s: %s", wlfile, strerror (errno));
+        event_log_error (hashcat_ctx, "%s: %s", plugin, strerror (errno));
 
         return -1;
       }
+
+      if (hc_path_is_directory (plugin) == true)
+      {
+        event_log_error (hashcat_ctx, "%s: A directory cannot be used as a plugin argument.", plugin);
+
+        return -1;
+      }
+
+      if (hc_path_read (plugin) == false)
+      {
+        event_log_error (hashcat_ctx, "%s: %s", plugin, strerror (errno));
+
+        return -1;
+      }
+
     }
 
     for (int i = 0; i < (int) user_options->rp_files_cnt; i++)
@@ -3181,7 +3244,7 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
 
   // check for outfile vs. cached wordlists
 
-  if (user_options->attack_mode == ATTACK_MODE_STRAIGHT)
+  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     for (int i = 0; i < user_options_extra->hc_workc; i++)
     {
@@ -3245,21 +3308,20 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
       }
     }
   }
-  else if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+  else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
   {
     for (int i = 0; i < user_options_extra->hc_workc; i++)
     {
-      char *wlfile = user_options_extra->hc_workv[i];
+      char *plugin = user_options_extra->hc_workv[i];
 
-      if (hc_same_files (outfile_ctx->filename, wlfile) == true)
+      if (hc_same_files (outfile_ctx->filename, plugin) == true)
       {
-        event_log_error (hashcat_ctx, "Outfile and wordlist cannot point to the same file.");
+        event_log_error (hashcat_ctx, "Outfile and plugin cannot point to the same file.");
 
         return -1;
       }
     }
   }
-
   // pidfile
 
   if (hc_path_exist (pidfile_ctx->filename) == true)

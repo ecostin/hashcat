@@ -41,7 +41,7 @@ DECLSPEC void memcat16 (PRIVATE_AS u32 *block0, PRIVATE_AS u32 *block1, PRIVATE_
   tmp2 = hc_bytealign_S (in1, in2, offset);
   tmp3 = hc_bytealign_S (in2, in3, offset);
   tmp4 = hc_bytealign_S (in3,   0, offset);
- 
+
   const u32 div = offset / 4;
 
   switch (div)

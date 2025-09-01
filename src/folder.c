@@ -621,21 +621,27 @@ int hc_mkdir (const char *name, MAYBE_UNUSED const int mode)
 
 int hc_mkdir_rec (const char *path, MAYBE_UNUSED const int mode)
 {
+  if (hc_mkdir (path, mode) == 0) return 0;
+
+  if (errno == EEXIST) return 0;
+
   char *fullpath = hcstrdup (path);
 
   char *subpath = dirname (fullpath);
 
-  if (strlen (subpath) > 1)
+  if (hc_mkdir_rec (subpath, mode) == -1)
   {
-    if (hc_mkdir_rec (subpath, mode) == -1) return -1;
+    hcfree (fullpath);
+
+    return -1;
   }
+
+  hcfree (fullpath);
 
   if (hc_mkdir (path, mode) == -1)
   {
     if (errno != EEXIST) return -1;
   }
-
-  hcfree (fullpath);
 
   return 0;
 }

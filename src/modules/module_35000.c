@@ -86,8 +86,8 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   token.attr[1]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_DIGIT;
 
-  token.len_min[2] = 0;  // todo
-  token.len_max[2] = 200; // todo
+  token.len_min[2] = 0;
+  token.len_max[2] = 344;
   token.attr[2]    = TOKEN_ATTR_VERIFY_LENGTH
                    | TOKEN_ATTR_VERIFY_BASE64A;
 
@@ -115,7 +115,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   const u8 *base64_pos = token.buf[2];
   const int base64_len = token.len[2];
 
-  u8 tmp_buf[200] = { 0 };
+  u8 tmp_buf[512] = { 0 };
 
   const u32 decoded_len = base64_decode (base64_to_int, base64_pos, base64_len, tmp_buf);
 
@@ -125,7 +125,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   const u32 salt_len = decoded_len - 64;
 
-  if (salt_len > 16) return (PARSER_SALT_LENGTH);
+  if (salt_len > 192) return (PARSER_SALT_LENGTH);
 
   memcpy (salt->salt_buf, tmp_buf + 64, salt_len);
 
@@ -162,7 +162,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   tmp[6] = byte_swap_64 (digest[6]);
   tmp[7] = byte_swap_64 (digest[7]);
 
-  char tmp_buf[256];
+  char tmp_buf[512];
 
   memcpy (tmp_buf +  0, tmp, 64);
   memcpy (tmp_buf + 64, salt->salt_buf, salt->salt_len);
@@ -171,7 +171,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   // base64 encode it
 
-  char base64_encoded[256] = { 0 };
+  char base64_encoded[512] = { 0 };
 
   base64_encode (int_to_base64, (const u8 *) tmp_buf, tmp_len, (u8 *) base64_encoded);
 

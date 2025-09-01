@@ -472,6 +472,19 @@ int status_get_guess_mode (const hashcat_ctx_t *hashcat_ctx)
     return GUESS_MODE_HYBRID2;
   }
 
+  if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+  {
+    if (has_rule_file == true)
+    {
+      return GUESS_MODE_GENERIC_RULES_FILE;
+    }
+    if (has_rule_gen == true)
+    {
+      return GUESS_MODE_GENERIC_RULES_GEN;
+    }
+    return GUESS_MODE_GENERIC;
+  }
+
   return GUESS_MODE_NONE;
 }
 
@@ -529,6 +542,12 @@ char *status_get_guess_base (const hashcat_ctx_t *hashcat_ctx)
 
     return strdup (straight_ctx->dict);
   }
+
+  if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+  {
+    // todo ATTACK_MODE_GENERIC probably python source file or so? here we will not have a wordlist!
+  }
+
   return NULL;
 }
 
@@ -575,6 +594,11 @@ int status_get_guess_base_offset (const hashcat_ctx_t *hashcat_ctx)
     const straight_ctx_t *straight_ctx = hashcat_ctx->straight_ctx;
 
     return straight_ctx->dicts_pos + 1;
+  }
+
+  if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+  {
+    return 1;
   }
 
   return 0;
@@ -625,6 +649,11 @@ int status_get_guess_base_count (const hashcat_ctx_t *hashcat_ctx)
     return straight_ctx->dicts_cnt;
   }
 
+  if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+  {
+    return 1;
+  }
+
   return 0;
 }
 
@@ -643,7 +672,7 @@ char *status_get_guess_mod (const hashcat_ctx_t *hashcat_ctx)
   const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
   const user_options_t *user_options = hashcat_ctx->user_options;
 
-  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_GENERIC) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     return status_get_rules_file (hashcat_ctx);
   }
@@ -693,7 +722,7 @@ int status_get_guess_mod_offset (const hashcat_ctx_t *hashcat_ctx)
   const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
   const user_options_t *user_options = hashcat_ctx->user_options;
 
-  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_GENERIC) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     return 1;
   }
@@ -737,7 +766,7 @@ int status_get_guess_mod_count (const hashcat_ctx_t *hashcat_ctx)
   const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
   const user_options_t *user_options = hashcat_ctx->user_options;
 
-  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
+  if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT) || (user_options->attack_mode == ATTACK_MODE_GENERIC) || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION))
   {
     return 1;
   }
@@ -1093,7 +1122,7 @@ time_t status_get_sec_etc (const hashcat_ctx_t *hashcat_ctx)
 
   time_t sec_etc = 0;
 
-  if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK))
+  if ((user_options_extra->wordlist_mode == WL_MODE_FILE) || (user_options_extra->wordlist_mode == WL_MODE_MASK) || (user_options_extra->wordlist_mode == WL_MODE_GENERIC))
   {
     if (status_ctx->devices_status != STATUS_CRACKED)
     {
@@ -1104,7 +1133,7 @@ time_t status_get_sec_etc (const hashcat_ctx_t *hashcat_ctx)
 
       const double hashes_msec_all = status_get_hashes_msec_all (hashcat_ctx);
 
-      if (hashes_msec_all > 0)
+      if ((progress_end_relative_skip) > 0 && (hashes_msec_all > 0))
       {
         const u64 progress_left_relative_skip = progress_end_relative_skip - progress_cur_relative_skip;
 
@@ -1353,6 +1382,8 @@ u64 status_get_progress_ignore (const hashcat_ctx_t *hashcat_ctx)
 
   u64 words_cnt = status_ctx->words_cnt;
 
+  if (words_cnt == -1ULL) words_cnt = 0;
+
   if (user_options->limit)
   {
     const combinator_ctx_t *combinator_ctx = hashcat_ctx->combinator_ctx;
@@ -1401,6 +1432,8 @@ u64 status_get_progress_end (const hashcat_ctx_t *hashcat_ctx)
   const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
 
   u64 progress_end = status_ctx->words_cnt;
+
+  if (progress_end == -1ULL) progress_end = 0;
 
   if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
   {

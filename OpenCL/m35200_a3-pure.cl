@@ -7,10 +7,10 @@
 
 #ifdef KERNEL_STATIC
 #include M2S(INCLUDE_PATH/inc_vendor.h)
-#include M2S(INCLUDE_PATH/inc_types.h) 
+#include M2S(INCLUDE_PATH/inc_types.h)
 #include M2S(INCLUDE_PATH/inc_platform.cl)
-#include M2S(INCLUDE_PATH/inc_common.cl)  
-#include M2S(INCLUDE_PATH/inc_simd.cl)  
+#include M2S(INCLUDE_PATH/inc_common.cl)
+#include M2S(INCLUDE_PATH/inc_simd.cl)
 #include M2S(INCLUDE_PATH/inc_hash_sha1.cl)
 #endif
 

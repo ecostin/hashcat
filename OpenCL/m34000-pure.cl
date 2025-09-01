@@ -142,7 +142,7 @@ KERNEL_FQ KERNEL_FA void m34000_comp (KERN_ATTR_TMPS_ESALT (argon2_tmp_t, merged
     case 3: V = d_extra3_buf; break;
   }
 
-  argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST].argon2_options;
+  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST].argon2_options;
 
   GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, gd4);
 

@@ -5151,11 +5151,6 @@ int backend_ctx_init (hashcat_ctx_t *hashcat_ctx)
 
     if ((rc_cuda_init == -1) && (rc_hip_init == -1) && (rc_ocl_init == -1) && (rc_metal_init == -1))
     {
-      event_log_error (hashcat_ctx, "ATTENTION! No OpenCL, Metal, HIP or CUDA installation found.");
-
-      event_log_warning (hashcat_ctx, "You are probably missing the CUDA, HIP or OpenCL runtime installation.");
-      event_log_warning (hashcat_ctx, NULL);
-
       #if defined (__APPLE__)
       event_log_error (hashcat_ctx, "ATTENTION! No OpenCL, Metal, HIP or CUDA compatible platform found.");
       #else
@@ -14667,7 +14662,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     }
     else
     {
-      if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
+      if ((user_options->attack_mode != ATTACK_MODE_STRAIGHT) && (user_options->attack_mode != ATTACK_MODE_GENERIC) && (user_options->attack_mode != ATTACK_MODE_ASSOCIATION))
       {
         /**
          * kernel mp source filename
@@ -16177,6 +16172,7 @@ int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
     // __local pw_t s_pws[64];
 
     if ((user_options->attack_mode == ATTACK_MODE_STRAIGHT)
+     || (user_options->attack_mode == ATTACK_MODE_GENERIC)
      || (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
      || (user_options->slow_candidates == true))
     {

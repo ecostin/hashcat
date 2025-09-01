@@ -423,10 +423,13 @@ static tuning_db_entry_t *tuning_db_search_real (hashcat_ctx_t *hashcat_ctx, con
 
   hcfree (device_name_nospace2);
 
-  // attack-mode 6 and 7 are attack-mode 1 basically
+  // attack-mode 6 and 7 are attack-kern 1
+  // attack-mode 8 and 9 are attack-kern 0
 
   if (attack_mode == 6) attack_mode = 1;
   if (attack_mode == 7) attack_mode = 1;
+  if (attack_mode == 8) attack_mode = 0;
+  if (attack_mode == 9) attack_mode = 0;
 
   // bsearch is not ideal but fast enough
 

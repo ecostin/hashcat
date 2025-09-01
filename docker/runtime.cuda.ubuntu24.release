@@ -1,6 +1,6 @@
 FROM nvidia/cuda:12.9.1-devel-ubuntu24.04
 
-ENV HASHCAT_VERSION=7.1.1
+ENV HASHCAT_VERSION=7.1.2
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV DEBIAN_FRONTEND=noninteractive
@@ -22,6 +22,11 @@ ENV PYENV_ROOT /root/.pyenv
 ENV PATH $PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 RUN git clone --depth=1 https://github.com/pyenv/pyenv.git .pyenv
 RUN pyenv install 3.13 && pyenv global 3.13
+
+## Install rust
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup target add x86_64-pc-windows-gnu
 
 # Add hashcat
 RUN curl https://hashcat.net/files/hashcat-${HASHCAT_VERSION}.7z -o hashcat-${HASHCAT_VERSION}.7z

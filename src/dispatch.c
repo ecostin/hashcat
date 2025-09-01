@@ -16,6 +16,8 @@
 #include "rp_cpu.h"
 #include "slow_candidates.h"
 #include "dispatch.h"
+#include "generic.h"
+#include "convert.h"
 
 #ifdef WITH_BRAIN
 #include "brain.h"
@@ -418,6 +420,7 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
   combinator_ctx_t     *combinator_ctx     = hashcat_ctx->combinator_ctx;
   backend_ctx_t        *backend_ctx        = hashcat_ctx->backend_ctx;
   status_ctx_t         *status_ctx         = hashcat_ctx->status_ctx;
+  generic_ctx_t        *generic_ctx        = hashcat_ctx->generic_ctx;
 
   const u32 attack_mode = user_options->attack_mode;
   const u32 attack_kern = user_options_extra->attack_kern;
@@ -1285,6 +1288,10 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
         if (words_fin == 0) break;
       }
     }
+    else if (attack_mode == ATTACK_MODE_GENERIC)
+    {
+      // todo: probably not supported, is a slow-candidate mode only
+    }
 
     #ifdef WITH_BRAIN
     if (user_options->brain_client == true)
@@ -1333,6 +1340,220 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
 
           status_ctx->words_cur = get_lowest_words_done (hashcat_ctx);
         }
+      }
+    }
+    else if (attack_mode == ATTACK_MODE_GENERIC)
+    {
+      bool iconv_enabled = false;
+
+      iconv_t iconv_ctx = NULL;
+
+      char *iconv_tmp = NULL;
+
+      if (generic_ctx->iconv_enable == true)
+      {
+        if (strcmp (user_options->encoding_from, user_options->encoding_to) != 0)
+        {
+          iconv_enabled = true;
+
+          iconv_ctx = iconv_open (user_options->encoding_to, user_options->encoding_from);
+
+          if (iconv_ctx == (iconv_t) -1)
+          {
+            event_log_error (hashcat_ctx, "iconv_open: %s", strerror (errno));
+
+            return -1;
+          }
+
+          iconv_tmp = (char *) hcmalloc (HCBUFSIZ_TINY);
+        }
+      }
+
+      int         rule_jk_len = (int) user_options_extra->rule_len_l;
+      const char *rule_jk_buf =       user_options->rule_buf_l;
+
+      const bool rule_engine = generic_ctx->rules_enable && run_rule_engine (rule_jk_len, rule_jk_buf);
+
+      const bool wordlist_autohex = generic_ctx->autohex_enable && user_options->wordlist_autohex;
+
+      const bool mods = iconv_enabled | rule_engine | wordlist_autohex;
+
+      while (status_ctx->run_thread_level1 == true)
+      {
+        u64 words_extra = -1U;      // rejects per loop
+        u64 words_extra_total = 0;  // rejects at the point of execution
+
+        memset (device_param->pws_comp, 0, device_param->size_pws_comp);
+        memset (device_param->pws_idx,  0, device_param->size_pws_idx);
+
+        while (words_extra)
+        {
+          const u64 work_cnt = get_work (hashcat_ctx, device_param, words_extra);
+
+          if (work_cnt == 0) break;
+
+          words_extra = 0;
+
+          if (generic_thread_seek (hashcat_ctx, device_param->device_id, device_param->words_off) == false) break;
+
+          for (u64 work_cur = 0; work_cur < work_cnt; work_cur++)
+          {
+            const u8 *out_buf = NULL;
+
+            const int out_len = generic_thread_next (hashcat_ctx, device_param->device_id, &out_buf);
+
+            if ((out_len == -1) || (out_buf == NULL))
+            {
+              words_extra = 0; // no more data available
+
+              break;
+            }
+
+            pw_idx_t *pw_idx = device_param->pws_idx + device_param->pws_cnt;
+
+            u8 *pw_buf = (u8 *) (device_param->pws_comp + pw_idx->off);
+
+            int pw_len = MIN (out_len, PW_MAX);
+
+            memcpy (pw_buf, out_buf, pw_len);
+
+            if (mods == true)
+            {
+              if (wordlist_autohex == true)
+              {
+                if (is_hexify ((const u8 *) pw_buf, pw_len) == true)
+                {
+                  pw_len = (int) exec_unhexify ((const u8 *) pw_buf, (u32) pw_len, (u8 *) pw_buf, (u32) pw_len);
+                }
+              }
+
+              if (iconv_enabled == true)
+              {
+                char  *iconv_ptr = iconv_tmp;
+                size_t iconv_sz  = HCBUFSIZ_TINY;
+
+                char  *in_pw_buf = (char *) pw_buf;
+                size_t in_pw_len = pw_len;
+
+                if (iconv (iconv_ctx, &in_pw_buf, &in_pw_len, &iconv_ptr, &iconv_sz) == (size_t) -1)
+                {
+                  words_extra_total++;
+
+                  words_extra++;
+
+                  continue;
+                }
+                else
+                {
+                  const size_t iconv_left = HCBUFSIZ_TINY - iconv_sz;
+
+                  if (iconv_left <= PW_MAX)
+                  {
+                    memcpy (pw_buf, iconv_tmp, iconv_left);
+
+                    pw_len = iconv_left;
+                  }
+                  else
+                  {
+                    words_extra_total++;
+
+                    words_extra++;
+
+                    continue;
+                  }
+                }
+              }
+
+              if (rule_engine == true)
+              {
+                char rule_buf_out[RP_PASSWORD_SIZE] = { 0 };
+
+                const int rule_len_out = _old_apply_rule (rule_jk_buf, rule_jk_len, (char *) pw_buf, (int) pw_len, rule_buf_out);
+
+                if (rule_len_out < 0)
+                {
+                  words_extra_total++;
+
+                  words_extra++;
+
+                  continue;
+                }
+
+                memcpy (pw_buf, rule_buf_out, rule_len_out);
+
+                pw_len = rule_len_out;
+              }
+            }
+
+            if ((pw_len < (int) hashconfig->pw_min) || (pw_len > (int) hashconfig->pw_max))
+            {
+              words_extra_total++;
+
+              words_extra++;
+
+              continue;
+            }
+
+            pw_add_zerocopy (device_param, pw_buf, pw_len);
+          }
+
+          if (status_ctx->run_thread_level1 == false) break;
+        }
+
+        if (status_ctx->run_thread_level1 == false) break;
+
+        if (words_extra_total > 0)
+        {
+          hc_thread_mutex_lock (status_ctx->mux_counter);
+
+          for (u32 salt_pos = 0; salt_pos < hashes->salts_cnt; salt_pos++)
+          {
+            status_ctx->words_progress_rejected[salt_pos] += words_extra_total * straight_ctx->kernel_rules_cnt;
+          }
+
+          hc_thread_mutex_unlock (status_ctx->mux_counter);
+        }
+
+        //
+        // flush
+        //
+
+        const u64 pws_cnt = device_param->pws_cnt;
+
+        if (pws_cnt)
+        {
+          if (run_copy (hashcat_ctx, device_param, pws_cnt) == -1)
+          {
+            return -1;
+          }
+
+          if (run_cracker (hashcat_ctx, device_param, device_param->words_off, pws_cnt) == -1)
+          {
+            return -1;
+          }
+
+          device_param->pws_cnt = 0;
+        }
+
+        if (device_param->speed_only_finish == true) break;
+
+        if (status_ctx->run_thread_level2 == true)
+        {
+          device_param->words_done += pws_cnt + words_extra_total;
+
+          status_ctx->words_cur = get_lowest_words_done (hashcat_ctx);
+        }
+
+        if (status_ctx->run_thread_level1 == false) break;
+
+        if (pws_cnt == 0) break;
+      }
+
+      if (iconv_enabled == true)
+      {
+        iconv_close (iconv_ctx);
+
+        hcfree (iconv_tmp);
       }
     }
     else

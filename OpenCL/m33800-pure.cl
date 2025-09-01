@@ -1,6 +1,6 @@
 /**
  * based on 3200
- * 
+ *
  */
 
 #ifdef KERNEL_STATIC
@@ -352,7 +352,7 @@ KERNEL_FQ KERNEL_FA void m33800_init2 (KERN_ATTR_TMPS (bcrypt_tmp_t))
   /**
    * set first bcrypt as input for second bcrypt
    */
-   
+
   //put in the saved beginning and salt of original hash
   w[ 0] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 0];
   w[ 1] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 1];
@@ -362,7 +362,7 @@ KERNEL_FQ KERNEL_FA void m33800_init2 (KERN_ATTR_TMPS (bcrypt_tmp_t))
   w[ 5] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 5];
   w[ 6] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 6];
   //w[ 7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 7]; //here for logic (overwritten in next step)
-  
+
   //now fill in base64; last Byte is zeroed (--> 0x00000F00 not 0x00000FC0)
   w[ 7] = salt_bufs[SALT_POS_HOST].salt_buf_pc[ 7] ^ (c_bcrypt_base64_alphabet[(r0&0xFC000000)>>26] << 8) ^ (c_bcrypt_base64_alphabet[(r0&0x03F00000)>> 20] << 16) ^ (c_bcrypt_base64_alphabet[(r0&0x000FC000)>>14] << 24);
   w[ 8] = c_bcrypt_base64_alphabet[(r0&0x00003F00)>> 8] ^ (c_bcrypt_base64_alphabet[(r0&0x000000FC)>> 2] << 8) ^ (c_bcrypt_base64_alphabet[(r0&0x00000003)<< 4 ^ (r1&0xF0000000)>>28] << 16) ^ (c_bcrypt_base64_alphabet[(r1&0x0FC00000)>>22] << 24);

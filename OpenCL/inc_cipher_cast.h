@@ -31,17 +31,17 @@ typedef struct {
 
 /* CAST uses three different round functions */
 #define CAST_f1(l, r, km, kr) \
-	t = hc_rotl32_S(km + r, kr); \
-	l ^= ((s_S[0][U8a(t)] ^ s_S[1][U8b(t)]) - \
-	 s_S[2][U8c(t)]) + s_S[3][U8d(t)];
+  t = hc_rotl32_S(km + r, kr); \
+  l ^= ((s_S[0][U8a(t)] ^ s_S[1][U8b(t)]) - \
+  s_S[2][U8c(t)]) + s_S[3][U8d(t)];
 #define CAST_f2(l, r, km, kr) \
-	t = hc_rotl32_S(km ^ r, kr); \
-	l ^= ((s_S[0][U8a(t)] - s_S[1][U8b(t)]) + \
-	 s_S[2][U8c(t)]) ^ s_S[3][U8d(t)];
+  t = hc_rotl32_S(km ^ r, kr); \
+  l ^= ((s_S[0][U8a(t)] - s_S[1][U8b(t)]) + \
+  s_S[2][U8c(t)]) ^ s_S[3][U8d(t)];
 #define CAST_f3(l, r, km, kr) \
-	t = hc_rotl32_S(km - r, kr); \
-	l ^= ((s_S[0][U8a(t)] + s_S[1][U8b(t)]) ^ \
-	 s_S[2][U8c(t)]) - s_S[3][U8d(t)];
+  t = hc_rotl32_S(km - r, kr); \
+  l ^= ((s_S[0][U8a(t)] + s_S[1][U8b(t)]) ^ \
+  s_S[2][U8c(t)]) - s_S[3][U8d(t)];
 
 #define CAST_F1(l, r, i, j) CAST_f1(l, r, K[i], K[i+j])
 #define CAST_F2(l, r, i, j) CAST_f2(l, r, K[i], K[i+j])

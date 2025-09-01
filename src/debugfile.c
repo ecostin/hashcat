@@ -102,6 +102,10 @@ void debugfile_write_append (hashcat_ctx_t *hashcat_ctx, const u8 *rule_buf, con
     {
       hc_fprintf (&debugfile_ctx->fp, "<stdin>");
     }
+    else if (user_options_extra->wordlist_mode == WL_MODE_GENERIC)
+    {
+      hc_fprintf (&debugfile_ctx->fp, "<generic>");
+    }
     else
     {
       hc_fprintf (&debugfile_ctx->fp, "<none>");

@@ -3,8 +3,6 @@
  * License.....: MIT
  */
 
-#define NEW_SIMD_CODE
-
 #ifdef KERNEL_STATIC
 #include M2S(INCLUDE_PATH/inc_vendor.h)
 #include M2S(INCLUDE_PATH/inc_types.h)
@@ -113,7 +111,7 @@ typedef struct merged_options
 
 #define MAX_ENTROPY 7.0
 
-KERNEL_FQ void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
+KERNEL_FQ KERNEL_FA void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
 
@@ -132,14 +130,14 @@ KERNEL_FQ void m34100_init (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
     case 3: V = d_extra3_buf; break;
   }
 
-  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
+  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST].argon2_options;
 
   GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, gd4);
 
   argon2_init_gg (&pws[gid], &salt_bufs[SALT_POS_HOST], &argon2_options, argon2_block);
 }
 
-KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
+KERNEL_FQ KERNEL_FA void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
   const u64 bid = get_group_id (0);
@@ -210,7 +208,7 @@ KERNEL_FQ void m34100_loop (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
   }
 }
 
-KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
+KERNEL_FQ KERNEL_FA void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
 {
   const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
@@ -282,7 +280,7 @@ KERNEL_FQ void m34100_comp (KERN_ATTR_TMPS_ESALT (luks_tmp_t, merged_options_t))
     case 3: V = d_extra3_buf; break;
   }
 
-  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
+  const argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST].argon2_options;
 
   GLOBAL_AS argon2_block_t *argon2_block = get_argon2_block (&argon2_options, V, gd4);
 

@@ -1,5 +1,5 @@
 #!/bin/bash python3
-
+import pickle
 import sys
 import struct
 import hashlib
@@ -36,50 +36,22 @@ def kernel_loop(ctx,passwords,salt_id,is_selftest):
   return hcmp.handle_queue(ctx,passwords,salt_id,is_selftest)
 
 def init(ctx):
-  # hcshared.dump_hashcat_ctx(ctx) #enable this to dump the ctx from hashcat
+  # Uncomment this line below to dump the hashcat ctx for your salted hash
+  # hcshared.dump_hashcat_ctx(ctx, source=__name__)
   hcmp.init(ctx,extract_esalts)
 
 def term(ctx):
   hcmp.term(ctx)
 
-# This code is only intended to enable debugging via a standalone Python interpreter.
-# It makes development easier as you don't have to use a hashcat to test your changes.
-# Read passwords from stdin
+
 if __name__ == '__main__':
-  # we've been called by Python (debugger) directly
-  # this codepath is never called by hashcat
+  # Main is only run when debugging this python script and never when -m 73000 is called directly from hashcat cli
 
   hcshared.add_hashcat_path_to_environment()
-
-  # the default example is a salted hash, we've dumped hashcat's ctx and added it here
-  #  to dump the ctx of a different hashlist enable dump_hashcat_ctx() in init()
-  ctx = {
-    'module_name': 'generic_hash_mp',
-    'parallelism': 22,
-    'salts_cnt': 1,
-    'salts_size': 572,
-    'salts_buf': bytes.fromhex("08af3c0600c75956bf9dd7715591c593") + b"\x00"*496 + bytes.fromhex("100000000000000001") + b"\x00"*27 + bytes.fromhex("01") + b"\x00"*23,
-    'esalts_cnt': 1,
-    'esalts_size': 2056,
-    'esalts_buf': bytes.fromhex("33333532326230666439383132616136383538366636366462613763313761386365363433343431333766396337643862313166333261363932316332326465") + b"\x00"*960 + bytes.fromhex("4000000039333438373436373830363033333433") + b"\x00"*1008 + bytes.fromhex("10000000"),
-    'st_salts_cnt': 1,
-    'st_salts_size': 572,
-    'st_salts_buf': bytes.fromhex("08af3c0600c75956bf9dd7715591c593") + b"\x00"*496 + bytes.fromhex("100000000000000001") + b"\x00"*51,
-    'st_esalts_cnt': 1,
-    'st_esalts_size': 2056,
-    'st_esalts_buf': bytes.fromhex("33333532326230666439383132616136383538366636366462613763313761386365363433343431333766396337643862313166333261363932316332326465") + b"\x00"*960 + bytes.fromhex("4000000039333438373436373830363033333433") + b"\x00"*1008 + bytes.fromhex("10000000")
-  }
-
-  # when no salt is used you can use an empty ctx
-  # ctx = {
-  #   "salts_buf": bytes(572),
-  #   "esalts_buf": bytes(2056),
-  #   "st_salts_buf": bytes(572),
-  #   "st_esalts_buf": bytes(2056),
-  #   "parallelism": 4
-  # }
-
+  # Load hashcat ctx from a file dumped when running -m 73000 . Optional argument is a Path() object to ctx file.
+  ctx = hcshared.load_ctx(ST_HASH)
   init(ctx)
+
   hashcat_passwords = 256
   passwords = []
   for line in sys.stdin:

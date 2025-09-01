@@ -592,6 +592,10 @@ u32 brain_compute_attack (hashcat_ctx_t *hashcat_ctx)
       XXH64_update (state, rule_buf_r, strlen (rule_buf_r));
     }
   }
+  else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
+  {
+    // todo: ATTACK_MODE_GENERIC brain compute attack
+  }
   else if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
   {
     if (straight_ctx->dict)

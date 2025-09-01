@@ -190,7 +190,7 @@ KERNEL_FQ KERNEL_FA void m34300_loop (KERN_ATTR_TMPS_ESALT (argon2_tmp_t, merged
     case 3: V = d_extra3_buf; break;
   }
 
-  argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST].argon2_options;
+  argon2_options_t argon2_options = esalt_bufs[DIGESTS_OFFSET_HOST_BID].argon2_options;
 
   #ifdef IS_APPLE
   // it doesn't work on Apple, so we won't set it up

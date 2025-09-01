@@ -6,7 +6,7 @@ import argparse
 
 def extract_hashes_from_pcl(file_path):
     shiro_pattern = re.compile(br'\$shiro1\$SHA-512\$(\d+)\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+')
-    
+
     try:
         with open(file_path, 'rb') as f:
             data = f.read()
@@ -18,7 +18,7 @@ def extract_hashes_from_pcl(file_path):
             full_match = match.group(0).decode()
             print(f'[+] Found Shiro 1 hash: {full_match}')
             extracted_hashes.append(full_match)
-            
+
         if not extracted_hashes:
             print(f"No Shiro 1 hashes found in {file_path}")
             return None

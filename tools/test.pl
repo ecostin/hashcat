@@ -8,11 +8,22 @@
 use strict;
 use warnings;
 
-use Data::Types qw (is_count is_whole);
 use File::Basename;
 use FindBin;
 use List::Util 'shuffle';
-use Digest::MD4 qw (md4_hex);
+
+my $TYPES = [ 'edge', 'single', 'passthrough', 'potthrough', 'verify' ];
+
+my $TYPE = shift @ARGV;
+my $MODE = shift @ARGV;
+
+is_in_array ($TYPE, $TYPES) or usage_exit ();
+
+eval {
+    require Data::Types;  Data::Types->import(qw(is_count is_whole));
+    require Digest::MD4;  Digest::MD4->import('md4_hex');
+    1;
+} or die "Missing Perl modules, read: docs/hashcat-plugin-development-guide.md (search test.pl), and run: ./tools/install_modules.sh\n";
 
 # allows require by filename
 use lib "$FindBin::Bin/test_modules";
@@ -23,13 +34,6 @@ if (exists $ENV{"IS_OPTIMIZED"} && defined $ENV{"IS_OPTIMIZED"})
 {
   $IS_OPTIMIZED = $ENV{"IS_OPTIMIZED"};
 }
-
-my $TYPES = [ 'edge', 'single', 'passthrough', 'potthrough', 'verify' ];
-
-my $TYPE = shift @ARGV;
-my $MODE = shift @ARGV;
-
-is_in_array ($TYPE, $TYPES) or usage_exit ();
 
 is_whole ($MODE) or die "Mode must be a number\n";
 

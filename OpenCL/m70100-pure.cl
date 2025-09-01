@@ -42,10 +42,10 @@ KERNEL_FQ KERNEL_FA void m70100_init (KERN_ATTR_TMPS (scrypt_tmp_t))
 
   sha256_hmac_update_global_swap (&sha256_hmac_ctx, salt_bufs[SALT_POS_HOST].salt_buf, salt_bufs[SALT_POS_HOST].salt_len);
 
-	u32 r = salt_bufs[SALT_POS_HOST].scrypt_r;
-	u32 p = salt_bufs[SALT_POS_HOST].scrypt_p;
+  u32 r = salt_bufs[SALT_POS_HOST].scrypt_r;
+  u32 p = salt_bufs[SALT_POS_HOST].scrypt_p;
 
-	u32 chunk_bytes = 64 * r * 2;
+  u32 chunk_bytes = 64 * r * 2;
 
   u32 x_bytes = chunk_bytes * p;
 
@@ -129,10 +129,10 @@ KERNEL_FQ KERNEL_FA void m70100_comp (KERN_ATTR_TMPS (scrypt_tmp_t))
 
   sha256_hmac_init_global_swap (&ctx, pws[gid].i, pws[gid].pw_len);
 
-	u32 r = salt_bufs[SALT_POS_HOST].scrypt_r;
-	u32 p = salt_bufs[SALT_POS_HOST].scrypt_p;
+  u32 r = salt_bufs[SALT_POS_HOST].scrypt_r;
+  u32 p = salt_bufs[SALT_POS_HOST].scrypt_p;
 
-	u32 chunk_bytes = 64 * r * 2;
+  u32 chunk_bytes = 64 * r * 2;
 
   u32 x_bytes = chunk_bytes * p;
 

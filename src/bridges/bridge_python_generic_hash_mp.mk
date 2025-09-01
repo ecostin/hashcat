@@ -57,7 +57,7 @@ ifeq ($(REPORT_MISSING_DLL),true)
 bridges/bridge_python_generic_hash_mp.dll:
 	@echo ""
 	@echo "$(RED)WARNING$(RESET): Skipping regular plugin 70300: Python Windows headers not found."
-	@echo "         To use -m 70300, you must install the required Python headers."
+	@echo "         To use -m 73000, you must install the required Python headers."
 	@echo "         Otherwise, you can safely ignore this warning."
 	@echo "         See BUILD_WSL.md how to prepare $(WIN_PYTHON)."
 	@echo ""
@@ -67,7 +67,7 @@ ifeq ($(REPORT_MISSING_SO),true)
 bridges/bridge_python_generic_hash_mp.so:
 	@echo ""
 	@echo "$(RED)WARNING$(RESET): Skipping regular plugin 70300: Python headers not found."
-	@echo "         To use -m 70300, you must install the required Python headers."
+	@echo "         To use -m 73000, you must install the required Python headers."
 	@echo "         Otherwise, you can safely ignore this warning."
 	@echo "         For more information, see 'docs/hashcat-python-plugin-requirements.md'."
 	@echo ""

@@ -82,6 +82,8 @@ PY
 };
   };
 
+  $digest =~ s/[\r\n]//g;
+
   return $digest;
 }
 

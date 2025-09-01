@@ -280,7 +280,7 @@ KERNEL_FQ KERNEL_FA void m35200_s04 (KERN_ATTR_RULES ())
   salt_buf3[3] = salt_bufs[SALT_POS_HOST].salt_buf_pc[15];
 
   const u32 salt_len = salt_bufs[SALT_POS_HOST].salt_len_pc * 2;
-  
+
   make_utf16be (salt_buf1, salt_buf2, salt_buf3);
   make_utf16be (salt_buf0, salt_buf0, salt_buf1);
 

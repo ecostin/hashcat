@@ -7,7 +7,7 @@
            |_____|     /___________/     |_____|  /_____/        /_______|
                  :                             :                         :
 
-hashcat v7.1.1
+hashcat v7.1.2
 ==============
 
 AMD GPUs on Linux require "AMD Radeon Software for Linux" with "ROCm"
@@ -325,6 +325,7 @@ NVIDIA GPUs require "NVIDIA CUDA Toolkit"
 - Radmin3
 - Dahua Authentication MD5
 - RedHat 389-DS LDAP (PBKDF2-HMAC-SHA256)
+- Besder Authentication MD5
 - FileZilla Server >= 0.9.55
 - ColdFusion 10+
 - Apache $apr1$ MD5, md5apr1, MD5 (APR)

@@ -5,8 +5,8 @@
 
 SHARED                  ?= 0
 DEBUG                   := 0
-PRODUCTION              := 1
-PRODUCTION_VERSION      := v7.1.1
+PRODUCTION              := 0
+PRODUCTION_VERSION      := v7.1.2
 ENABLE_CUBIN            ?= 1
 ENABLE_BRAIN            ?= 1
 ENABLE_UNRAR            ?= 1
@@ -44,7 +44,7 @@ endif
 
 BUILD_MODE := native
 
-ifneq ($(filter binaries linux host_linux modules_linux bridges_linux win host_win modules_win bridges_win,$(MAKECMDGOALS)),)
+ifneq ($(filter binaries linux host_linux modules_linux bridges_linux feeds_linux win host_win modules_win bridges_win feeds_win,$(MAKECMDGOALS)),)
   BUILD_MODE := cross
 endif
 
@@ -64,6 +64,7 @@ endif
 
 MODULE_INTERFACE_VERSION := 700
 BRIDGE_INTERFACE_VERSION := 700
+FEEDS_INTERFACE_VERSION  := 713
 
 ##
 ## Native compiler paths
@@ -201,6 +202,14 @@ COMPTIME                := $(shell date +%s)
 ##
 
 LFLAGS                  := $(LDFLAGS)
+
+ifneq ($(UNAME),Darwin)
+ifeq ($(MAINTAINER_MODE),0)
+ifeq ($(BUILD_MODE),native)
+CFLAGS                  += -march=native
+endif
+endif
+endif
 
 ifeq ($(PRODUCTION),0)
 CFLAGS                  += -W
@@ -468,7 +477,7 @@ EMU_OBJS_ALL            += emu_inc_hash_md4 emu_inc_hash_md5 emu_inc_hash_ripemd
 EMU_OBJS_ALL            += emu_inc_cipher_aes emu_inc_cipher_camellia emu_inc_cipher_des emu_inc_cipher_kuznyechik emu_inc_cipher_serpent emu_inc_cipher_twofish
 EMU_OBJS_ALL            += emu_inc_hash_base58
 
-OBJS_ALL                := affinity autotune backend benchmark bitmap bitops bridges combinator common convert cpt cpu_crc32 debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_hip ext_nvapi ext_nvml ext_nvrtc ext_hiprtc ext_OpenCL ext_sysfs_amdgpu ext_sysfs_intelgpu ext_sysfs_cpu ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
+OBJS_ALL                := affinity autotune backend benchmark bitmap bitops bridges combinator common convert cpt cpu_crc32 cpu_features debugfile dictstat dispatch dynloader event ext_ADL ext_cuda ext_hip ext_nvapi ext_nvml ext_nvrtc ext_hiprtc ext_OpenCL ext_sysfs_amdgpu ext_sysfs_intelgpu ext_sysfs_cpu ext_lzma filehandling folder hashcat hashes hlfmt hwmon induct interface keyboard_layout locking logfile loopback memory monitor mpsp outfile_check outfile pidfile potfile restore rp rp_cpu selftest slow_candidates shared status stdout straight generic terminal thread timer tuningdb usage user_options wordlist $(EMU_OBJS_ALL)
 
 ifeq ($(ENABLE_BRAIN),1)
 OBJS_ALL                += brain
@@ -532,7 +541,7 @@ TOOLS                   += $(wildcard tools/*hashcat.py)
 ##
 
 .PHONY: default
-default: $(HASHCAT_FRONTEND) modules bridges
+default: $(HASHCAT_FRONTEND) modules bridges feeds
 
 .PHONY: clean
 clean:
@@ -540,10 +549,15 @@ clean:
 	$(RM) -f $(HASHCAT_LIBRARY)
 	$(RM) -rf modules/*.dSYM
 	$(RM) -rf bridges/*.dSYM
+	$(RM) -rf feeds/*.dSYM
 	$(RM) -f modules/*.dll
-	$(RM) -f modules/*.so
 	$(RM) -f bridges/*.dll
+	$(RM) -f bridges/subs/*.dll
+	$(RM) -f feeds/*.dll
+	$(RM) -f modules/*.so
 	$(RM) -f bridges/*.so
+	$(RM) -f bridges/subs/*.so
+	$(RM) -f feeds/*.so
 	$(RM) -f obj/*/*/*.o
 	$(RM) -f obj/*/*.o
 	$(RM) -f obj/*.o
@@ -557,6 +571,8 @@ clean:
 	$(RM) -rf *.induct
 	$(RM) -rf *.outfiles
 	$(RM) -rf kernels
+	$(RM) -rf Rust/bridges/*/target
+	$(RM) -rf Rust/feeds/*/target
 
 .PHONY: distclean
 distclean: clean
@@ -587,9 +603,9 @@ endif
 
 .PHONY: install
 ifeq ($(SHARED),1)
-install: install_docs install_shared install_tools install_library install_library_dev install_tunings install_kernels install_modules install_bridges install_hashcat
+install: install_docs install_shared install_tools install_library install_library_dev install_tunings install_kernels install_modules install_bridges install_feeds install_hashcat
 else
-install: install_docs install_shared install_tools                                     install_tunings install_kernels install_modules install_bridges install_hashcat
+install: install_docs install_shared install_tools                                     install_tunings install_kernels install_modules install_bridges install_feeds install_hashcat
 endif
 
 # we need this extra target to make sure that for parallel builds (i.e. 2+ Makefile targets could possible run at the same time)
@@ -665,6 +681,12 @@ install_bridges: install_shared bridges
 	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(SHARED_FOLDER)/bridges
 	$(FIND) bridges/  -mindepth 1 -type d -execdir $(INSTALL) -m 755 -d     $(DESTDIR)$(SHARED_FOLDER)/bridges/{} \;
 	$(FIND) bridges/  -mindepth 1 -type f -execdir $(INSTALL) -m 644 {}     $(DESTDIR)$(SHARED_FOLDER)/bridges/{} \;
+
+.PHONY: install_feeds
+install_feeds: install_shared feeds
+	$(INSTALL) -m 755 -d                                                    $(DESTDIR)$(SHARED_FOLDER)/feeds
+	$(FIND) feeds/    -mindepth 1 -type d -execdir $(INSTALL) -m 755 -d     $(DESTDIR)$(SHARED_FOLDER)/feeds/{} \;
+	$(FIND) feeds/    -mindepth 1 -type f -execdir $(INSTALL) -m 644 {}     $(DESTDIR)$(SHARED_FOLDER)/feeds/{} \;
 
 .PHONY: install_library
 install_library: $(HASHCAT_LIBRARY)
@@ -830,6 +852,40 @@ BRIDGES_LIB   := $(patsubst src/bridges/bridge_%.c, bridges/bridge_%.$(BRIDGE_SU
 bridges: $(BRIDGES_LIB)
 
 ##
+## native compiled feeds
+##
+
+FEEDS_SUFFIX := so
+
+ifeq ($(UNAME),CYGWIN)
+FEEDS_SUFFIX := dll
+endif
+
+ifeq ($(UNAME),MSYS2)
+FEEDS_SUFFIX := dll
+endif
+
+FEEDS_SRC := $(wildcard src/feeds/*.c)
+
+## not used so far, see modules above
+FEEDS_DISABLE ?=
+
+$(FEEDS_DISABLE): ;
+
+ifeq ($(SHARED),1)
+feeds/feed_%.$(FEEDS_SUFFIX): src/feeds/feed_%.c $(HASHCAT_LIBRARY)
+	$(CC)    $(CCFLAGS) $(CFLAGS_NATIVE) $^ -o $@ $(LFLAGS_NATIVE) -shared -fPIC -D FEEDS_INTERFACE_VERSION_CURRENT=$(FEEDS_INTERFACE_VERSION)
+else
+feeds/feed_%.$(FEEDS_SUFFIX): src/feeds/feed_%.c obj/combined.NATIVE.a
+	$(CC)    $(CCFLAGS) $(CFLAGS_NATIVE) $^ -o $@ $(LFLAGS_NATIVE) -shared -fPIC -D FEEDS_INTERFACE_VERSION_CURRENT=$(FEEDS_INTERFACE_VERSION)
+endif
+
+FEEDS_LIB := $(patsubst src/feeds/feed_%.c, feeds/feed_%.$(FEEDS_SUFFIX), $(FEEDS_SRC))
+
+.PHONY: feeds
+feeds: $(FEEDS_LIB)
+
+##
 ## Cross Compilation (binary release version)
 ##
 
@@ -905,7 +961,7 @@ binaries: win
 host_win:   hashcat.exe
 
 .PHONY: win
-win:   host_win   modules_win   bridges_win
+win:   host_win   modules_win   bridges_win   feeds_win
 else
 .PHONY: binaries
 binaries: linux win
@@ -915,8 +971,8 @@ host_linux: hashcat.bin
 host_win:   hashcat.exe
 
 .PHONY: linux win
-linux: host_linux modules_linux bridges_linux
-win:   host_win   modules_win   bridges_win
+linux: host_linux modules_linux bridges_linux feeds_linux
+win:   host_win   modules_win   bridges_win   feeds_win
 endif
 
 ##
@@ -952,6 +1008,23 @@ bridges/bridge_%.so:  src/bridges/bridge_%.c obj/combined.LINUX.a
 
 bridges/bridge_%.dll: src/bridges/bridge_%.c obj/combined.WIN.a
 	$(CC_WIN)    $(CCFLAGS) $(CFLAGS_CROSS_WIN)   $^ -o $@ $(LFLAGS_CROSS_WIN)   -shared -fPIC -D BRIDGE_INTERFACE_VERSION_CURRENT=$(BRIDGE_INTERFACE_VERSION)
+
+##
+## cross compiled feeds
+##
+
+FEEDS_LIB_LINUX   := $(patsubst src/feeds/feed_%.c, feeds/feed_%.so,  $(FEEDS_SRC))
+FEEDS_LIB_WIN     := $(patsubst src/feeds/feed_%.c, feeds/feed_%.dll, $(FEEDS_SRC))
+
+.PHONY: feeds_linux feeds_win
+feeds_linux: $(FEEDS_LIB_LINUX)
+feeds_win:   $(FEEDS_LIB_WIN)
+
+feeds/feed_%.so:  src/feeds/feed_%.c obj/combined.LINUX.a
+	$(CC_LINUX)  $(CCFLAGS) $(CFLAGS_CROSS_LINUX) $^ -o $@ $(LFLAGS_CROSS_LINUX) -shared -fPIC -D FEEDS_INTERFACE_VERSION_CURRENT=$(FEEDS_INTERFACE_VERSION)
+
+feeds/feed_%.dll: src/feeds/feed_%.c obj/combined.WIN.a
+	$(CC_WIN)    $(CCFLAGS) $(CFLAGS_CROSS_WIN)   $^ -o $@ $(LFLAGS_CROSS_WIN)   -shared -fPIC -D FEEDS_INTERFACE_VERSION_CURRENT=$(FEEDS_INTERFACE_VERSION)
 
 ##
 ## cross compiled hashcat
@@ -1016,8 +1089,7 @@ hashcat.dll: src/main.c obj/combined.WIN.a $(WIN_ICONV)/lib/libiconv.a
 
 endif
 
-# Give plugin developers a chance to add some 3rd party libraries
-include	$(wildcard src/modules/module_*.mk)
-
-# Give plugin developers a chance to add some 3rd party libraries
-include $(wildcard src/bridges/bridge_*.mk)
+# Give developers a chance to add some 3rd party dependancies
+include	$(wildcard src/modules/*.mk)
+include $(wildcard src/bridges/*.mk)
+include $(wildcard src/feeds/*.mk)

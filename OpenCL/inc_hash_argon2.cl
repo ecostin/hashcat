@@ -20,16 +20,16 @@ DECLSPEC void argon2_initial_block (PRIVATE_AS const u32 *in, const u32 lane, co
 
   blake2b_init (&ctx);
 
-  ctx.m[0] = hl32_to_64 (in[ 0],   sizeof(argon2_block_t));
-  ctx.m[1] = hl32_to_64 (in[ 2],   in[ 1]);
-  ctx.m[2] = hl32_to_64 (in[ 4],   in[ 3]);
-  ctx.m[3] = hl32_to_64 (in[ 6],   in[ 5]);
-  ctx.m[4] = hl32_to_64 (in[ 8],   in[ 7]);
-  ctx.m[5] = hl32_to_64 (in[10],   in[ 9]);
-  ctx.m[6] = hl32_to_64 (in[12],   in[11]);
-  ctx.m[7] = hl32_to_64 (in[14],   in[13]);
-  ctx.m[8] = hl32_to_64 (blocknum, in[15]);
-  ctx.m[9] = hl32_to_64 (0,        lane);
+  ctx.m[0] = hl32_to_64_S (in[ 0],   sizeof(argon2_block_t));
+  ctx.m[1] = hl32_to_64_S (in[ 2],   in[ 1]);
+  ctx.m[2] = hl32_to_64_S (in[ 4],   in[ 3]);
+  ctx.m[3] = hl32_to_64_S (in[ 6],   in[ 5]);
+  ctx.m[4] = hl32_to_64_S (in[ 8],   in[ 7]);
+  ctx.m[5] = hl32_to_64_S (in[10],   in[ 9]);
+  ctx.m[6] = hl32_to_64_S (in[12],   in[11]);
+  ctx.m[7] = hl32_to_64_S (in[14],   in[13]);
+  ctx.m[8] = hl32_to_64_S (blocknum, in[15]);
+  ctx.m[9] = hl32_to_64_S (0,        lane);
 
   blake2b_transform (ctx.h, ctx.m, 76, (u64) BLAKE2B_FINAL);
 
@@ -79,10 +79,12 @@ DECLSPEC void blake2b_update_8 (PRIVATE_AS blake2b_ctx_t *ctx, const u32 w0, con
     if (ctx->len > 0) // if new block (pos == 0) AND the (old) len is not zero => transform
     {
       blake2b_transform (ctx->h, ctx->m, ctx->len, BLAKE2B_UPDATE);
+
+      for (u32 i = 0; i < 16; i++) ctx->m[i] = 0;
     }
   }
 
-  const u64 m  = hl32_to_64 (w1, w0);
+  const u64 m  = hl32_to_64_S (w1, w0);
   const u32 s  = (pos & 7) * 8;
   const u64 m0 = (m << s);
   const u64 m1 = (m >> 8) >> (56 - s);
@@ -125,9 +127,9 @@ DECLSPEC void argon2_initial_hash (PRIVATE_AS const u32 *pw_buf, const int pw_le
   blake2b_ctx_t ctx;
   blake2b_init (&ctx);
 
-  ctx.m[0] = hl32_to_64 (options->digest_len, options->parallelism);
-  ctx.m[1] = hl32_to_64 (options->iterations, options->memory_usage_in_kib);
-  ctx.m[2] = hl32_to_64 (options->type,       options->version);
+  ctx.m[0] = hl32_to_64_S (options->digest_len, options->parallelism);
+  ctx.m[1] = hl32_to_64_S (options->iterations, options->memory_usage_in_kib);
+  ctx.m[2] = hl32_to_64_S (options->type,       options->version);
   ctx.len  = 24;
 
   blake2b_update_8 (&ctx, pw_len, 0, 4);
@@ -474,7 +476,7 @@ DECLSPEC void argon2_final (GLOBAL_AS argon2_block_t *blocks, PRIVATE_AS const a
     {
       const u64 value = ctx.m[idx];
 
-      ctx.m[idx] = hl32_to_64 (l32_from_64_S (value), rem);
+      ctx.m[idx] = hl32_to_64_S (l32_from_64_S (value), rem);
 
       rem = h32_from_64_S (value);
     }
@@ -486,7 +488,7 @@ DECLSPEC void argon2_final (GLOBAL_AS argon2_block_t *blocks, PRIVATE_AS const a
     for (u32 idx = 0; idx < 16; idx++) ctx.m[idx] = 0;
   }
 
-  ctx.m[0] = hl32_to_64 (0, rem);
+  ctx.m[0] = hl32_to_64_S (0, rem);
 
   blake2b_transform (ctx.h, ctx.m, 1028, (u64) BLAKE2B_FINAL);
 

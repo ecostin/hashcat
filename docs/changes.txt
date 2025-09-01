@@ -1,3 +1,33 @@
+* changes v7.1.2 -> v7.1.x
+
+* changes v7.1.1 -> v7.1.2
+
+##
+## New Algorithms
+##
+
+- Added hash-mode: Generic Hash [Bridged: Rust] with the new Rust Bridge
+- Added hash-mode: Besder Authentication MD5
+
+##
+## Improvements
+##
+
+- CRC Libraries: CRC restructure
+- GOST Libraries: GOST R 34.11-94 restructure
+- SAP CODVN H: Raised the maximum salt length for hash-mode 35000 (isSHA512) from 16 to 192
+
+##
+## Bugs
+##
+
+- Argon2 Libraries: fixed call to vector helper functions when only using scalar buffers
+- Argon2 Libraries: fixed esalt access pattern across Argon2, LUKS2, and KeePass KDBX4 kernels
+- Argon2 Libraries: fixed false negatives for password and salt combinations longer than 64 characters
+- Folders: fixed hc_mkdir_rec(), which was not creating directories correctly
+- Status View: fixed broken backward compatibility in machine-readable mode introduced in v7.1.0
+- sha224(sha224($pass)) and sha224(sha1($pass)): Fix hash category as unsalted
+
 * changes v7.1.0 -> v7.1.1
 
 ##
@@ -5,6 +35,7 @@
 ##
 
 Docker: Add initial support for AMD GPUs when running Hashcat inside Docker using HIP and OpenCL
+Docker: Add Ubuntu18 docker which produces one version compiled with gcc/mingw and the other with clang
 Hardware Monitor: Suppress fan speed warnings for unified memory setups (typically internal GPUs)
 Testing Framework: Enable hardware monitor to improve testing of memory-heavy algorithms
 Unit tests: Updated install_modules.sh to use an external module for Digest::MD6

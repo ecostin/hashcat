@@ -116,6 +116,7 @@ typedef enum event_identifier
   EVENT_BRIDGES_SALT_PRE          = 0x00000123,
   EVENT_CALCULATED_WORDS_BASE     = 0x00000020,
   EVENT_CALCULATED_WORDS_CNT      = 0x00000021,
+  EVENT_CLEAR_EVENT_LINE          = 0x00001000,
   EVENT_CRACKER_FINISHED          = 0x00000030,
   EVENT_CRACKER_HASH_CRACKED      = 0x00000031,
   EVENT_CRACKER_STARTING          = 0x00000032,
@@ -246,10 +247,11 @@ typedef enum rc_final
 
 typedef enum wl_mode
 {
-  WL_MODE_NONE  = 0,
-  WL_MODE_STDIN = 1,
-  WL_MODE_FILE  = 2,
-  WL_MODE_MASK  = 3
+  WL_MODE_NONE    = 0,
+  WL_MODE_STDIN   = 1,
+  WL_MODE_FILE    = 2,
+  WL_MODE_MASK    = 3,
+  WL_MODE_GENERIC = 4,
 
 } wl_mode_t;
 
@@ -263,16 +265,17 @@ typedef enum hl_mode
 
 typedef enum attack_mode
 {
-  ATTACK_MODE_STRAIGHT  = 0,
-  ATTACK_MODE_COMBI     = 1,
-  ATTACK_MODE_TOGGLE    = 2,
-  ATTACK_MODE_BF        = 3,
-  ATTACK_MODE_PERM      = 4,
-  ATTACK_MODE_TABLE     = 5,
-  ATTACK_MODE_HYBRID1   = 6,
-  ATTACK_MODE_HYBRID2   = 7,
-  ATTACK_MODE_ASSOCIATION   = 9,
-  ATTACK_MODE_NONE      = 100
+  ATTACK_MODE_STRAIGHT    = 0,
+  ATTACK_MODE_COMBI       = 1,
+  ATTACK_MODE_TOGGLE      = 2,
+  ATTACK_MODE_BF          = 3,
+  ATTACK_MODE_PERM        = 4,
+  ATTACK_MODE_TABLE       = 5,
+  ATTACK_MODE_HYBRID1     = 6,
+  ATTACK_MODE_HYBRID2     = 7,
+  ATTACK_MODE_GENERIC     = 8,
+  ATTACK_MODE_ASSOCIATION = 9,
+  ATTACK_MODE_NONE        = 100
 
 } attack_mode_t;
 
@@ -673,6 +676,9 @@ typedef enum guess_mode
   GUESS_MODE_HYBRID1_CS                 = 12,
   GUESS_MODE_HYBRID2                    = 13,
   GUESS_MODE_HYBRID2_CS                 = 14,
+  GUESS_MODE_GENERIC                    = 15,
+  GUESS_MODE_GENERIC_RULES_FILE         = 16,
+  GUESS_MODE_GENERIC_RULES_GEN          = 17,
 
 } guess_mode_t;
 
@@ -2746,6 +2752,64 @@ typedef struct mask_ctx
 
 } mask_ctx_t;
 
+typedef struct generic_global_ctx
+{
+  bool   quiet;
+
+  int    workc;
+  char **workv;
+
+  char  *profile_dir;
+  char  *cache_dir;
+
+  bool   error;
+  char   error_msg[256];
+
+  void  *gbldata; // super generic
+
+} generic_global_ctx_t;
+
+typedef struct generic_thread_ctx
+{
+  void  *thrdata; // super generic
+
+} generic_thread_ctx_t;
+
+typedef bool (*GENERIC_GLOBAL_INIT)     (generic_global_ctx_t *, generic_thread_ctx_t *, void *hashcat_ctx);
+typedef void (*GENERIC_GLOBAL_TERM)     (generic_global_ctx_t *, generic_thread_ctx_t *, void *hashcat_ctx);
+typedef u64  (*GENERIC_GLOBAL_KEYSPACE) (generic_global_ctx_t *, generic_thread_ctx_t *, void *hashcat_ctx);
+
+typedef bool (*GENERIC_THREAD_INIT)     (generic_global_ctx_t *, generic_thread_ctx_t *);
+typedef void (*GENERIC_THREAD_TERM)     (generic_global_ctx_t *, generic_thread_ctx_t *);
+typedef int  (*GENERIC_THREAD_NEXT)     (generic_global_ctx_t *, generic_thread_ctx_t *, const u8 **);
+typedef bool (*GENERIC_THREAD_SEEK)     (generic_global_ctx_t *, generic_thread_ctx_t *, const u64);
+
+typedef struct generic_ctx
+{
+  bool enabled;
+
+  generic_global_ctx_t  global_ctx;
+  generic_thread_ctx_t  thread_ctx[DEVICES_MAX];
+
+  char *dynlib_filename;
+
+  hc_dynlib_t lib;
+
+  GENERIC_GLOBAL_INIT      global_init;
+  GENERIC_GLOBAL_TERM      global_term;
+  GENERIC_GLOBAL_KEYSPACE  global_keyspace;
+
+  GENERIC_THREAD_INIT      thread_init;
+  GENERIC_THREAD_TERM      thread_term;
+  GENERIC_THREAD_NEXT      thread_next;
+  GENERIC_THREAD_SEEK      thread_seek;
+
+  bool autohex_enable;
+  bool iconv_enable;
+  bool rules_enable;
+
+} generic_ctx_t;
+
 typedef struct cpt_ctx
 {
   bool enabled;
@@ -2983,7 +3047,7 @@ typedef struct cache_generate
   u64 cnt;
   u64 cnt2;
 
-  time_t runtime;
+  float runtime;
 
 } cache_generate_t;
 
@@ -3169,6 +3233,7 @@ typedef struct hashcat_ctx
   dictstat_ctx_t        *dictstat_ctx;
   event_ctx_t           *event_ctx;
   folder_config_t       *folder_config;
+  generic_ctx_t         *generic_ctx;
   hashcat_user_t        *hashcat_user;
   hashconfig_t          *hashconfig;
   hashes_t              *hashes;

@@ -1,10 +1,14 @@
 import struct
 import sys
 from pathlib import Path
+import hcsp
+import pickle
 
+# Global defs
+script_dir = Path(__file__).resolve().parent
+example_ctx = "example.ctx"
 # Extract a blob that is a list of salt_t entries and convert it to a list of dictionaries
 # The salt_t is a fixed data-type so we can handle it here
-
 def extract_salts(salts_buf) -> list:
   salts=[]
   for salt_buf, salt_buf_pc, salt_len, salt_len_pc, salt_iter, salt_iter2, salt_dimy, salt_sign, salt_repeats, orig_pos, digests_cnt, digests_done, digests_offset, scrypt_N, scrypt_r, scrypt_p in struct.iter_unpack("256s 256s I I I I I 8s I I I I I I I I", salts_buf):
@@ -74,89 +78,42 @@ def _worker_batch(passwords, salt_id, is_selftest, user_fn, salts, st_salts):
             hashes.append("invalid-password")
     return hashes
 
-def _bytes_expr(b: bytes, zero_run_fold_min: int = 9) -> str:
-    n = len(b)
-    if n == 0:
-        return "bytes(0)"
-    if b.rstrip(b"\x00") == b"":
-        # all zeros
-        return f"bytes({n})"
+def dump_hashcat_ctx(ctx, source):
+  if source == '__main__':
+    exit(f"You are trying to dump hashcat ctx by calling the python script directly. This will not work."
+         f"\n To dump the ctx run 'hashcat -m 73000 -b' or 'hashcat -m 72000 -b'"
+         f"\n To debug your python bridge, comment the call to hcshared.dump_hashcat_ctx() in your script.")
 
-    parts = []
-    hex_buf = []
+  print("\nDumping hashcat ctx...")
+  with open(script_dir.joinpath("hashcat.ctx"), "wb") as f:
+    pickle.dump(ctx, f)
+    print(f"Dumped hashcat ctx to: {script_dir.joinpath('hashcat.ctx')}\n")
+  hcsp.term(ctx)
 
-    def flush_hex():
-        if hex_buf:
-            parts.append(f'bytes.fromhex("{"".join(hex_buf)}")')
-            hex_buf.clear()
+def load_ctx(selftest_hash, hashcat_ctx=script_dir.joinpath("hashcat.ctx")):
+  # Empty ctx for unsalted hashes:
+  ctx = {
+      "salts_buf": bytes(572),
+      "esalts_buf": bytes(2056),
+      "st_salts_buf": bytes(572),
+      "st_esalts_buf": bytes(2056),
+      "parallelism": 4
+    }
+  if selftest_hash == "33522b0fd9812aa68586f66dba7c17a8ce64344137f9c7d8b11f32a6921c22de*9348746780603343":
+    print(f"You are running the example with example selftest-hash, so {example_ctx} is loaded.", file=sys.stderr)
+    with open(script_dir.joinpath(example_ctx), "rb") as f:
+      return pickle.load(f)
 
-    i = 0
-    while i < n:
-        if b[i] != 0:
-            hex_buf.append(f"{b[i]:02x}")
-            i += 1
-            continue
-        # count zero run
-        j = i
-        while j < n and b[j] == 0:
-            j += 1
-        run = j - i
-        if run >= zero_run_fold_min:
-            flush_hex()
-            parts.append(f'b"\\x00"*{run}')
-        else:
-            hex_buf.extend(["00"] * run)
-        i = j
-    flush_hex()
-    return " + ".join(parts) if parts else "bytes(0)"
-
-def _render(obj, indent=0, step=2):
-    pad = " " * indent
-    if isinstance(obj, (bytes, bytearray, memoryview)):
-        return _bytes_expr(bytes(obj))
-    if isinstance(obj, dict):
-        if not obj:
-            return "{}"
-        items = []
-        for k, v in obj.items():
-            key = repr(k)
-            val = _render(v, indent + step, step)
-            items.append(f'{" "*(indent+step)}{key}: {val}')
-        return "{\n" + ",\n".join(items) + f"\n{pad}" + "}"
-    if isinstance(obj, (list, tuple)):
-        if not obj:
-            return "[]" if isinstance(obj, list) else "()"
-        open_, close_ = ("[", "]") if isinstance(obj, list) else ("(", ")")
-        items = [f'{" "*(indent+step)}{_render(v, indent + step, step)}' for v in obj]
-        # single-item tuple needs a trailing comma
-        if isinstance(obj, tuple) and len(obj) == 1:
-            items[0] += ","
-        return open_ + "\n" + ",\n".join(items) + f"\n{pad}" + close_
-    # primitives
-    return repr(obj)
-
-def pprint_bytes_runs(obj, *, indent=2, prefix=None):
-    rendered = _render(obj, indent=indent, step=indent)
-    if prefix:
-        pad = " " * indent
-        print(f"{pad}{prefix} = {rendered}")
-    else:
-        print(rendered)
-
-def dump_hashcat_ctx(ctx):
-  print("")
-  print("Dump hashcat's ctx to allow for the (e)salts to be populated correctly")
-  print("  enable this code, run hashcat with -m73000, update the ctx-variable at the top of __main__, and disable this code again")
-  pprint_bytes_runs(ctx, prefix="ctx")
-  # import pprint
-  # pprint.pprint(ctx) #this this prints without summarizing runs of zero-bytes outputting a big struct..
-  print("")
-  exit()
+  if hashcat_ctx.exists():
+    with open(hashcat_ctx, "rb") as f:
+      return pickle.load(f)
+  else:
+    print(f"{hashcat_ctx.name} not found, using empty ctx, assuming your hashes are unsalted.", file=sys.stderr)
+  return ctx
 
 def add_hashcat_path_to_environment():
-  # add the hashcat path to the environment to import the hcshared and hcmp libraries
-  script_dir = Path(__file__).resolve().parent
-  if script_dir.name == "Python" and script_dir.parent.name == "hashcat":
-    sys.path.insert(0, script_dir)
-  else:
-    print(f"script ({script_dir}) is not running from the hashcat/Python folder, so the debugging of hcmp.py and hcshared.py is disabled", file=sys.stderr)
+  files = [script_dir/"hcmp.py", script_dir/"hcshared.py" ]
+  missing = [f for f in files if not f.exists()]
+  for m in missing:
+      print(f"Cant find {m} in the same directory, so debugging of those impossible", file=sys.stderr)
+  sys.path.insert(0, script_dir)

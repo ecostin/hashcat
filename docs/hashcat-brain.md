@@ -24,10 +24,10 @@ Before you try it out yourself, let me show you a few examples.
 
 There's no doubt that rule-based attacks are the greatest general purpose attack-modifier on an existing wordlist. But they have a little-known problem: They produce a lot of duplicate candidates. While this is not relevant for fast hashes, it has a large impact on slow hashes.
 
-In this example, we apply best64.rule to example.dict, and writes the result to test.txt:
+In this example, we apply best66.rule to example.dict, and writes the result to test.txt:
 
 ```
-$ ./hashcat --stdout example.dict -r rules/best64.rule -o test.txt
+$ ./hashcat --stdout example.dict -r rules/best66.rule -o test.txt
 ```
 
 Now we can see how many candidates were produced:
@@ -47,7 +47,7 @@ $ sort -u test.txt | wc -l
 Of course, the wordlist and rules used have a large impact on the number of duplicates. In our example - a common wordlist and general purpose rule - the average ratio of produced dupes seems to be around 25%. And all of these dupes are detected by the brain:
 
 ```
-$ ./hashcat -z example0.hash example.dict -r rules/best64.rule
+$ ./hashcat -z example0.hash example.dict -r rules/best66.rule
 ...
 Rejected.........: 2379391/9888032 (24.06%)
 ```

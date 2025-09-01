@@ -131,4 +131,12 @@ bool get_free_memory (u64 *free_mem);
 u32 previous_power_of_two (const u32 x);
 u32 next_power_of_two (const u32 x);
 
+typedef size_t (*hc_memchr_t) (const u8 *ptr, int ch, size_t max_len);
+
+size_t hc_memchr_generic      (const u8 *ptr, int ch, size_t max_len);
+size_t hc_memchr_avx2         (const u8 *ptr, int ch, size_t max_len);
+size_t hc_memchr_avx512       (const u8 *ptr, int ch, size_t max_len);
+
+hc_memchr_t hc_memchr_get     (void);
+
 #endif // HC_SHARED_H

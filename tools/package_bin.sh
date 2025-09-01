@@ -6,7 +6,7 @@
 ##
 
 export IN=.
-export OUT=$HOME/xy/hashcat-7.1.1
+export OUT=$HOME/xy/hashcat-7.1.2
 
 rm -rf $OUT
 rm -rf $OUT.7z
@@ -15,6 +15,8 @@ mkdir -p $OUT
 
 mkdir -p $OUT/tools
 mkdir -p $OUT/Python
+mkdir -p $OUT/Rust/bridges/generic_hash
+mkdir -p $OUT/Rust/bridges/dynamic_hash
 
 cp    $IN/hashcat.exe                   $OUT/
 cp    $IN/hashcat.bin                   $OUT/
@@ -25,6 +27,7 @@ cp -r $IN/charsets                      $OUT/
 cp -r $IN/layouts                       $OUT/
 cp -r $IN/masks                         $OUT/
 cp -r $IN/bridges                       $OUT/
+cp -r $IN/feeds                         $OUT/
 cp -r $IN/modules                       $OUT/
 cp -r $IN/rules                         $OUT/
 cp -r $IN/extra                         $OUT/
@@ -33,6 +36,12 @@ cp    $IN/example.dict                  $OUT/
 cp    $IN/example[0123456789]*.hash     $OUT/
 cp    $IN/example[0123456789]*.cmd      $OUT/
 cp -r $IN/Python/*.py                   $OUT/Python/
+cp -r $IN/Rust/bridges/generic_hash/src         $OUT/Rust/bridges/generic_hash/
+cp    $IN/Rust/bridges/generic_hash/Cargo.*     $OUT/Rust/bridges/generic_hash/
+cp    $IN/Rust/bridges/generic_hash/build.rs    $OUT/Rust/bridges/generic_hash/
+cp -r $IN/Rust/bridges/dynamic_hash/src         $OUT/Rust/bridges/dynamic_hash/
+cp    $IN/Rust/bridges/dynamic_hash/Cargo.*     $OUT/Rust/bridges/dynamic_hash/
+cp    $IN/Rust/bridges/dynamic_hash/build.rs    $OUT/Rust/bridges/dynamic_hash/
 cp -r $IN/OpenCL                        $OUT/
 cp    $IN/tools/*hashcat.pl             $OUT/tools/
 cp    $IN/tools/*hashcat.py             $OUT/tools/
@@ -85,6 +94,10 @@ chmod 755 $OUT/masks
 chmod 644 $OUT/masks/*
 chmod 755 $OUT/bridges
 chmod 644 $OUT/bridges/*
+chmod 755 $OUT/bridges/subs
+chmod 644 $OUT/bridges/subs/*
+chmod 755 $OUT/feeds
+chmod 644 $OUT/feeds/*
 chmod 755 $OUT/modules
 chmod 644 $OUT/modules/*
 chmod 644 $OUT/example*
@@ -94,6 +107,8 @@ chmod 755 $OUT/extra/tab_completion/*.sh
 chmod 755 $OUT/extra/tab_completion/install
 chmod 755 $OUT/Python
 chmod 644 $OUT/Python/*
+chmod 755 $OUT/Rust
+#chmod 644 $OUT/Python/*
 chmod 755 $OUT/OpenCL
 chmod 644 $OUT/OpenCL/*
 chmod 755 $OUT/tunings
