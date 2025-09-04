@@ -2,7 +2,7 @@
  * Author......: See docs/credits.txt
  * License.....: MIT
  */
-use crate::interop::Context;
+use crate::interop::ThreadContext;
 use sha2::{Digest, Sha256};
 
 // Trailing zeroes are necessary.
@@ -26,10 +26,10 @@ pub(crate) fn calc_hash(password: &[u8], salt: &[u8]) -> Vec<String> {
 }
 
 #[allow(unused_variables)]
-pub(crate) fn thread_init(ctx: &mut Context) {}
+pub(crate) fn thread_init(ctx: &mut ThreadContext) {}
 
 #[allow(unused_variables)]
-pub(crate) fn thread_term(ctx: &mut Context) {}
+pub(crate) fn thread_term(ctx: &mut ThreadContext) {}
 
 #[cfg(test)]
 mod tests {

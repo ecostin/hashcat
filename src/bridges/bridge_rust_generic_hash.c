@@ -38,8 +38,13 @@ typedef struct
 
 } generic_io_tmp_t;
 
-typedef void (*RS_INIT)(void *);
-typedef void (*RS_TERM)(void *);
+typedef struct bridge_context bridge_context_t;
+
+typedef int (*RS_GET_INFO)(char *, int);
+typedef bool (*RS_GLOBAL_INIT)(const bridge_context_t *);
+typedef void (*RS_GLOBAL_TERM)(const bridge_context_t *);
+typedef void (*RS_THREAD_INIT)(void *);
+typedef void (*RS_THREAD_TERM)(void *);
 typedef bool (*RS_KERNEL_LOOP)(void *, generic_io_tmp_t *, u64, int, bool);
 
 typedef void *(*RS_NEW_CONTEXT)(
@@ -85,7 +90,7 @@ typedef struct
 
 } unit_t;
 
-typedef struct
+struct bridge_context
 {
   unit_t *units_buf;
   int units_cnt;
@@ -93,10 +98,13 @@ typedef struct
   char *dynlib_filename;
   hc_dynlib_t lib;
 
-  RS_INIT init;
-  RS_TERM term;
-  RS_KERNEL_LOOP kernel_loop;
-  RS_NEW_CONTEXT new_context;
+  RS_GET_INFO     get_info;
+  RS_GLOBAL_INIT  global_init;
+  RS_GLOBAL_TERM  global_term;
+  RS_THREAD_INIT  thread_init;
+  RS_THREAD_TERM  thread_term;
+  RS_KERNEL_LOOP  kernel_loop;
+  RS_NEW_CONTEXT  new_context;
   RS_DROP_CONTEXT drop_context;
 
   const char *bridge_parameter1;
@@ -104,7 +112,7 @@ typedef struct
   const char *bridge_parameter3;
   const char *bridge_parameter4;
 
-} bridge_context_t;
+};
 
 static const char *extract_module_name(const char *path)
 {
@@ -161,8 +169,7 @@ static bool units_init(bridge_context_t *bridge_context)
   {
     unit_t *unit_buf = &units_buf[i];
 
-    unit_buf->unit_info_len = snprintf(unit_buf->unit_info_buf, sizeof(unit_buf->unit_info_buf) - 1, "Rust");
-
+    unit_buf->unit_info_len = bridge_context->get_info (unit_buf->unit_info_buf, sizeof(unit_buf->unit_info_buf) - 1);
     unit_buf->unit_info_buf[unit_buf->unit_info_len] = 0;
 
     unit_buf->workitem_count = N_ACCEL;
@@ -241,11 +248,27 @@ void *platform_init(user_options_t *user_options)
     }                                                                                          \
   } while (0)
 
-  HC_LOAD_FUNC_RUST(bridge_context, init, RS_INIT);
-  HC_LOAD_FUNC_RUST(bridge_context, term, RS_TERM);
+  HC_LOAD_FUNC_RUST(bridge_context, get_info, RS_GET_INFO);
+  HC_LOAD_FUNC_RUST(bridge_context, global_init, RS_GLOBAL_INIT);
+  HC_LOAD_FUNC_RUST(bridge_context, global_term, RS_GLOBAL_TERM);
+  HC_LOAD_FUNC_RUST(bridge_context, thread_init, RS_THREAD_INIT);
+  HC_LOAD_FUNC_RUST(bridge_context, thread_term, RS_THREAD_TERM);
   HC_LOAD_FUNC_RUST(bridge_context, kernel_loop, RS_KERNEL_LOOP);
   HC_LOAD_FUNC_RUST(bridge_context, new_context, RS_NEW_CONTEXT);
   HC_LOAD_FUNC_RUST(bridge_context, drop_context, RS_DROP_CONTEXT);
+
+  bridge_context->bridge_parameter1 = user_options->bridge_parameter1;
+  bridge_context->bridge_parameter2 = user_options->bridge_parameter2;
+  bridge_context->bridge_parameter3 = user_options->bridge_parameter3;
+  bridge_context->bridge_parameter4 = user_options->bridge_parameter4;
+
+  if (!bridge_context->global_init(bridge_context))
+  {
+    hcfree(bridge_context);
+
+    return NULL;
+  }
+
 
   if (!units_init(bridge_context))
   {
@@ -254,17 +277,14 @@ void *platform_init(user_options_t *user_options)
     return NULL;
   }
 
-  bridge_context->bridge_parameter1 = user_options->bridge_parameter1;
-  bridge_context->bridge_parameter2 = user_options->bridge_parameter2;
-  bridge_context->bridge_parameter3 = user_options->bridge_parameter3;
-  bridge_context->bridge_parameter4 = user_options->bridge_parameter4;
-
   return bridge_context;
 }
 
 void platform_term(void *platform_context)
 {
   bridge_context_t *bridge_context = platform_context;
+
+  bridge_context->global_term(bridge_context);
 
   units_term(bridge_context);
 
@@ -313,7 +333,7 @@ bool thread_init(MAYBE_UNUSED void *platform_context, MAYBE_UNUSED hc_device_par
   if (!unit_buf->unit_context)
     return false;
 
-  bridge_context->init(unit_buf->unit_context);
+  bridge_context->thread_init(unit_buf->unit_context);
 
   return true;
 }
@@ -326,7 +346,7 @@ void thread_term(MAYBE_UNUSED void *platform_context, MAYBE_UNUSED hc_device_par
 
   unit_t *unit_buf = &bridge_context->units_buf[unit_idx];
 
-  bridge_context->term(unit_buf->unit_context);
+  bridge_context->thread_term(unit_buf->unit_context);
 
   bridge_context->drop_context(unit_buf->unit_context);
 }

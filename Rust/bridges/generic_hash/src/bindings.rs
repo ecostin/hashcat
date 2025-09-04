@@ -191,6 +191,16 @@ pub type uint_fast64_t = ::std::os::raw::c_ulong;
 pub type intmax_t = __intmax_t;
 pub type uintmax_t = __uintmax_t;
 pub type u32_ = u32;
+pub type unit_t = ::std::os::raw::c_void;
+pub type hc_dynlib_t = *mut ::std::os::raw::c_void;
+pub type RS_GET_INFO = *mut ::std::os::raw::c_void;
+pub type RS_GLOBAL_INIT = *mut ::std::os::raw::c_void;
+pub type RS_GLOBAL_TERM = *mut ::std::os::raw::c_void;
+pub type RS_THREAD_INIT = *mut ::std::os::raw::c_void;
+pub type RS_THREAD_TERM = *mut ::std::os::raw::c_void;
+pub type RS_KERNEL_LOOP = *mut ::std::os::raw::c_void;
+pub type RS_NEW_CONTEXT = *mut ::std::os::raw::c_void;
+pub type RS_DROP_CONTEXT = *mut ::std::os::raw::c_void;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct salt {
@@ -278,4 +288,61 @@ const _: () = {
         [::std::mem::offset_of!(generic_io_t, salt_buf) - 1028usize];
     ["Offset of field: generic_io_t::salt_len"]
         [::std::mem::offset_of!(generic_io_t, salt_len) - 2052usize];
+};
+pub type bridge_context_t = bridge_context;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct bridge_context {
+    pub units_buf: *mut unit_t,
+    pub units_cnt: ::std::os::raw::c_int,
+    pub dynlib_filename: *mut ::std::os::raw::c_char,
+    pub lib: hc_dynlib_t,
+    pub get_info: RS_GET_INFO,
+    pub global_init: RS_GLOBAL_INIT,
+    pub global_term: RS_GLOBAL_TERM,
+    pub thread_init: RS_THREAD_INIT,
+    pub thread_term: RS_THREAD_TERM,
+    pub kernel_loop: RS_KERNEL_LOOP,
+    pub new_context: RS_NEW_CONTEXT,
+    pub drop_context: RS_DROP_CONTEXT,
+    pub bridge_parameter1: *const ::std::os::raw::c_char,
+    pub bridge_parameter2: *const ::std::os::raw::c_char,
+    pub bridge_parameter3: *const ::std::os::raw::c_char,
+    pub bridge_parameter4: *const ::std::os::raw::c_char,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of bridge_context"][::std::mem::size_of::<bridge_context>() - 128usize];
+    ["Alignment of bridge_context"][::std::mem::align_of::<bridge_context>() - 8usize];
+    ["Offset of field: bridge_context::units_buf"]
+        [::std::mem::offset_of!(bridge_context, units_buf) - 0usize];
+    ["Offset of field: bridge_context::units_cnt"]
+        [::std::mem::offset_of!(bridge_context, units_cnt) - 8usize];
+    ["Offset of field: bridge_context::dynlib_filename"]
+        [::std::mem::offset_of!(bridge_context, dynlib_filename) - 16usize];
+    ["Offset of field: bridge_context::lib"][::std::mem::offset_of!(bridge_context, lib) - 24usize];
+    ["Offset of field: bridge_context::get_info"]
+        [::std::mem::offset_of!(bridge_context, get_info) - 32usize];
+    ["Offset of field: bridge_context::global_init"]
+        [::std::mem::offset_of!(bridge_context, global_init) - 40usize];
+    ["Offset of field: bridge_context::global_term"]
+        [::std::mem::offset_of!(bridge_context, global_term) - 48usize];
+    ["Offset of field: bridge_context::thread_init"]
+        [::std::mem::offset_of!(bridge_context, thread_init) - 56usize];
+    ["Offset of field: bridge_context::thread_term"]
+        [::std::mem::offset_of!(bridge_context, thread_term) - 64usize];
+    ["Offset of field: bridge_context::kernel_loop"]
+        [::std::mem::offset_of!(bridge_context, kernel_loop) - 72usize];
+    ["Offset of field: bridge_context::new_context"]
+        [::std::mem::offset_of!(bridge_context, new_context) - 80usize];
+    ["Offset of field: bridge_context::drop_context"]
+        [::std::mem::offset_of!(bridge_context, drop_context) - 88usize];
+    ["Offset of field: bridge_context::bridge_parameter1"]
+        [::std::mem::offset_of!(bridge_context, bridge_parameter1) - 96usize];
+    ["Offset of field: bridge_context::bridge_parameter2"]
+        [::std::mem::offset_of!(bridge_context, bridge_parameter2) - 104usize];
+    ["Offset of field: bridge_context::bridge_parameter3"]
+        [::std::mem::offset_of!(bridge_context, bridge_parameter3) - 112usize];
+    ["Offset of field: bridge_context::bridge_parameter4"]
+        [::std::mem::offset_of!(bridge_context, bridge_parameter4) - 120usize];
 };

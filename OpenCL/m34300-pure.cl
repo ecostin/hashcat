@@ -8,10 +8,10 @@
 Pseudocode:
 1. sha256(sha256(password=masterkey)||keyfile) = argon.in
 2. argon2(salt=transformseed, password=argon2.in) = argon2.out
-2. sha512(masterseed||argon2.out||0x01) = final
-3. sha512(0xFFFFFFFFFFFFFFFF||final) = out
-4. hmac_sha256(init=out, data=header) = header_hmac
-5. compare header_hmac to hash
+3. sha512(masterseed||argon2.out||0x01) = final
+4. sha512(0xFFFFFFFFFFFFFFFF||final) = out
+5. hmac_sha256(init=out, data=header) = header_hmac
+6. compare header_hmac to hash
 */
 
 #ifdef KERNEL_STATIC

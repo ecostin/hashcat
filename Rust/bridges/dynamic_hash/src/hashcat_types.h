@@ -6,6 +6,16 @@
 #include <stdint.h>
 
 typedef uint32_t u32;
+typedef void unit_t;
+typedef void *hc_dynlib_t;
+typedef void *RS_GET_INFO;
+typedef void *RS_GLOBAL_INIT;
+typedef void *RS_GLOBAL_TERM;
+typedef void *RS_THREAD_INIT;
+typedef void *RS_THREAD_TERM;
+typedef void *RS_KERNEL_LOOP;
+typedef void *RS_NEW_CONTEXT;
+typedef void *RS_DROP_CONTEXT;
 
 // Sync with:
 // OpenCL/inc_types.h
@@ -65,3 +75,30 @@ typedef struct
     u32 salt_len;
 
 } generic_io_t;
+
+// Sync with bridge_rust_generic_hash.c:
+
+typedef struct bridge_context bridge_context_t;
+
+struct bridge_context
+{
+    unit_t *units_buf;
+    int units_cnt;
+
+    char *dynlib_filename;
+    hc_dynlib_t lib;
+
+    RS_GET_INFO get_info;
+    RS_GLOBAL_INIT global_init;
+    RS_GLOBAL_TERM global_term;
+    RS_THREAD_INIT thread_init;
+    RS_THREAD_TERM thread_term;
+    RS_KERNEL_LOOP kernel_loop;
+    RS_NEW_CONTEXT new_context;
+    RS_DROP_CONTEXT drop_context;
+
+    const char *bridge_parameter1;
+    const char *bridge_parameter2;
+    const char *bridge_parameter3;
+    const char *bridge_parameter4;
+};

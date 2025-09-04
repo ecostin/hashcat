@@ -4,14 +4,22 @@
  */
 use std::{
     ffi::{CStr, c_char, c_int, c_void},
-    mem, ptr, slice,
+    mem,
+    path::Path,
+    ptr, slice,
+    sync::OnceLock,
 };
 
-use crate::bindings::{generic_io_t, generic_io_tmp_t, salt_t};
-use crate::generic_hash::{calc_hash, thread_init, thread_term};
+use crate::generic_hash::calc_hash;
+use crate::{
+    bindings::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t},
+    generic_hash,
+};
+
+static INFO: OnceLock<&'static str> = OnceLock::new();
 
 #[repr(C)]
-pub(crate) struct Context {
+pub(crate) struct ThreadContext {
     pub module_name: String,
 
     pub salts: Vec<salt_t>,
@@ -25,7 +33,7 @@ pub(crate) struct Context {
     pub bridge_parameter4: String,
 }
 
-impl Context {
+impl ThreadContext {
     fn get_raw_esalt(&self, salt_id: usize, is_selftest: bool) -> &generic_io_t {
         if is_selftest {
             &self.st_esalts[salt_id]
@@ -93,7 +101,7 @@ pub extern "C" fn new_context(
     let bridge_parameter3 = unsafe { string_from_ptr(bridge_parameter3) };
     let bridge_parameter4 = unsafe { string_from_ptr(bridge_parameter4) };
 
-    Box::into_raw(Box::new(Context {
+    Box::into_raw(Box::new(ThreadContext {
         module_name,
         salts,
         esalts,
@@ -110,22 +118,52 @@ pub extern "C" fn new_context(
 pub extern "C" fn drop_context(ctx: *mut c_void) {
     assert!(!ctx.is_null());
     unsafe {
-        drop(Box::from_raw(ctx as *mut Context));
+        drop(Box::from_raw(ctx as *mut ThreadContext));
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn init(ctx: *mut c_void) {
-    assert!(!ctx.is_null());
-    let ctx = unsafe { &mut *ctx.cast::<Context>() };
-    thread_init(ctx);
+pub extern "C" fn get_info(buf: *mut c_char, buf_size: c_int) -> c_int {
+    assert!(buf_size > 0);
+    let info = INFO.get().unwrap_or(&"");
+    let n = info.len().min(buf_size as usize);
+    unsafe {
+        ptr::copy_nonoverlapping(info.as_ptr(), buf as *mut u8, n);
+    }
+    n as c_int
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn term(ctx: *mut c_void) {
+pub extern "C" fn global_init(ctx: *mut bridge_context_t) -> bool {
     assert!(!ctx.is_null());
-    let ctx = unsafe { &mut *ctx.cast::<Context>() };
-    thread_term(ctx);
+    let ctx = unsafe { &mut *ctx };
+    assert!(!ctx.dynlib_filename.is_null());
+
+    let dynlib_name = unsafe { string_from_ptr(ctx.dynlib_filename) };
+    let dynlib_name = Path::new(&dynlib_name)
+        .file_name()
+        .and_then(|x| x.to_str())
+        .unwrap_or_default();
+    let info = format!("Rust [{}]", dynlib_name);
+    INFO.set(info.leak()).expect("global_init called twice");
+    true
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn global_term(_ctx: *mut bridge_context_t) {}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn thread_init(ctx: *mut c_void) {
+    assert!(!ctx.is_null());
+    let ctx = unsafe { &mut *ctx.cast::<ThreadContext>() };
+    generic_hash::thread_init(ctx);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn thread_term(ctx: *mut c_void) {
+    assert!(!ctx.is_null());
+    let ctx = unsafe { &mut *ctx.cast::<ThreadContext>() };
+    generic_hash::thread_term(ctx);
 }
 
 #[unsafe(no_mangle)]
@@ -140,7 +178,7 @@ pub extern "C" fn kernel_loop(
     assert!(!io.is_null());
     let io = unsafe { slice::from_raw_parts_mut(io, pws_cnt as usize) };
 
-    let ctx = unsafe { &*ctx.cast::<Context>() };
+    let ctx = unsafe { &*ctx.cast::<ThreadContext>() };
 
     let results = process_batch(ctx, io, salt_id as usize, is_selftest);
 
@@ -157,6 +195,7 @@ pub extern "C" fn kernel_loop(
             .iter()
             .zip(dst.out_buf.iter_mut().zip(dst.out_len.iter_mut()))
         {
+            assert!(s.len() <= mem::size_of_val(buf), "digest size too big");
             unsafe {
                 ptr::copy_nonoverlapping(s.as_ptr(), buf.as_mut_ptr() as *mut u8, s.len());
             }
@@ -167,7 +206,7 @@ pub extern "C" fn kernel_loop(
 }
 
 fn process_batch(
-    ctx: &Context,
+    ctx: &ThreadContext,
     io: &[generic_io_tmp_t],
     salt_id: usize,
     is_selftest: bool,
