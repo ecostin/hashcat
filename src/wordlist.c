@@ -544,7 +544,10 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
 
   memcpy (d.hash_filename, sha1_ctx.h, 16);
 
-  const u64 cached_cnt = dictstat_find (hashcat_ctx, &d);
+  u64 cached_cnt;
+  const char* s = getenv("KEYSPACE");
+  if(s) cached_cnt = (atoll(s));
+  else cached_cnt = dictstat_find (hashcat_ctx, &d);
 
   if (run_rule_engine (user_options_extra->rule_len_l, user_options->rule_buf_l) == 0)
   {

@@ -61,7 +61,7 @@ int dictstat_init (hashcat_ctx_t *hashcat_ctx)
   if (user_options->hash_info      > 0)    return 0;
 
   if (user_options->benchmark     == true) return 0;
-  if (user_options->keyspace      == true) return 0;
+/*  if (user_options->keyspace      == true) return 0; */
   if (user_options->left          == true) return 0;
   if (user_options->show          == true) return 0;
   if (user_options->version       == true) return 0;
@@ -74,7 +74,7 @@ int dictstat_init (hashcat_ctx_t *hashcat_ctx)
   dictstat_ctx->base    = (dictstat_t *) hccalloc (MAX_DICTSTAT, sizeof (dictstat_t));
   dictstat_ctx->cnt     = 0;
 
-  hc_asprintf (&dictstat_ctx->filename, "%s/%s", folder_config->profile_dir, DICTSTAT_FILENAME);
+  hc_asprintf (&dictstat_ctx->filename, "%s/%s", folder_config->cwd, DICTSTAT_FILENAME);
 
   return 0;
 }
