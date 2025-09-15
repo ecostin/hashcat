@@ -3095,31 +3095,29 @@ int user_options_check_files (hashcat_ctx_t *hashcat_ctx)
   }
   else if (user_options->attack_mode == ATTACK_MODE_GENERIC)
   {
-    for (int i = 0; i < user_options_extra->hc_workc; i++)
+    //for (int i = 0; i < user_options_extra->hc_workc; i++)
+
+    char *library_filename = user_options_extra->hc_workv[0];
+
+    if (hc_path_exist (library_filename) == false)
     {
-      char *plugin = user_options_extra->hc_workv[i];
+      event_log_error (hashcat_ctx, "%s: %s", library_filename, strerror (errno));
 
-      if (hc_path_exist (plugin) == false)
-      {
-        event_log_error (hashcat_ctx, "%s: %s", plugin, strerror (errno));
+      return -1;
+    }
 
-        return -1;
-      }
+    if (hc_path_is_directory (library_filename) == true)
+    {
+      event_log_error (hashcat_ctx, "%s: A directory cannot be used as first plugin argument.", library_filename);
 
-      if (hc_path_is_directory (plugin) == true)
-      {
-        event_log_error (hashcat_ctx, "%s: A directory cannot be used as a plugin argument.", plugin);
+      return -1;
+    }
 
-        return -1;
-      }
+    if (hc_path_read (library_filename) == false)
+    {
+      event_log_error (hashcat_ctx, "%s: %s", library_filename, strerror (errno));
 
-      if (hc_path_read (plugin) == false)
-      {
-        event_log_error (hashcat_ctx, "%s: %s", plugin, strerror (errno));
-
-        return -1;
-      }
-
+      return -1;
     }
 
     for (int i = 0; i < (int) user_options->rp_files_cnt; i++)

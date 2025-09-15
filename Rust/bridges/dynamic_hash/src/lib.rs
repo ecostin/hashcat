@@ -9,7 +9,6 @@
     non_upper_case_globals
 )]
 mod bindings;
-mod dynamic_hash;
 mod eval;
 mod interop;
 mod parse;
@@ -38,6 +37,7 @@ pub enum ExtraParams {
     Key(Box<Expr>),
     StartLength(u32, u32),
     CostSalt(Box<Expr>, Box<Expr>),
+    RoundsSaltDklen(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 pub enum Expr {

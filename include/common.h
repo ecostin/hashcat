@@ -145,3 +145,6 @@ but this is needed for VS compiler which doesn't have inline keyword but has __i
 
 #endif // HC_COMMON_H
 
+
+#define USAGE_NOTICE_NUM_ROUNDS "rounds=[# of iterations] is optional here, after signature, e.g. $5$rounds=5000"
+#define USAGE_NOTICE_ITUNES_BACKUP "You can use https://github.com/philsmd/itunes_backup2hashcat/ to extract the hashes from the Manifest.plist file"

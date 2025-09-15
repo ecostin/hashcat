@@ -316,22 +316,24 @@ static int outfile_remove (hashcat_ctx_t *hashcat_ctx)
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_outfile_remove (void *p)
+#else
 HC_API_CALL void *thread_outfile_remove (void *p)
+#endif
 {
   hashcat_ctx_t *hashcat_ctx = (hashcat_ctx_t *) p;
 
   const hashconfig_t   *hashconfig   = hashcat_ctx->hashconfig;
   const outcheck_ctx_t *outcheck_ctx = hashcat_ctx->outcheck_ctx;
 
-  if (hashconfig->outfile_check_disable == true) return NULL;
+  if (hashconfig->outfile_check_disable == true) return 0;
 
-  if (outcheck_ctx->enabled == false) return NULL;
+  if (outcheck_ctx->enabled == false) return 0;
 
-  const int rc = outfile_remove (hashcat_ctx);
+  outfile_remove (hashcat_ctx);
 
-  if (rc == -1) return NULL;
-
-  return NULL;
+  return 0;
 }
 
 int outcheck_ctx_init (hashcat_ctx_t *hashcat_ctx)

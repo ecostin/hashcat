@@ -102,7 +102,7 @@ That’s it.
 
 ### Benchmark
 
-    hashcat -m 74000 yescrypt.hash -a 3 ?b?b?b?b?b?b?b?b
+    hashcat -m 74000 yescrypt.hash -a 3 ?b?b?b?b?b?b?b
 
 ### Regular Cracking
 

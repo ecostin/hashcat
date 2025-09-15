@@ -1236,7 +1236,11 @@ static int process_selftest (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *devi
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_selftest (void *p)
+#else
 HC_API_CALL void *thread_selftest (void *p)
+#endif
 {
   thread_param_t *thread_param = (thread_param_t *) p;
 
@@ -1246,33 +1250,33 @@ HC_API_CALL void *thread_selftest (void *p)
   hashconfig_t  *hashconfig  = hashcat_ctx->hashconfig;
   hashes_t      *hashes      = hashcat_ctx->hashes;
 
-  if (backend_ctx->enabled == false) return NULL;
+  if (backend_ctx->enabled == false) return 0;
 
   user_options_t *user_options = hashcat_ctx->user_options;
 
-  if (user_options->self_test == false) return NULL;
+  if (user_options->self_test == false) return 0;
 
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
-  if (device_param->skipped == true) return NULL;
-  if (device_param->skipped_warning == true) return NULL;
+  if (device_param->skipped == true) return 0;
+  if (device_param->skipped_warning == true) return 0;
 
   if (bridge_ctx->enabled == true)
   {
     if (bridge_ctx->thread_init != BRIDGE_DEFAULT)
     {
-      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return NULL;
+      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return 0;
     }
   }
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return 0;
   }
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return 0;
   }
 
   const int rc_selftest = process_selftest (hashcat_ctx, device_param);
@@ -1295,14 +1299,14 @@ HC_API_CALL void *thread_selftest (void *p)
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuStreamSynchronize (hashcat_ctx, device_param->cuda_stream) == -1) return NULL;
+    if (hc_cuStreamSynchronize (hashcat_ctx, device_param->cuda_stream) == -1) return 0;
 
-    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return 0;
   }
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipStreamSynchronize (hashcat_ctx, device_param->hip_stream) == -1) return NULL;
+    if (hc_hipStreamSynchronize (hashcat_ctx, device_param->hip_stream) == -1) return 0;
   }
 
   if (bridge_ctx->enabled == true)
@@ -1315,8 +1319,8 @@ HC_API_CALL void *thread_selftest (void *p)
 
   if (device_param->is_opencl == true)
   {
-    if (hc_clFinish (hashcat_ctx, device_param->opencl_command_queue) == -1) return NULL;
+    if (hc_clFinish (hashcat_ctx, device_param->opencl_command_queue) == -1) return 0;
   }
 
-  return NULL;
+  return 0;
 }

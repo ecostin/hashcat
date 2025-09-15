@@ -12,6 +12,7 @@ import re
 
 # Replace LUKS v1 hashes, they're too big: Github no longer shows the .md "(Sorry about that, but we can’t show files that are this big right now.)"
 EXAMPLE_HASH_REPLACEMENTS = {
+    "14600": "https://hashcat.net/misc/example_hashes/hashcat_luks_testfiles.7z",
     "29511": "https://hashcat.net/misc/example_hashes/hashcat_luks_sha1_aes_cbc-essiv_128.txt",
     "29512": "https://hashcat.net/misc/example_hashes/hashcat_luks_sha1_serpent_cbc-plain64_256.txt",
     "29513": "https://hashcat.net/misc/example_hashes/hashcat_luks_sha1_twofish_xts-plain64_256.txt",
@@ -42,6 +43,9 @@ OPENCL_ABBREV = {
 }
 OPENCL_ABBREV_SORT_ORDER = ["p", "o", "a0p", "a0o", "a1p", "a1o", "a3p", "a3o"]
 order_map = {v: i for i, v in enumerate(OPENCL_ABBREV_SORT_ORDER)}
+
+def md_remove_backticks_and_pipes(msg):
+    return msg.replace('`', '').replace('|', '')
 
 def sort_abbrevs(links):
     """Sort markdown links by their abbreviation order."""
@@ -159,6 +163,8 @@ def main():
         name = value["name"]
         example_hash = value["example_hash"]
         example_pass = value["example_pass"]
+        usage_notice = value["usage_notice"]
+        advice_notice = value["advice_notice"]
 
         # Replace example_hash if key is in the replacement map
         if key in EXAMPLE_HASH_REPLACEMENTS:
@@ -166,10 +172,27 @@ def main():
 
         footnote = ""
         if example_pass != "hashcat":
-            if example_pass not in footnote_map:
-                footnote_map[example_pass] = footnote_counter
+            footnote_val = f"Example password: `{example_pass}`"
+            if footnote_val not in footnote_map:
+                footnote_map[footnote_val] = footnote_counter
                 footnote_counter += 1
-            footnote = f"[^{footnote_map[example_pass]}]"
+            footnote += f"[^{footnote_map[footnote_val]}]"
+
+        if usage_notice != "N/A":
+            usage_notice = md_remove_backticks_and_pipes(usage_notice)
+            footnote_val = f"Module usage notice: `{usage_notice}`"
+            if footnote_val not in footnote_map:
+                footnote_map[footnote_val] = footnote_counter
+                footnote_counter += 1
+            footnote += f"[^{footnote_map[footnote_val]}]"
+
+        if advice_notice != "N/A":
+            advice_notice = md_remove_backticks_and_pipes(advice_notice)
+            footnote_val = f"Module advice notice: `{advice_notice}`"
+            if footnote_val not in footnote_map:
+                footnote_map[footnote_val] = footnote_counter
+                footnote_counter += 1
+            footnote += f"[^{footnote_map[footnote_val]}]"
 
         zfilled_key = key.zfill(5)
         opencl_links = find_opencl(zfilled_key)
@@ -178,6 +201,9 @@ def main():
         # Make sure we refer to root for display
         opencl_links = opencl_links.replace('/../../', '/')
         test_link = test_link.replace('/../../', '/')
+
+        name = md_remove_backticks_and_pipes(name)
+        example_hash = md_remove_backticks_and_pipes(example_hash)
 
         row = f"| [`{key}`](/src/modules/module_{zfilled_key}.c) | `{name}`{footnote} | <sup> {opencl_links} </sup> | {test_link} | `{example_hash}` |"
         table_rows.append(row)
@@ -188,8 +214,8 @@ def main():
     # Print footnotes
     if footnote_map:
         print()
-        for pass_val, num in footnote_map.items():
-            print(f"[^{num}]: Password: `{pass_val}`")
+        for val, num in footnote_map.items():
+            print(f"[^{num}]: {val}")
 
 if __name__ == "__main__":
     main()

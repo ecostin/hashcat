@@ -33,6 +33,7 @@ obj/*.o
 obj/*.a
 include/CL
 tools/luks_tests
+tools/luks2_tests
 .vscode
 test_edge*
 Rust/feeds/*/target

@@ -122,6 +122,8 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
 
   if (rc_load == false) return -1;
 
+  module_ctx->module_usage_notice = MODULE_DEFAULT; // set all module to have usage_notice by empty default; such that this property doesn't have to be declared explicitly by all modules (such that we don't break private plugins without this options)
+  module_ctx->module_advice_notice = MODULE_DEFAULT; // set all module to have advice_notice empty by default; such that this property doesn't have to be declared explicitly by all modules (such that we don't break private plugins without this options)
   module_ctx->module_init (module_ctx);
 
   if (module_ctx->module_context_size != MODULE_CONTEXT_SIZE_CURRENT)
@@ -159,6 +161,8 @@ int hashconfig_init (hashcat_ctx_t *hashcat_ctx)
   CHECK_DEFINED (module_ctx, module_build_plain_postprocess);
   CHECK_DEFINED (module_ctx, module_deep_comp_kernel);
   CHECK_DEFINED (module_ctx, module_deprecated_notice);
+  // CHECK_DEFINED (module_ctx, module_usage_notice); // we don't check this here as it's an optional field
+  // CHECK_DEFINED (module_ctx, module_advice_notice); // we don't check this here as it's an optional field
   CHECK_DEFINED (module_ctx, module_dgst_pos0);
   CHECK_DEFINED (module_ctx, module_dgst_pos1);
   CHECK_DEFINED (module_ctx, module_dgst_pos2);

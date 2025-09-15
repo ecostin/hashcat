@@ -30,18 +30,18 @@ pub struct generic_thread_ctx_t
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn global_init (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void) -> bool
+pub extern "C" fn global_init (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void) -> bool
 {
   true
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn global_term (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void)
+pub extern "C" fn global_term (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void)
 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn global_keyspace (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void) -> u64
+pub extern "C" fn global_keyspace (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut *mut generic_thread_ctx_t, _hashcat_ctx: *mut c_void) -> u64
 {
   0xffff_ffff_ffff_ffff
 }
@@ -79,14 +79,9 @@ pub extern "C" fn thread_seek (_global_ctx: *mut generic_global_ctx_t, _thread_c
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn thread_next (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut generic_thread_ctx_t, out_buf: *mut *mut u8) -> c_int
+pub extern "C" fn thread_next (_global_ctx: *mut generic_global_ctx_t, _thread_ctx: *mut generic_thread_ctx_t, out_buf: *mut u8) -> c_int
 {
-  unsafe
-  {
-    let buf_ptr = (*_thread_ctx).thrdata as *mut [u8; 256];
-
-    *out_buf = buf_ptr as *mut u8;
-  }
+  unsafe { std::ptr::copy_nonoverlapping(b"Password1".as_ptr(), out_buf, 9) }
 
   9
 }

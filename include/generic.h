@@ -34,7 +34,7 @@ void generic_global_term     (hashcat_ctx_t *hashcat_ctx);
 u64  generic_global_keyspace (hashcat_ctx_t *hashcat_ctx);
 bool generic_thread_init     (hashcat_ctx_t *hashcat_ctx, const int backend_device_idx);
 void generic_thread_term     (hashcat_ctx_t *hashcat_ctx, const int backend_device_idx);
-int  generic_thread_next     (hashcat_ctx_t *hashcat_ctx, const int backend_device_idx, const u8 **out_buf);
+int  generic_thread_next     (hashcat_ctx_t *hashcat_ctx, const int backend_device_idx, u8 *out_buf);
 bool generic_thread_seek     (hashcat_ctx_t *hashcat_ctx, const int backend_device_idx, const u64 offset);
 
 int  generic_ctx_init        (hashcat_ctx_t *hashcat_ctx);

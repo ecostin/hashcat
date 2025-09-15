@@ -42,22 +42,22 @@ static void error_set (generic_global_ctx_t *global_ctx, const char *fmt, ...)
   va_end (ap);
 }
 
-static size_t process_word (const u8 *buf, const size_t len, const u8 **out_buf)
+static size_t process_word (const u8 *buf, const size_t len, u8 *out_buf)
 {
   size_t word_len = len;
 
   while ((word_len > 0) && (buf[word_len - 1] == '\r')) word_len--;
 
-  //size_t report_len = MIN (word_len, PW_MAX);
+  // important: the output buffer, provided by hashcat, has only space for PW_MAX (256)
 
-  //if (report_len) memcpy (out_buf, buf, report_len);
+  const size_t report_len = MIN (word_len, PW_MAX);
 
-  *out_buf = buf;
+  memcpy ((char *) out_buf, buf, report_len);
 
-  return word_len;
+  return report_len;
 }
 
-bool global_init (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
+bool global_init (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t **thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
 {
   // create our own context
 
@@ -83,7 +83,7 @@ bool global_init (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED ge
   return true;
 }
 
-void global_term (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
+void global_term (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t **thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
 {
   feed_global_t *feed_global = global_ctx->gbldata;
 
@@ -94,7 +94,7 @@ void global_term (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED ge
   global_ctx->gbldata = NULL;
 }
 
-u64 global_keyspace (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
+u64 global_keyspace (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t **thread_ctx, MAYBE_UNUSED hashcat_ctx_t *hashcat_ctx)
 {
   feed_global_t *feed_global = global_ctx->gbldata;
 
@@ -118,9 +118,9 @@ u64 global_keyspace (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED
     return feed_global->line_count;
   }
 
-  thread_init (global_ctx, thread_ctx);
+  thread_init (global_ctx, thread_ctx[0]);
 
-  feed_thread_t *feed_thread = thread_ctx->thrdata;
+  feed_thread_t *feed_thread = thread_ctx[0]->thrdata;
 
   hc_timer_t start;
 
@@ -141,14 +141,14 @@ u64 global_keyspace (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED
 
   hcfree (seekdb_file);
 
+  thread_term (global_ctx, thread_ctx[0]);
+
   return feed_global->line_count;
 }
 
 bool thread_init (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx)
 {
   feed_global_t *feed_global = global_ctx->gbldata;
-
-  thread_ctx->thrdata = feed_global;
 
   feed_thread_t *feed_thread = hcmalloc (sizeof (feed_thread_t));
 
@@ -223,7 +223,7 @@ void thread_term (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED ge
   thread_ctx->thrdata = NULL;
 }
 
-int thread_next (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx, const u8 **out_buf)
+int thread_next (MAYBE_UNUSED generic_global_ctx_t *global_ctx, MAYBE_UNUSED generic_thread_ctx_t *thread_ctx, u8 *out_buf)
 {
   feed_thread_t *feed_thread = thread_ctx->thrdata;
 

@@ -187,6 +187,7 @@ Usage: hashcat [options]... hash|hashfile|hccapxfile [dictionary|mask|directory]
   3 | Brute-force
   6 | Hybrid Wordlist + Mask
   7 | Hybrid Mask + Wordlist
+  8 | Generic
   9 | Association
 
 - [ Built-in Charsets ] -
@@ -233,6 +234,7 @@ Usage: hashcat [options]... hash|hashfile|hccapxfile [dictionary|mask|directory]
   Wordlist + Rules | MD5   | hashcat -a 0 -m 0 example0.hash example.dict -r rules/best66.rule
   Brute-Force      | MD5   | hashcat -a 3 -m 0 example0.hash ?a?a?a?a?a?a
   Combinator       | MD5   | hashcat -a 1 -m 0 example0.hash example.dict example.dict
+  Generic          | $1$   | hashcat -a 8 -m 500 example500.hash feeds/feed_wordlist.so 1word.dict -r rules/best66.rule
   Association      | $1$   | hashcat -a 9 -m 500 example500.hash 1word.dict -r rules/best66.rule
 
 If you still have no idea what just happened, try the following pages:

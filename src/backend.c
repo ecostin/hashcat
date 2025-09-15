@@ -17495,7 +17495,11 @@ int backend_session_update_mp_rl (hashcat_ctx_t *hashcat_ctx, const u32 css_cnt_
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD hook12_thread (void *p)
+#else
 HC_API_CALL void *hook12_thread (void *p)
+#endif
 {
   hook_thread_param_t *hook_thread_param = (hook_thread_param_t *) p;
 
@@ -17516,10 +17520,14 @@ HC_API_CALL void *hook12_thread (void *p)
     }
   }
 
-  return NULL;
+  return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD hook23_thread (void *p)
+#else
 HC_API_CALL void *hook23_thread (void *p)
+#endif
 {
   hook_thread_param_t *hook_thread_param = (hook_thread_param_t *) p;
 
@@ -17540,5 +17548,5 @@ HC_API_CALL void *hook23_thread (void *p)
     }
   }
 
-  return NULL;
+  return 0;
 }

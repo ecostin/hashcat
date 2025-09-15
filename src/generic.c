@@ -34,7 +34,7 @@ bool generic_global_init (hashcat_ctx_t *hashcat_ctx)
   // ok we can also add hashcat_ctx, which might be hard to bind, but we make it optional
   // so those who support it, can have full access into hashcat core
 
-  const bool rc = generic_ctx->global_init (&generic_ctx->global_ctx, generic_ctx->thread_ctx, hashcat_ctx);
+  const bool rc = generic_ctx->global_init (&generic_ctx->global_ctx, &generic_ctx->thread_ctx, hashcat_ctx);
 
   if (generic_ctx->global_ctx.error == true)
   {
@@ -50,7 +50,7 @@ void generic_global_term (hashcat_ctx_t *hashcat_ctx)
 {
   generic_ctx_t *generic_ctx = hashcat_ctx->generic_ctx;
 
-  generic_ctx->global_term (&generic_ctx->global_ctx, generic_ctx->thread_ctx, hashcat_ctx);
+  generic_ctx->global_term (&generic_ctx->global_ctx, &generic_ctx->thread_ctx, hashcat_ctx);
 
   if (generic_ctx->global_ctx.error == true)
   {
@@ -62,7 +62,7 @@ u64 generic_global_keyspace (hashcat_ctx_t *hashcat_ctx)
 {
   generic_ctx_t *generic_ctx = hashcat_ctx->generic_ctx;
 
-  const u64 keyspace = generic_ctx->global_keyspace (&generic_ctx->global_ctx, generic_ctx->thread_ctx, hashcat_ctx);
+  const u64 keyspace = generic_ctx->global_keyspace (&generic_ctx->global_ctx, &generic_ctx->thread_ctx, hashcat_ctx);
 
   if (generic_ctx->global_ctx.error == true)
   {
@@ -102,7 +102,7 @@ void generic_thread_term (hashcat_ctx_t *hashcat_ctx, const int device_id)
   }
 }
 
-int generic_thread_next (hashcat_ctx_t *hashcat_ctx, const int device_id, const u8 **out_buf)
+int generic_thread_next (hashcat_ctx_t *hashcat_ctx, const int device_id, u8 *out_buf)
 {
   generic_ctx_t *generic_ctx = hashcat_ctx->generic_ctx;
 
@@ -200,6 +200,8 @@ int generic_ctx_init (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
+  generic_ctx->thread_ctx = hccalloc (sizeof (generic_thread_ctx_t), DEVICES_MAX);
+
   generic_ctx->autohex_enable = (*generic_plugin_options & GENERIC_PLUGIN_OPTIONS_AUTOHEX) ? true : false;
   generic_ctx->iconv_enable   = (*generic_plugin_options & GENERIC_PLUGIN_OPTIONS_ICONV)   ? true : false;
   generic_ctx->rules_enable   = (*generic_plugin_options & GENERIC_PLUGIN_OPTIONS_RULES)   ? true : false;
@@ -282,6 +284,8 @@ void generic_ctx_destroy (hashcat_ctx_t *hashcat_ctx)
 
     generic_thread_term (hashcat_ctx, device_param->device_id);
   }
+
+  hcfree (generic_ctx->thread_ctx);
 
   generic_global_term (hashcat_ctx);
 

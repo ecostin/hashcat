@@ -437,7 +437,7 @@ fn test_pass_salt() {
 
 #[test]
 fn test_raw_output_format() {
-    let algoritm = r#"sha1(sha1:raw($p))"#;
+    let algoritm = "sha1(sha1:raw($p))";
     let ast = parse(algoritm).unwrap();
     let mut ctx = EvalContext::new();
     ctx.set_var("p", "qwerty");
@@ -453,4 +453,85 @@ fn test_md2() {
     ctx.set_var("p", "qwerty");
     let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
     assert_eq!(hash, "8350e5a3e24c153df2275c9f80692773");
+}
+
+#[test]
+fn test_pbkdf2_hmac_md5() {
+    let algoritm =
+        r#""md5:".$s1.":".$s2.":".pbkdf2_hmac_md5(rounds=$s1,salt=$s2:b64dec,dklen=$s3,$p)"#;
+    let ast = parse(algoritm).unwrap();
+    let mut ctx = EvalContext::new();
+    ctx.set_var("s1", "1000");
+    ctx.set_var("s2", "NjAxMDY4MQ==");
+    ctx.set_var("s3", "32");
+    ctx.set_var("p", "hashcat");
+    let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
+    assert_eq!(
+        hash,
+        "md5:1000:NjAxMDY4MQ==:a00DtIW9hP9voC85fmEA5uVhgdDx67nSPSm9yADHjkI="
+    );
+}
+
+#[test]
+fn test_pbkdf2_hmac_sha1() {
+    let algoritm =
+        r#""sha1:".$s1.":".$s2.":".pbkdf2_hmac_sha1(rounds=$s1,salt=$s2:b64dec,dklen=$s3,$p)"#;
+    let ast = parse(algoritm).unwrap();
+    let mut ctx = EvalContext::new();
+    ctx.set_var("s1", "1000");
+    ctx.set_var("s2", "MTYwNTM4MDU4Mzc4MzA=");
+    ctx.set_var("s3", "16");
+    ctx.set_var("p", "hashcat");
+    let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
+    assert_eq!(
+        hash,
+        "sha1:1000:MTYwNTM4MDU4Mzc4MzA=:aGghFQBtQ8+WVlMk5GEaMw=="
+    );
+}
+
+#[test]
+fn test_pbkdf2_hmac_sha256() {
+    let algoritm =
+        r#""sha256:".$s1.":".$s2.":".pbkdf2_hmac_sha256(rounds=$s1,salt=$s2:b64dec,dklen=$s3,$p)"#;
+    let ast = parse(algoritm).unwrap();
+    let mut ctx = EvalContext::new();
+    ctx.set_var("s1", "1000");
+    ctx.set_var("s2", "NjI3MDM3");
+    ctx.set_var("s3", "24");
+    ctx.set_var("p", "hashcat");
+    let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
+    assert_eq!(
+        hash,
+        "sha256:1000:NjI3MDM3:vVfavLQL9ZWjg8BUMq6/FB8FtpkIGWYk"
+    );
+}
+
+#[test]
+fn test_pbkdf2_hmac_sha512() {
+    let algoritm =
+        r#""sha512:".$s1.":".$s2.":".pbkdf2_hmac_sha512(rounds=$s1,salt=$s2:b64dec,dklen=$s3,$p)"#;
+    let ast = parse(algoritm).unwrap();
+    let mut ctx = EvalContext::new();
+    ctx.set_var("s1", "1000");
+    ctx.set_var("s2", "NzY2");
+    ctx.set_var("s3", "16");
+    ctx.set_var("p", "hashcat");
+    let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
+    assert_eq!(hash, "sha512:1000:NzY2:DNWohLbdIWIt4Npk9gpTvA==");
+}
+
+#[test]
+fn test_m12800() {
+    let algoritm = r#"pbkdf2_hmac_sha256:hex(rounds=$s1,salt=$s2:unhex,dklen=$s3,utf16le(upper(md4(utf16le($p)))))"#;
+    let ast = parse(algoritm).unwrap();
+    let mut ctx = EvalContext::new();
+    ctx.set_var("s1", "100");
+    ctx.set_var("s2", "54188415275183448824");
+    ctx.set_var("s3", "32");
+    ctx.set_var("p", "hashcat");
+    let hash = String::from_utf8(ctx.eval(&ast).unwrap()).unwrap();
+    assert_eq!(
+        hash,
+        "55b530f052a9af79a7ba9c466dddcb8b116f8babf6c3873a51a3898fb008e123"
+    );
 }

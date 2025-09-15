@@ -351,7 +351,11 @@ static int calc_stdin (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_par
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_calc_stdin (void *p)
+#else
 HC_API_CALL void *thread_calc_stdin (void *p)
+#endif
 {
   thread_param_t *thread_param = (thread_param_t *) p;
 
@@ -361,29 +365,29 @@ HC_API_CALL void *thread_calc_stdin (void *p)
   hashconfig_t  *hashconfig  = hashcat_ctx->hashconfig;
   hashes_t      *hashes      = hashcat_ctx->hashes;
 
-  if (backend_ctx->enabled == false) return NULL;
+  if (backend_ctx->enabled == false) return 0;
 
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
-  if (device_param->skipped) return NULL;
-  if (device_param->skipped_warning == true) return NULL;
+  if (device_param->skipped) return 0;
+  if (device_param->skipped_warning == true) return 0;
 
   if (bridge_ctx->enabled == true)
   {
     if (bridge_ctx->thread_init != BRIDGE_DEFAULT)
     {
-      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return NULL;
+      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return 0;
     }
   }
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return 0;
   }
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return 0;
   }
 
   if (calc_stdin (hashcat_ctx, device_param) == -1)
@@ -395,7 +399,7 @@ HC_API_CALL void *thread_calc_stdin (void *p)
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return 0;
   }
 
   if (bridge_ctx->enabled == true)
@@ -406,7 +410,7 @@ HC_API_CALL void *thread_calc_stdin (void *p)
     }
   }
 
-  return NULL;
+  return 0;
 }
 
 static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
@@ -1398,24 +1402,20 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
 
           for (u64 work_cur = 0; work_cur < work_cnt; work_cur++)
           {
-            const u8 *out_buf = NULL;
+            pw_idx_t *pw_idx = device_param->pws_idx + device_param->pws_cnt;
 
-            const int out_len = generic_thread_next (hashcat_ctx, device_param->device_id, &out_buf);
+            u8 *pw_buf = (u8 *) (device_param->pws_comp + pw_idx->off);
 
-            if ((out_len == -1) || (out_buf == NULL))
+            int pw_len = generic_thread_next (hashcat_ctx, device_param->device_id, pw_buf);
+
+            if (pw_len == -1)
             {
               words_extra = 0; // no more data available
 
               break;
             }
 
-            pw_idx_t *pw_idx = device_param->pws_idx + device_param->pws_cnt;
-
-            u8 *pw_buf = (u8 *) (device_param->pws_comp + pw_idx->off);
-
-            int pw_len = MIN (out_len, PW_MAX);
-
-            memcpy (pw_buf, out_buf, pw_len);
+            pw_len = MIN (pw_len, PW_MAX);  // truncate if > 256  -- note: not rejected!
 
             if (mods == true)
             {
@@ -1869,7 +1869,11 @@ static int calc (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param)
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_calc (void *p)
+#else
 HC_API_CALL void *thread_calc (void *p)
+#endif
 {
   thread_param_t *thread_param = (thread_param_t *) p;
 
@@ -1879,29 +1883,29 @@ HC_API_CALL void *thread_calc (void *p)
   hashconfig_t  *hashconfig  = hashcat_ctx->hashconfig;
   hashes_t      *hashes      = hashcat_ctx->hashes;
 
-  if (backend_ctx->enabled == false) return NULL;
+  if (backend_ctx->enabled == false) return 0;
 
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
-  if (device_param->skipped) return NULL;
-  if (device_param->skipped_warning == true) return NULL;
+  if (device_param->skipped) return 0;
+  if (device_param->skipped_warning == true) return 0;
 
   if (bridge_ctx->enabled == true)
   {
     if (bridge_ctx->thread_init != BRIDGE_DEFAULT)
     {
-      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return NULL;
+      if (bridge_ctx->thread_init (bridge_ctx->platform_context, device_param, hashconfig, hashes) == false) return 0;
     }
   }
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return 0;
   }
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return 0;
   }
 
   if (calc (hashcat_ctx, device_param) == -1)
@@ -1913,7 +1917,7 @@ HC_API_CALL void *thread_calc (void *p)
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return 0;
   }
 
   if (bridge_ctx->enabled == true)
@@ -1924,5 +1928,5 @@ HC_API_CALL void *thread_calc (void *p)
     }
   }
 
-  return NULL;
+  return 0;
 }

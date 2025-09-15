@@ -1,7 +1,19 @@
 
 # Introducing Attack-Mode 8: Generic Password Candidate Generator Mode
 
-The new attack mode is similar to the assimilation bridge in that we have added a standardized interface that allows users to easily add new functions and extend the customization of hashcat. Unlike the assimilation bridge, which operates on the output channel, this plugin interface operates on the input channel, the password candidate generator side.
+Attack-Mode 8 is a generic interface that allows hashcat users to customize the password candidate input channel with their own code, most often to implement custom password generator logic.
+
+Hashcat includes several embedded attack modes: 0, 1, 3, 6, 7, and 9. Each attack mode represents a specific password candidate generator implementation. These embedded generators were designed primarily to run efficiently on GPUs. For example, they can read a wordlist and apply rules, generate a virtual wordlist from a mask, or combine both. The purpose of these generators is that they support a multiplier logic. Multiplier logic helps work around the PCIe bottleneck and ensures maximum performance when attacking very fast hashes.
+
+For slow hashes, however, overcoming the PCIe bottleneck is less important, and other features become more useful. Their focus is usually not on multiplier logic but on candidate quality, and therefore they can be considered "advanced" generators. In our terminology, any generator that does not fit into the existing multiplier logic is defined as an "advanced" password generator.
+
+Examples of advanced generators include:
+
+- Logic based systems for contextualized passwords (too complex pattern for normal rules)
+- Statistical models that adapt dynamically using feedback loops (omen, pcfg, ...)
+- AI driven candidate generation (passgan, ...)
+- Reading data from a network stream
+- Your own ideas...
 
 ---
 

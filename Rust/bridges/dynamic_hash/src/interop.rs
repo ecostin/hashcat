@@ -3,18 +3,25 @@
  * License.....: MIT
  */
 use std::{
+    cell::OnceCell,
     ffi::{CStr, c_char, c_int, c_void},
     mem,
     path::Path,
-    ptr, slice,
-    sync::OnceLock,
+    process, ptr, slice,
+    sync::{Once, OnceLock},
 };
 
 use crate::{
+    Expr,
     bindings::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t},
-    dynamic_hash,
 };
-use crate::{dynamic_hash::calc_hash, parse};
+use crate::{eval::EvalContext, parse};
+
+thread_local! {
+    static AST: OnceCell<Expr> = OnceCell::new();
+}
+
+static LOG_ERROR_ONCE: Once = Once::new();
 
 static INFO: OnceLock<&'static str> = OnceLock::new();
 
@@ -154,15 +161,12 @@ pub extern "C" fn global_term(_ctx: *mut bridge_context_t) {}
 pub extern "C" fn thread_init(ctx: *mut c_void) {
     assert!(!ctx.is_null());
     let ctx = unsafe { &mut *ctx.cast::<ThreadContext>() };
-    dynamic_hash::thread_init(ctx);
+    let ast = parse::parse(&ctx.bridge_parameter2).expect("invalid algorithm description");
+    AST.with(|c| c.set(ast).unwrap_or_default());
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn thread_term(ctx: *mut c_void) {
-    assert!(!ctx.is_null());
-    let ctx = unsafe { &mut *ctx.cast::<ThreadContext>() };
-    dynamic_hash::thread_term(ctx);
-}
+pub extern "C" fn thread_term(_ctx: *mut c_void) {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_loop(
@@ -191,12 +195,32 @@ fn process_batch(ctx: &ThreadContext, io: &mut [generic_io_tmp_t], salt_id: usiz
             esalt.salt_len as usize,
         )
     };
+
+    let mut eval_ctx = EvalContext::new();
+    eval_ctx.set_var("s", salt);
+    if salt.contains(&b'*') {
+        for (i, s) in salt.split(|&b| b == b'*').enumerate() {
+            eval_ctx.set_var(format!("s{}", i + 1), s);
+        }
+    }
+
     for in_out in io {
         let pw = unsafe {
             slice::from_raw_parts(in_out.pw_buf.as_ptr() as *const u8, in_out.pw_len as usize)
         };
-        let hash = calc_hash(pw, salt);
+        eval_ctx.set_var("p", pw);
+
+        let hash = AST
+            .with(|c| {
+                let ast = c.get().expect("no algorithm");
+                eval_ctx.eval(ast)
+            })
+            .unwrap_or_else(|e| {
+                LOG_ERROR_ONCE.call_once(|| eprintln!("ERROR: {}", e));
+                process::exit(-1);
+            });
         assert!(hash.len() <= mem::size_of_val(&in_out.out_buf[0]));
+
         in_out.out_cnt = 1;
         unsafe {
             ptr::copy_nonoverlapping(

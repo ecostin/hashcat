@@ -696,19 +696,23 @@ static int autotune (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_autotune (void *p)
+#else
 HC_API_CALL void *thread_autotune (void *p)
+#endif
 {
   thread_param_t *thread_param = (thread_param_t *) p;
 
   hashcat_ctx_t *hashcat_ctx = thread_param->hashcat_ctx;
   backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
 
-  if (backend_ctx->enabled == false) return NULL;
+  if (backend_ctx->enabled == false) return 0;
 
   hc_device_param_t *device_param = backend_ctx->devices_param + thread_param->tid;
 
-  if (device_param->skipped == true) return NULL;
-  if (device_param->skipped_warning == true) return NULL;
+  if (device_param->skipped == true) return 0;
+  if (device_param->skipped_warning == true) return 0;
 
   // init autotunes status and rc
 
@@ -717,12 +721,12 @@ HC_API_CALL void *thread_autotune (void *p)
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPushCurrent (hashcat_ctx, device_param->cuda_context) == -1) return 0;
   }
 
   if (device_param->is_hip == true)
   {
-    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return NULL;
+    if (hc_hipSetDevice (hashcat_ctx, device_param->hip_device) == -1) return 0;
   }
 
   // check for autotune failure
@@ -735,9 +739,9 @@ HC_API_CALL void *thread_autotune (void *p)
 
   if (device_param->is_cuda == true)
   {
-    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return NULL;
+    if (hc_cuCtxPopCurrent (hashcat_ctx, &device_param->cuda_context) == -1) return 0;
   }
 
-  return NULL;
+  return 0;
 }
 

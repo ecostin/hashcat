@@ -424,13 +424,17 @@ static void keypress (hashcat_ctx_t *hashcat_ctx)
   tty_fix ();
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_keypress (void *p)
+#else
 HC_API_CALL void *thread_keypress (void *p)
+#endif
 {
   hashcat_ctx_t *hashcat_ctx = (hashcat_ctx_t *) p;
 
   keypress (hashcat_ctx);
 
-  return NULL;
+  return 0;
 }
 
 #if defined (_WIN)
@@ -717,6 +721,40 @@ void hash_info_single_json (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *us
       printf ("\"deprecated_notice\": \"%s\", ", "N/A");
     }
 
+    if (module_ctx->module_usage_notice != MODULE_DEFAULT)
+    {
+      const char *t_deprecated_notice = module_ctx->module_usage_notice (hashconfig, hashcat_ctx->user_options, user_options_extra);
+
+      char *t_usage_notice_json_encoded = (char *) hcmalloc (strlen (t_deprecated_notice) * 2);
+
+      json_encode (t_deprecated_notice, t_usage_notice_json_encoded);
+
+      printf ("\"usage_notice\": \"%s\", ", t_usage_notice_json_encoded);
+
+      hcfree (t_usage_notice_json_encoded);
+    }
+    else
+    {
+      printf ("\"usage_notice\": \"%s\", ", "N/A");
+    }
+
+    if (module_ctx->module_advice_notice != MODULE_DEFAULT)
+    {
+      const char *t_deprecated_notice = module_ctx->module_advice_notice (hashconfig, hashcat_ctx->user_options, user_options_extra);
+
+      char *t_advice_notice_json_encoded = (char *) hcmalloc (strlen (t_deprecated_notice) * 2);
+
+      json_encode (t_deprecated_notice, t_advice_notice_json_encoded);
+
+      printf ("\"advice_notice\": \"%s\", ", t_advice_notice_json_encoded);
+
+      hcfree (t_advice_notice_json_encoded);
+    }
+    else
+    {
+      printf ("\"advice_notice\": \"%s\", ", "N/A");
+    }
+
     char *t_pw_desc = "plain";
     if (hashconfig->opts_type & OPTS_TYPE_PT_HEX) t_pw_desc = "HEX";
     else if (hashconfig->opts_type & OPTS_TYPE_PT_BASE58) t_pw_desc = "BASE58";
@@ -954,6 +992,27 @@ void hash_info_single (hashcat_ctx_t *hashcat_ctx, user_options_extra_t *user_op
     }
 
     event_log_info (hashcat_ctx, "  Deprecated.Notice...: %s", t_deprecated_notice);
+
+
+    char *t_module_usage_notice = "N/A";
+
+    if (module_ctx->module_usage_notice != MODULE_DEFAULT)
+    {
+      t_module_usage_notice = (char *) module_ctx->module_usage_notice (hashconfig, hashcat_ctx->user_options, user_options_extra);
+    }
+
+    event_log_info (hashcat_ctx, "  Usage.Notice........: %s", t_module_usage_notice);
+
+
+    char *t_module_advice_notice = "N/A";
+
+    if (module_ctx->module_advice_notice != MODULE_DEFAULT)
+    {
+      t_module_advice_notice = (char *) module_ctx->module_advice_notice (hashconfig, hashcat_ctx->user_options, user_options_extra);
+    }
+
+    event_log_info (hashcat_ctx, "  Advice.Notice.......: %s", t_module_advice_notice);
+
 
     char *t_pw_desc = "plain";
     if (hashconfig->opts_type & OPTS_TYPE_PT_HEX) t_pw_desc = "HEX";

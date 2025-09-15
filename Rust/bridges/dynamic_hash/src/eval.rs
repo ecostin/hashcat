@@ -79,6 +79,10 @@ impl EvalContext {
                     "b64dec" | "b64decode" => {
                         BASE64_STANDARD.decode(data).map_err(|e| e.to_string())?
                     }
+                    "utf16le" => match std::str::from_utf8(&data) {
+                        Ok(s) => s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect(),
+                        Err(_) => vec![],
+                    },
 
                     "md2" => digest!(Md2),
                     "md4" => digest!(Md4),
@@ -104,10 +108,10 @@ impl EvalContext {
                 output_format,
             } => {
                 let data = self.eval(arg)?;
+                let key = self.eval(key_expr)?;
 
                 macro_rules! hmac_digest {
                     ($x:ty) => {{
-                        let key = self.eval(key_expr)?;
                         let mut hmac =
                             Hmac::<$x>::new_from_slice(&key).map_err(|e| e.to_string())?;
                         hmac.update(&data);
@@ -141,6 +145,47 @@ impl EvalContext {
             Expr::Call {
                 name,
                 arg,
+                params: Some(ExtraParams::RoundsSaltDklen(rounds, salt, dklen)),
+                output_format,
+            } => {
+                let data = self.eval(arg)?;
+                let rounds = self.eval_number(rounds)?;
+                let salt = self.eval(salt)?;
+                let dklen = self.eval_number(dklen)? as usize;
+
+                macro_rules! pbkdf2_digest {
+                    ($x:ty) => {{
+                        let mut output = vec![0u8; dklen];
+                        pbkdf2::pbkdf2_hmac::<$x>(&data, &salt, rounds, &mut output);
+                        match output_format {
+                            OutputFormat::Base64 | OutputFormat::Default => {
+                                BASE64_STANDARD.encode(output).into_bytes()
+                            }
+                            OutputFormat::Hex => hex::encode(output).into_bytes(),
+                            OutputFormat::Binary => output,
+                        }
+                    }};
+                }
+
+                Ok(match name.as_str() {
+                    "pbkdf2_hmac_md5" => pbkdf2_digest!(Md5),
+                    "pbkdf2_hmac_sha1" => pbkdf2_digest!(Sha1),
+                    "pbkdf2_hmac_sha224" => pbkdf2_digest!(Sha224),
+                    "pbkdf2_hmac_sha256" => pbkdf2_digest!(Sha256),
+                    "pbkdf2_hmac_sha384" => pbkdf2_digest!(Sha384),
+                    "pbkdf2_hmac_sha512" => pbkdf2_digest!(Sha512),
+                    "pbkdf2_hmac_sha3_224" => pbkdf2_digest!(Sha3_224),
+                    "pbkdf2_hmac_sha3_256" => pbkdf2_digest!(Sha3_256),
+                    "pbkdf2_hmac_sha3_384" => pbkdf2_digest!(Sha3_384),
+                    "pbkdf2_hmac_sha3_512" => pbkdf2_digest!(Sha3_512),
+
+                    _ => unimplemented!(),
+                })
+            }
+
+            Expr::Call {
+                name,
+                arg,
                 params: Some(ExtraParams::StartLength(start, length)),
                 ..
             } => {
@@ -162,6 +207,8 @@ impl EvalContext {
                 ..
             } => {
                 let data = self.eval(arg)?;
+                let cost = self.eval_number(cost_expr)?;
+                let salt = self.eval(salt_expr)?;
 
                 macro_rules! to_arr16 {
                     ($x:expr) => {{
@@ -173,8 +220,6 @@ impl EvalContext {
 
                 macro_rules! bcrypt {
                     ($version:expr) => {{
-                        let cost = self.eval_number(cost_expr)?;
-                        let salt = self.eval(salt_expr)?;
                         let bin_salt: [u8; 16] = match salt.len() {
                             16 => to_arr16!(&salt),
                             22 => match bcrypt::BASE_64.decode(salt) {

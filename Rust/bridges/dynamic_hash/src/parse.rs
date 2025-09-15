@@ -19,6 +19,7 @@ const SUPPORTED_ALGORITHMS: &[&str] = &[
     "lower",
     "lc",
     "cut",
+    "utf16le",
     "md2",
     "md4",
     "md5",
@@ -181,7 +182,7 @@ impl Parser {
         }
     }
 
-    fn parse_named_value(&mut self, name: &str) -> ParseResult<Expr> {
+    fn parse_named_value(&mut self, name: &str, allow_numbers: bool) -> ParseResult<Expr> {
         self.skip_ws();
         self.consume(name)?;
         self.skip_ws();
@@ -190,6 +191,7 @@ impl Parser {
         let value = match self.peek() {
             Some('"') => self.parse_string_literal(),
             Some('$') => self.parse_variable(),
+            Some('0'..='9') if allow_numbers => Ok(Expr::Number(self.parse_number()?)),
             Some(c) => self.unexpected_char(c),
             None => Err(ParseError::new("Unexpected end of input", self.pos)),
         }?;
@@ -228,7 +230,7 @@ impl Parser {
         }
     }
 
-    fn parse_bcrypt_params(&mut self) -> ParseResult<(Expr, Expr)> {
+    fn parse_bcrypt_params(&mut self) -> ParseResult<ExtraParams> {
         let mut cost = None;
         let mut salt = None;
 
@@ -236,28 +238,14 @@ impl Parser {
             self.skip_ws();
             match self.peek() {
                 Some('c') if cost.is_none() => {
-                    self.consume("cost")?;
-                    self.skip_ws();
-                    self.consume("=")?;
-                    if let Ok(c) = self.parse_number() {
-                        cost = Some(Expr::Number(c));
-                    } else {
-                        if self.peek() != Some('$') {
-                            return Err(ParseError::new(
-                                "Expected a number or a variable",
-                                self.pos,
-                            ));
-                        }
-                        cost = Some(self.parse_variable()?);
-                    }
-                    self.consume_char(',')?;
+                    cost = Some(self.parse_named_value("cost", true)?);
                 }
                 Some('s') if salt.is_none() => {
-                    salt = Some(self.parse_named_value("salt")?);
+                    salt = Some(self.parse_named_value("salt", false)?);
                 }
                 Some(c) => {
                     return Err(ParseError::new(
-                        format!("Unexpected character '{}'", c),
+                        format!("Expected 'cost=' or 'salt=', got '{}'", c),
                         self.pos,
                     ));
                 }
@@ -265,7 +253,44 @@ impl Parser {
             }
         }
 
-        Ok((cost.unwrap(), salt.unwrap()))
+        Ok(ExtraParams::CostSalt(
+            Box::new(cost.unwrap()),
+            Box::new(salt.unwrap()),
+        ))
+    }
+
+    fn parse_pbkdf2_params(&mut self) -> ParseResult<ExtraParams> {
+        let mut rounds = None;
+        let mut salt = None;
+        let mut dklen = None;
+
+        for _ in 0..3 {
+            self.skip_ws();
+            match self.peek() {
+                Some('r') if rounds.is_none() => {
+                    rounds = Some(self.parse_named_value("rounds", true)?);
+                }
+                Some('s') if salt.is_none() => {
+                    salt = Some(self.parse_named_value("salt", false)?);
+                }
+                Some('d') if dklen.is_none() => {
+                    dklen = Some(self.parse_named_value("dklen", true)?);
+                }
+                Some(c) => {
+                    return Err(ParseError::new(
+                        format!("Expected 'rounds=' or 'salt=' or 'dklen=', got '{}'", c),
+                        self.pos,
+                    ));
+                }
+                None => return Err(ParseError::new("Unexpected end of input", self.pos)),
+            }
+        }
+
+        Ok(ExtraParams::RoundsSaltDklen(
+            Box::new(rounds.unwrap()),
+            Box::new(salt.unwrap()),
+            Box::new(dklen.unwrap()),
+        ))
     }
 
     fn parse_call(&mut self) -> ParseResult<Expr> {
@@ -273,6 +298,8 @@ impl Parser {
 
         if !SUPPORTED_ALGORITHMS.contains(&name.as_str())
             && !SUPPORTED_ALGORITHMS.contains(&name.strip_prefix("hmac_").unwrap_or_default())
+            && !SUPPORTED_ALGORITHMS
+                .contains(&name.strip_prefix("pbkdf2_hmac_").unwrap_or_default())
         {
             return Err(ParseError::new(
                 format!("Unsupported primitive '{}'", name),
@@ -301,6 +328,7 @@ impl Parser {
                     "lower",
                     "lc",
                     "cut",
+                    "utf16le",
                 ]
                 .contains(&name.as_str())
             {
@@ -324,12 +352,17 @@ impl Parser {
         };
 
         if name.starts_with("bcrypt") {
-            let (cost, salt) = self.parse_bcrypt_params()?;
-            params = Some(ExtraParams::CostSalt(Box::new(cost), Box::new(salt)))
+            params = Some(self.parse_bcrypt_params()?);
         };
 
         if name.starts_with("hmac_") {
-            params = Some(ExtraParams::Key(Box::new(self.parse_named_value("key")?)))
+            params = Some(ExtraParams::Key(Box::new(
+                self.parse_named_value("key", false)?,
+            )))
+        };
+
+        if name.starts_with("pbkdf2_hmac_") {
+            params = Some(self.parse_pbkdf2_params()?);
         };
 
         let arg = self.parse_concat()?;

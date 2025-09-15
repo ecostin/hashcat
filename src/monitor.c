@@ -409,11 +409,15 @@ static int monitor (hashcat_ctx_t *hashcat_ctx)
   return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD thread_monitor (void *p)
+#else
 HC_API_CALL void *thread_monitor (void *p)
+#endif
 {
   hashcat_ctx_t *hashcat_ctx = (hashcat_ctx_t *) p;
 
   monitor (hashcat_ctx); // we should give back some useful returncode
 
-  return NULL;
+  return 0;
 }

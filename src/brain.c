@@ -2063,7 +2063,11 @@ void brain_server_handle_signal (int signo)
   }
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD brain_server_handle_dumps (void *p)
+#else
 HC_API_CALL void *brain_server_handle_dumps (void *p)
+#endif
 {
   brain_server_dumper_options_t *brain_server_dumper_options = (brain_server_dumper_options_t *) p;
 
@@ -2071,7 +2075,7 @@ HC_API_CALL void *brain_server_handle_dumps (void *p)
 
   u32 brain_server_timer = brain_server_dumper_options->brain_server_timer;
 
-  if (brain_server_timer == 0) return NULL;
+  if (brain_server_timer == 0) return 0;
 
   u32 i = 0;
 
@@ -2092,10 +2096,14 @@ HC_API_CALL void *brain_server_handle_dumps (void *p)
     sleep (1);
   }
 
-  return NULL;
+  return 0;
 }
 
+#if defined (_WIN32) || defined (__WIN32__)
+HC_API_CALL DWORD brain_server_handle_client (void *p)
+#else
 HC_API_CALL void *brain_server_handle_client (void *p)
+#endif
 {
   brain_server_client_options_t *brain_server_client_options = (brain_server_client_options_t *) p;
 
@@ -2120,7 +2128,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
   #else
 
@@ -2136,7 +2144,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   u32 brain_link_version_ok = (brain_link_version >= (u32) BRAIN_LINK_VERSION_MIN) ? 1 : 0;
@@ -2149,7 +2157,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   if (brain_link_version_ok == 0)
@@ -2160,7 +2168,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   u32 challenge = brain_auth_challenge ();
@@ -2173,7 +2181,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   u64 response = 0;
@@ -2186,7 +2194,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   u64 auth_hash = brain_auth_hash (challenge, auth_password, strlen (auth_password));
@@ -2201,7 +2209,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   if (password_ok == 0)
@@ -2212,7 +2220,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   u32 brain_session = 0;
@@ -2225,7 +2233,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   if (session_whitelist_cnt > 0)
@@ -2250,7 +2258,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
       close (client_fd);
 
-      return NULL;
+      return 0;
     }
   }
 
@@ -2264,7 +2272,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   i64 passwords_max = 0;
@@ -2277,7 +2285,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   if (passwords_max >= BRAIN_LINK_CANDIDATES_MAX)
@@ -2288,7 +2296,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   brain_logging (stdout, client_idx, "Session: 0x%08x, Attack: 0x%08x, Kernel-power: %" PRIu64 "\n", brain_session, brain_attack, passwords_max);
@@ -2323,7 +2331,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
       close (client_fd);
 
-      return NULL;
+      return 0;
     }
 
     brain_server_db_hash = &brain_server_dbs->hash_buf[brain_server_dbs->hash_cnt];
@@ -2359,7 +2367,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
       close (client_fd);
 
-      return NULL;
+      return 0;
     }
 
     brain_server_db_attack = &brain_server_dbs->attack_buf[brain_server_dbs->attack_cnt];
@@ -2383,7 +2391,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   // recv
@@ -2400,7 +2408,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   // send
@@ -2417,7 +2425,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   // temp
@@ -2432,7 +2440,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   // short global alloc
@@ -2450,7 +2458,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
     close (client_fd);
 
-    return NULL;
+    return 0;
   }
 
   // main loop
@@ -3051,7 +3059,7 @@ HC_API_CALL void *brain_server_handle_client (void *p)
 
   close (client_fd);
 
-  return NULL;
+  return 0;
 }
 
 int brain_server (const char *listen_host, const int listen_port, const char *brain_password, const char *brain_session_whitelist, const u32 brain_server_timer)

@@ -26,6 +26,14 @@
 //Define Performance Metrics Log max sensors number
 #define ADL_PMLOG_MAX_SENSORS  256
 
+#if defined (__MSC_VER)
+#define HC_ADL_API_CALL __cdecl
+#elif defined (_WIN32) || defined (__WIN32__)
+#define HC_ADL_API_CALL __stdcall
+#else
+#define HC_ADL_API_CALL
+#endif
+
 typedef enum ADLSensorType
 {
   SENSOR_MAXTYPES = 0,
@@ -642,7 +650,7 @@ typedef struct hm_adl_lib
 
 typedef hm_adl_lib_t ADL_PTR;
 
-void *HC_API_CALL ADL_Main_Memory_Alloc (const int iSize);
+void *HC_ADL_API_CALL ADL_Main_Memory_Alloc (const int iSize);
 
 int adl_init (void *hashcat_ctx);
 void adl_close (void *hashcat_ctx);
