@@ -2,6 +2,8 @@
 """Utility to extract Bitwarden hash for hashcat from Google Chrome / Firefox / Desktop local data"""
 
 #
+# Script to extract the hash for use with hashcat mode 23400.
+#
 # Based on bitwarden2john.py https://github.com/willstruggle/john/blob/master/bitwarden2john.py
 #
 # Various data locations are documented here: https://bitwarden.com/help/data-storage/#on-your-local-machine

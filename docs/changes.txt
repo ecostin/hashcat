@@ -1,5 +1,18 @@
 * changes v7.1.2 -> v7.1.x
 
+##
+## Improvements
+##
+
+Docker: Add hashcat-toolchain
+
+##
+## Bugs
+##
+
+- Added workaround for CUDA memory leak in benchmark mode caused by register spilling
+- Fixed bugs on multiple DES based modules when used with CPU devices
+
 * changes v7.1.1 -> v7.1.2
 
 ##

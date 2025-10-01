@@ -1193,7 +1193,7 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 	    N > SIZE_MAX / 128 / r)
 		goto out_EINVAL;
 	if (flags & YESCRYPT_RW) {
-		if (N / p <= 3 || p > SIZE_MAX / Salloc)
+		if (N / p <= 3 || (size_t)p > SIZE_MAX / Salloc)
 			goto out_EINVAL;
 	}
 #ifdef _OPENMP

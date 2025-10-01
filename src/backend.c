@@ -13372,6 +13372,33 @@ static int backend_session_setup_opencl_kernel_types (hashcat_ctx_t *hashcat_ctx
   return 0;
 }
 
+void backend_session_context_reset (hashcat_ctx_t *hashcat_ctx)
+{
+  // workaround for context bug (CUDA)
+  // unclear if needded for other runtimes too
+  // can be reproduced by setting src/benchmark.c to only: 17200, 15700, -1 and then -b
+  // reason is that the spilling buffer is not free'd by the runtime after use and we have no control over this buffer
+  // dropping the context seem to release it
+
+  backend_ctx_t *backend_ctx = hashcat_ctx->backend_ctx;
+
+  if (backend_ctx->enabled == false) return;
+
+  for (int backend_devices_idx = 0; backend_devices_idx < backend_ctx->backend_devices_cnt; backend_devices_idx++)
+  {
+    hc_device_param_t *device_param = &backend_ctx->devices_param[backend_devices_idx];
+
+    if (device_param->skipped == true) continue;
+
+    if (device_param->is_cuda == true)
+    {
+      hc_cuCtxDestroy (hashcat_ctx, device_param->cuda_context);
+
+      hc_cuCtxCreate (hashcat_ctx, &device_param->cuda_context, CU_CTX_SCHED_BLOCKING_SYNC, device_param->cuda_device);
+    }
+  }
+}
+
 int backend_session_begin (hashcat_ctx_t *hashcat_ctx)
 {
   const bitmap_ctx_t         *bitmap_ctx          = hashcat_ctx->bitmap_ctx;

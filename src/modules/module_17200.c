@@ -345,44 +345,46 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (pkzip->version == 1)
   {
-    sprintf (line_buf, "%s", SIGNATURE_PKZIP_V1);
-    out_len += 7;
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%s", SIGNATURE_PKZIP_V1);
   }
   else
   {
-    sprintf (line_buf, "%s", SIGNATURE_PKZIP_V2);
-    out_len += 8;
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%s", SIGNATURE_PKZIP_V2);
   }
-  out_len += sprintf (line_buf + out_len, "%i*%i*", pkzip->hash_count, pkzip->checksum_size);
 
-  out_len += sprintf (line_buf + out_len, "%i*%i*", pkzip->hash.data_type_enum, pkzip->hash.magic_type_enum);
+  out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%i*", pkzip->hash_count, pkzip->checksum_size);
+
+  out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%i*", pkzip->hash.data_type_enum, pkzip->hash.magic_type_enum);
+
   if (pkzip->hash.data_type_enum > 1)
   {
-    out_len += sprintf (line_buf + out_len, "%x*%x*%x*%x*%x*", pkzip->hash.compressed_length, pkzip->hash.uncompressed_length, pkzip->hash.crc32, pkzip->hash.offset, pkzip->hash.additional_offset);
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%x*%x*%x*%x*%x*", pkzip->hash.compressed_length, pkzip->hash.uncompressed_length, pkzip->hash.crc32, pkzip->hash.offset, pkzip->hash.additional_offset);
   }
 
-  out_len += sprintf (line_buf + out_len, "%i*%x*%04x*", pkzip->hash.compression_type, pkzip->hash.data_length, pkzip->hash.checksum_from_crc);
+  out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%x*%04x*", pkzip->hash.compression_type, pkzip->hash.data_length, pkzip->hash.checksum_from_crc);
+
   if (pkzip->version == 2)
   {
-    out_len += sprintf (line_buf + out_len, "%04x*", pkzip->hash.checksum_from_timestamp);
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%04x*", pkzip->hash.checksum_from_timestamp);
   }
 
   for (u32 i = 0; i < pkzip->hash.data_length / 4; i++)
   {
-    out_len += sprintf (line_buf + out_len, "%08x", byte_swap_32 (pkzip->hash.data[i]));
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%08x", byte_swap_32 (pkzip->hash.data[i]));
   }
+
   for (u32 i = 0; i < pkzip->hash.data_length % 4; i++)
   {
-    out_len += sprintf (line_buf + out_len, "%02x", (pkzip->hash.data[pkzip->hash.data_length / 4] >> i*8) & 0xff);
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%02x", (pkzip->hash.data[pkzip->hash.data_length / 4] >> i*8) & 0xff);
   }
 
   if (pkzip->version == 1)
   {
-    out_len += sprintf (line_buf + out_len, "*$/pkzip$");
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "*$/pkzip$");
   }
   else
   {
-    out_len += sprintf (line_buf + out_len, "*$/pkzip2$");
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "*$/pkzip2$");
   }
 
   return out_len;

@@ -18,7 +18,8 @@
 typedef struct gpg
 {
   u32 cipher_algo;
-  u32 iv[4]; // make this dynamic based on the input hash.. iv_size can be 8 bytes or 16 bytes
+  u32 iv[4];
+  u32 iv_size;
   u32 modulus_size;
   u32 encrypted_data[384];
   u32 encrypted_data_size;
@@ -92,6 +93,7 @@ DECLSPEC void memzero_be_S (PRIVATE_AS u32 *block, const u32 start_offset, const
   }
 }
 
+
 DECLSPEC void cast128_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data_len, PRIVATE_AS const u32 *iv, PRIVATE_AS const u32 *key, PRIVATE_AS u32 *decrypted_data, SHM_TYPE u32 (*s_S)[256])
 {
   u8 essiv[8];
@@ -110,13 +112,13 @@ DECLSPEC void cast128_decrypt_cfb (GLOBAL_AS const u32 *encrypted_data, int data
   PRIVATE_AS u8 *lencrypted_data8 = (PRIVATE_AS u8*)lencrypted_data;
   PRIVATE_AS u8 *decrypted_data8 = (PRIVATE_AS u8*)decrypted_data;
   PRIVATE_AS u8 *key8 = (PRIVATE_AS u8*)key;
+  PRIVATE_AS u8 *iv8 = (PRIVATE_AS u8*)iv;
 
-
-  // Copy the IV, since this will be modified
-  // essiv[0] = iv[0];  // IV is zero for our example, but we load it dynamically..
-  // essiv[1] = iv[1];  // IV is zero for our example, but we load it dynamically..
-  // essiv[2] = 0;
-  // essiv[3] = 0; //TODO load IV dynamically, code doesn't make any sense currently as essiv is now a u8
+  // set IV
+  for (int j = 0; j < 16; j++)
+  {
+    essiv[j] = iv8[j];
+  }
 
   CAST_KEY ck;
   Cast5SetKey(&ck, 16, key8, s_S);
@@ -148,8 +150,6 @@ DECLSPEC int check_decoded_data (PRIVATE_AS u32 *decoded_data, const u32 decoded
   expected_sha1[2] = hc_bytealign_be_S (decoded_data[sha1_u32_off + 3], decoded_data[sha1_u32_off + 2], sha1_byte_off);
   expected_sha1[3] = hc_bytealign_be_S (decoded_data[sha1_u32_off + 4], decoded_data[sha1_u32_off + 3], sha1_byte_off);
   expected_sha1[4] = hc_bytealign_be_S (decoded_data[sha1_u32_off + 5], decoded_data[sha1_u32_off + 4], sha1_byte_off);
-
-
 
   memzero_le_S (decoded_data, sha1_byte_off, 384 * sizeof(u32));
 
@@ -191,18 +191,21 @@ KERNEL_FQ KERNEL_FA void m17040_init (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   // create a number of copies for efficiency
   const u32 copies = 80 * sizeof(u32) / salted_pw_len;
 
+
   for (u32 idx = 1; idx < copies; idx++)
   {
     memcat_le_S (salted_pw_block, idx * salted_pw_len, salted_pw_block, salted_pw_len);
   }
 
+  // IMPORTANT: store UNSWAPPED (native order) because we will use sha1_update_swap()
   for (u32 idx = 0; idx < 80; idx++)
   {
-    tmps[gid].salted_pw_block[idx] = hc_swap32_S (salted_pw_block[idx]);
+    tmps[gid].salted_pw_block[idx] = salted_pw_block[idx];
   }
 
   tmps[gid].salted_pw_block_len = (copies * salted_pw_len);
 
+  // init sha1 scratch
   tmps[gid].h[0] = SHA1M_A;
   tmps[gid].h[1] = SHA1M_B;
   tmps[gid].h[2] = SHA1M_C;
@@ -214,13 +217,29 @@ KERNEL_FQ KERNEL_FA void m17040_init (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   tmps[gid].h[8] = SHA1M_D;
   tmps[gid].h[9] = SHA1M_E;
 
+  tmps[gid].w0[0] = 0;
+  tmps[gid].w0[1] = 0;
+  tmps[gid].w0[2] = 0;
+  tmps[gid].w0[3] = 0;
+  tmps[gid].w1[0] = 0;
+  tmps[gid].w1[1] = 0;
+  tmps[gid].w1[2] = 0;
+  tmps[gid].w1[3] = 0;
+  tmps[gid].w2[0] = 0;
+  tmps[gid].w2[1] = 0;
+  tmps[gid].w2[2] = 0;
+  tmps[gid].w2[3] = 0;
+  tmps[gid].w3[0] = 0;
+  tmps[gid].w3[1] = 0;
+  tmps[gid].w3[2] = 0;
+  tmps[gid].w3[3] = 0;
+
   tmps[gid].len = 0;
 }
 
 KERNEL_FQ KERNEL_FA void m17040_loop_prepare (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
   const u64 gid = get_global_id (0);
-
   if (gid >= GID_CNT) return;
 
   tmps[gid].h[0] = SHA1M_A;
@@ -256,15 +275,14 @@ KERNEL_FQ KERNEL_FA void m17040_loop_prepare (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, g
 
 KERNEL_FQ KERNEL_FA void m17040_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
-  const u64 gid = get_global_id (0);
   const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
 
   if (gid >= GID_CNT) return;
 
   // get the prepared buffer from the gpg_tmp_t struct into a local buffer
   u32 salted_pw_block[80];
   for (int i = 0; i < 80; i++) salted_pw_block[i] = tmps[gid].salted_pw_block[i];
-
 
   const u32 salted_pw_block_len = tmps[gid].salted_pw_block_len;
 
@@ -274,35 +292,80 @@ KERNEL_FQ KERNEL_FA void m17040_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   /**
    * context load
    */
-
   sha1_ctx_t ctx;
 
-  for (int i = 0; i < 5; i++) ctx.h[i] = tmps[gid].h[i];
+  /* ---- Legacy S2K path: exactly salt||password once ---- */
+  if (salt_bufs[SALT_POS_HOST].salt_iter == 1)
+  {
+    sha1_init (&ctx);
+
+    const u32 pw_len = pws[gid].pw_len; // raw password length in bytes
+    const u32 salted_pw_len = salt_bufs[SALT_POS_HOST].salt_len + pw_len; // salt_len should be 8
+
+    // Build the exact byte sequence: salt || password
+    // Use raw bytes from salt_buf and pws[].i (no swaps, no padding, no repeats)
+    u8 one[320] = { 0 }; // plenty
+    // copy 8-byte salt
+    PRIVATE_AS const u8 *salt8 = (PRIVATE_AS const u8 *) salt_bufs[SALT_POS_HOST].salt_buf;
+    for (u32 i = 0; i < salt_bufs[SALT_POS_HOST].salt_len; i++) one[i] = salt8[i];
+
+    // copy password bytes
+    PRIVATE_AS const u8 *pw8 = (PRIVATE_AS const u8 *) pws[gid].i;
+    for (u32 i = 0; i < pw_len; i++) one[salt_bufs[SALT_POS_HOST].salt_len + i] = pw8[i];
+
+    // Feed exactly those bytes. Buffer is in native order → use _swap
+    sha1_update_swap (&ctx, (PRIVATE_AS const u32 *) one, salted_pw_len);
+    sha1_final       (&ctx);
+
+    // Save state for aux1
+    for (int i = 0; i < 5; i++) tmps[gid].h[i]  = ctx.h[i];
+    for (int i = 0; i < 4; i++) tmps[gid].w0[i] = ctx.w0[i];
+    for (int i = 0; i < 4; i++) tmps[gid].w1[i] = ctx.w1[i];
+    for (int i = 0; i < 4; i++) tmps[gid].w2[i] = ctx.w2[i];
+    for (int i = 0; i < 4; i++) tmps[gid].w3[i] = ctx.w3[i];
+    tmps[gid].len = 0;
+
+    return;
+  }
+
+  /* ---- Iterated+salted S2K path (unchanged) ---- */
+  const u32 sha_offset = SALT_REPEAT * 5;
+
+  for (int i = 0; i < 5; i++) ctx.h[i] = tmps[gid].h[sha_offset + i];
 
   for (int i = 0; i < 4; i++) ctx.w0[i] = tmps[gid].w0[i];
   for (int i = 0; i < 4; i++) ctx.w1[i] = tmps[gid].w1[i];
   for (int i = 0; i < 4; i++) ctx.w2[i] = tmps[gid].w2[i];
   for (int i = 0; i < 4; i++) ctx.w3[i] = tmps[gid].w3[i];
 
-  const u32 pw_len = pws[gid].pw_len;
-  const u32 salted_pw_len = (salt_bufs[SALT_POS_HOST].salt_len + pw_len);
-  const u32 remaining_bytes = salted_pw_len % 4;
-
   ctx.len = tmps[gid].len;
 
-  memzero_be_S (salted_pw_block, salted_pw_len, salted_pw_block_len);
-  // zero out last bytes of password if not a multiple of 4
-  // TODO do we need this wo don't feed the remainder to the hashing algorithm anyway..??
-  sha1_update (&ctx, salted_pw_block, salted_pw_len);
-  sha1_final (&ctx);
+  // sha-1 of salt and password, up to 'salt_iter' bytes
+  const u32 salt_iter = salt_bufs[SALT_POS_HOST].salt_iter;
 
-  /**
-   * context save
-   */
+  const u32 salted_pw_block_pos = LOOP_POS % salted_pw_block_len;
+  const u32 rounds = (LOOP_CNT + salted_pw_block_pos) / salted_pw_block_len;
 
-  for (int i = 0; i < 5; i++) tmps[gid].h[i] = ctx.h[i];
-  // this is the sha1 hash of the salt+password:
+  for (u32 i = 0; i < rounds; i++)
+  {
+    sha1_update_swap (&ctx, salted_pw_block, salted_pw_block_len);
+  }
 
+  if ((LOOP_POS + LOOP_CNT) == salt_iter)
+  {
+    const u32 remaining_bytes = salt_iter % salted_pw_block_len;
+
+    if (remaining_bytes)
+    {
+      memzero_le_S (salted_pw_block, remaining_bytes, salted_pw_block_len);
+
+      sha1_update_swap (&ctx, salted_pw_block, remaining_bytes);
+    }
+
+    sha1_final (&ctx);
+  }
+
+  for (int i = 0; i < 5; i++) tmps[gid].h[sha_offset + i] = ctx.h[i];
   for (int i = 0; i < 4; i++) tmps[gid].w0[i] = ctx.w0[i];
   for (int i = 0; i < 4; i++) tmps[gid].w1[i] = ctx.w1[i];
   for (int i = 0; i < 4; i++) tmps[gid].w2[i] = ctx.w2[i];
@@ -313,11 +376,6 @@ KERNEL_FQ KERNEL_FA void m17040_loop (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
 KERNEL_FQ KERNEL_FA void m17040_comp (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 {
-  // not in use here, special case...
-}
-
-KERNEL_FQ KERNEL_FA void m17040_aux1 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
-{
   /**
    * modifier
    */
@@ -327,8 +385,8 @@ KERNEL_FQ KERNEL_FA void m17040_aux1 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
   const u64 lsz = get_local_size (0);
 
   /**
-   * aes shared
-   */
+    * aes shared
+    */
 
   #ifdef REAL_SHM
 
@@ -356,24 +414,60 @@ KERNEL_FQ KERNEL_FA void m17040_aux1 (KERN_ATTR_TMPS_ESALT (gpg_tmp_t, gpg_t))
 
   if (gid >= GID_CNT) return;
 
-  // retrieve and use the SHA-1 as the key for CAST5
-  u32 cast_key[5];
-  for (int i = 0; i < 5; i++) cast_key[i] = hc_swap32_S (tmps[gid].h[i]);
+  /* --- Build CAST5 key = first 16 bytes of SHA1(salt||password) --- */
+  /* tmps[gid].h[] holds the SHA-1 state words after final().
+     We want bytes in big-endian order when interpreted as u8*. */
+  u32 cast_key[5]; /* last word unused by SetKey(16), but keep for alignment */
 
-  u32 iv[4] = {0};
-  for (int idx = 0; idx < 4; idx++) iv[idx] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[idx];
+  // /* Optional: show raw digest words for debugging */
+  // if ((gid == 0) && (lid == 0))
+  // {
+  //   printf("digest(h)=\t");
+  //   for (int i = 0; i < 5; i++) printf("%08x", tmps[gid].h[i]);
+  //   printf("\n");
+  // }
+
+  /* Pack first 16 bytes (h0..h3) in BE byte order when viewed as u8* */
+  cast_key[0] = hc_swap32_S (tmps[gid].h[0]);
+  cast_key[1] = hc_swap32_S (tmps[gid].h[1]);
+  cast_key[2] = hc_swap32_S (tmps[gid].h[2]);
+  cast_key[3] = hc_swap32_S (tmps[gid].h[3]);
+  cast_key[4] = 0; /* not used */
+
+  // if ((gid == 0) && (lid == 0))
+  // {
+  //   printf("cast_key16=\t");
+  //   for (int i = 0; i < 4; i++) printf("%08x", cast_key[i]);
+  //   printf("\n");
+  // }
+
+  /* IV as provided by esalt (first 8 bytes used by CFB) */
+  u32 iv[4] = { 0 };
+  for (int i = 0; i < 4; i++) iv[i] = esalt_bufs[DIGESTS_OFFSET_HOST].iv[i];
+
+  // if ((gid == 0) && (lid == 0))
+  // {
+  //   printf("iv=\t");
+  //   for (int i = 0; i < 4; i++) printf("%08x", iv[i]);
+  //   printf("\n");
+  // }
 
   u32 decoded_data[384];
-
   const u32 enc_data_size = esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data_size;
 
-  cast128_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data, enc_data_size, iv, cast_key, decoded_data, s_S);
+  cast128_decrypt_cfb (esalt_bufs[DIGESTS_OFFSET_HOST].encrypted_data,
+                       enc_data_size,
+                       iv,
+                       cast_key,
+                       decoded_data,
+                       s_S);
 
   if (check_decoded_data (decoded_data, enc_data_size))
   {
     if (hc_atomic_inc (&hashes_shown[DIGESTS_OFFSET_HOST]) == 0)
     {
-      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
+      mark_hash (plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT,
+                 0, DIGESTS_OFFSET_HOST + 0, gid, 0, 0, 0);
     }
   }
 }

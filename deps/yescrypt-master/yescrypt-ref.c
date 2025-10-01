@@ -597,8 +597,8 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 		goto out_EINVAL;
 	if (flags & YESCRYPT_RW) {
 		if (N / p <= 1 || r < rmin ||
-		    p > SIZE_MAX / Sbytes ||
-		    p > SIZE_MAX / sizeof(*pwxform_ctx))
+		    (size_t)p > SIZE_MAX / Sbytes ||
+		    (size_t)p > SIZE_MAX / sizeof(*pwxform_ctx))
 			goto out_EINVAL;
 	}
 

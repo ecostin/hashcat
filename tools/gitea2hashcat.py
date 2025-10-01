@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Converts gitea PBKDF2-HMAC-SHA256 hashes into a format hashcat can use
+# Converts gitea PBKDF2-HMAC-SHA256 hashes into a format hashcat can use with hashcat mode 10900
 # written by unix-ninja
 
 import argparse

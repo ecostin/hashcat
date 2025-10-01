@@ -60,9 +60,9 @@ This function is called whenever hashcat needs the next password candidate. You 
 ### Full Function Set
 
 ```
-bool global_init     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx[DEVICES_MAX], hashcat_ctx_t *hashcat_ctx);
-void global_term     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx[DEVICES_MAX], hashcat_ctx_t *hashcat_ctx);
-u64  global_keyspace (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx[DEVICES_MAX], hashcat_ctx_t *hashcat_ctx);
+bool global_init     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t **thread_ctx, hashcat_ctx_t *hashcat_ctx);
+void global_term     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t **thread_ctx, hashcat_ctx_t *hashcat_ctx);
+u64  global_keyspace (generic_global_ctx_t *global_ctx, generic_thread_ctx_t **thread_ctx, hashcat_ctx_t *hashcat_ctx);
 bool thread_init     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx)
 void thread_term     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx)
 int  thread_next     (generic_global_ctx_t *global_ctx, generic_thread_ctx_t *thread_ctx, u8 *out_buf)

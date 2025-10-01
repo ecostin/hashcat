@@ -1,0 +1,174 @@
+diff --git a/src/Makefile b/src/Makefile
+index 1f1987fbe..4f89b8d63 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -10,6 +10,7 @@ PRODUCTION_VERSION      := v7.1.2
+ ENABLE_CUBIN            ?= 1
+ ENABLE_BRAIN            ?= 1
+ ENABLE_UNRAR            ?= 1
++ENABLE_LTO              ?= 0
+ USE_SYSTEM_LZMA         ?= 0
+ USE_SYSTEM_ZLIB         ?= 0
+ USE_SYSTEM_OPENCL       ?= 0
+@@ -201,12 +202,23 @@ COMPTIME                := $(shell date +%s)
+ ## General compiler and linker options
+ ##
+ 
++CFLAGS                  := $(CFLAGS)
+ LFLAGS                  := $(LDFLAGS)
+ 
++#ifeq ($(DEBUG),1)
++CFLAGS                  += -fstack-usage
++#endif
++
++ifeq ($(ENABLE_LTO),1)
++CFLAGS                  += -flto=auto -Wno-unknown-warning-option
++LFLAGS                  += -flto=auto -Wno-lto-type-mismatch
++endif
++
+ ifneq ($(UNAME),Darwin)
+ ifeq ($(MAINTAINER_MODE),0)
+ ifeq ($(BUILD_MODE),native)
+ CFLAGS                  += -march=native
++CFLAGS                  += -mtune=native
+ endif
+ endif
+ endif
+@@ -284,7 +296,7 @@ endif
+ endif
+ 
+ ifeq ($(DEBUG),0)
+-CFLAGS                  += -O2
++CFLAGS                  += -O2 -fomit-frame-pointer -fno-plt
+ ifneq ($(UNAME),Darwin)
+ LFLAGS                  += -s
+ endif
+@@ -354,9 +366,11 @@ CFLAGS                  += -I$(DEPS_UNRAR_PATH)
+ ifeq ($(UNAME),OpenBSD)
+ LFLAGS                  += -lc++
+ else
++ifeq ($(UNAME),Darwin)
+ LFLAGS                  += -lstdc++
+ endif
+ endif
++endif
+ 
+ ##
+ ## Native compilation target
+@@ -552,23 +566,31 @@ clean:
+ 	$(RM) -rf modules/*.dSYM
+ 	$(RM) -rf bridges/*.dSYM
+ 	$(RM) -rf feeds/*.dSYM
+-	$(RM) -f modules/*.dll
+-	$(RM) -f bridges/*.dll
++	$(RM) -rf *.dSYM
+ 	$(RM) -f bridges/subs/*.dll
+-	$(RM) -f feeds/*.dll
+-	$(RM) -f modules/*.so
+-	$(RM) -f bridges/*.so
+ 	$(RM) -f bridges/subs/*.so
++	$(RM) -f bridges/subs/*.su
++	$(RM) -f bridges/*.dll
++	$(RM) -f bridges/*.so
++	$(RM) -f bridges/*.su
++	$(RM) -f feeds/*.dll
+ 	$(RM) -f feeds/*.so
++	$(RM) -f feeds/*.su
++	$(RM) -f modules/*.dll
++	$(RM) -f modules/*.so
++	$(RM) -f modules/*.su
+ 	$(RM) -f obj/*/*/*.o
++	$(RM) -f obj/*/*/*.su
+ 	$(RM) -f obj/*/*.o
++	$(RM) -f obj/*/*.su
+ 	$(RM) -f obj/*.o
++	$(RM) -f obj/*.su
+ 	$(RM) -f obj/*.a
+-	$(RM) -rf *.dSYM
+ 	$(RM) -f *.dylib
+ 	$(RM) -f *.bin *.exe
+ 	$(RM) -f *.pid
+ 	$(RM) -f *.log
++	$(RM) -f *.su
+ 	$(RM) -f core
+ 	$(RM) -rf *.induct
+ 	$(RM) -rf *.outfiles
+@@ -917,24 +939,77 @@ WIN_PYTHON              := /opt/win-python
+ CFLAGS_CROSS_LINUX      := $(CFLAGS)
+ CFLAGS_CROSS_LINUX      += -fPIC
+ CFLAGS_CROSS_LINUX      += -DWITH_HWMON
++
++ifneq (,$(findstring clang, $(CC_LINUX)))
++CFLAGS_CROSS_LINUX      += -Wno-typedef-redefinition
++CFLAGS_CROSS_LINUX      += -Wno-unknown-warning-option
++endif
++
+ CFLAGS_CROSS_WIN        := $(CFLAGS)
+ CFLAGS_CROSS_WIN        += -fPIC
+ CFLAGS_CROSS_WIN        += -I$(WIN_ICONV)/include/
+ CFLAGS_CROSS_WIN        += -DWITH_HWMON
+ 
++ifneq (,$(findstring clang, $(CC_WIN)))
++CFLAGS_CROSS_WIN        := $(filter-out -fno-plt,$(CFLAGS_CROSS_WIN))
++CFLAGS_CROSS_WIN        += --target=x86_64-w64-mingw32
++CFLAGS_CROSS_WIN        += -D_CLANG_DISABLE_CRT_DEPRECATION_WARNINGS
++CFLAGS_CROSS_WIN        += -D__INTRINSIC_DEFINED___cpuidex=1
++CFLAGS_CROSS_WIN        += -D__INTRINSIC_DEFINED__xgetbv=1
++CFLAGS_CROSS_WIN        += -Wno-typedef-redefinition
++CFLAGS_CROSS_WIN        += -Wno-ignored-attributes
++CFLAGS_CROSS_WIN        += -Wno-unknown-warning-option
++endif
++
+ LFLAGS_CROSS_LINUX      := $(LFLAGS)
+ LFLAGS_CROSS_LINUX      += -lpthread
+ LFLAGS_CROSS_LINUX      += -ldl
+ LFLAGS_CROSS_LINUX      += -lm
++LFLAGS_CROSS_LINUX      += -static-libgcc
++
++ifneq (,$(findstring clang, $(CC_LINUX)))
++LFLAGS_CROSS_LINUX      += -stdlib=libc++
++else
++LFLAGS_CROSS_LINUX      += -static-libstdc++
++endif
++
++ifeq ($(ENABLE_LTO),1)
++ifneq (,$(findstring clang, $(CC_LINUX)))
++LFLAGS_CROSS_LINUX      += -fuse-ld=lld
++else
++LFLAGS_CROSS_LINUX      += -fuse-ld=gold
++endif
++endif
++
+ LFLAGS_CROSS_WIN        := $(LFLAGS)
++ifneq ($(UNAME),Darwin)
++LFLAGS_CROSS_WIN        += -lstdc++
++endif
++
++ifeq (,$(findstring clang, $(CC_WIN)))
+ LFLAGS_CROSS_WIN        += -Wl,--dynamicbase
+ LFLAGS_CROSS_WIN        += -Wl,--nxcompat
++endif
+ LFLAGS_CROSS_WIN        += -lpsapi
+ LFLAGS_CROSS_WIN        += -lws2_32
+ LFLAGS_CROSS_WIN        += -lpowrprof
+-LFLAGS_CROSS_WIN        += -static -static-libgcc -static-libstdc++
++
++ifeq (,$(findstring clang, $(CC_WIN)))
++LFLAGS_CROSS_WIN        += -static
++endif
++LFLAGS_CROSS_WIN        += -static-libgcc
++ifeq (,$(findstring clang, $(CC_WIN)))
++LFLAGS_CROSS_WIN        += -static-libstdc++
++endif
+ LFLAGS_CROSS_WIN        += -lole32 -loleaut32 -lwbemuuid
+ 
++ifeq ($(ENABLE_LTO),1)
++ifneq (,$(findstring clang, $(CC_WIN)))
++LFLAGS_CROSS_WIN        += -fuse-ld=lld
++LFLAGS_CROSS_WIN        += -Wl,--stack,16777216
++endif
++endif
++
+ CFLAGS_LZMA_WIN         := $(CFLAGS_LZMA)
+ CFLAGS_UNRAR_WIN        := $(CFLAGS_UNRAR)
+ 

@@ -341,51 +341,54 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   if (pkzip->version == 1)
   {
-    sprintf (line_buf, "%s", SIGNATURE_PKZIP_V1);
-    out_len += 7;
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%s", SIGNATURE_PKZIP_V1);
   }
   else
   {
-    sprintf (line_buf, "%s", SIGNATURE_PKZIP_V2);
-    out_len += 8;
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%s", SIGNATURE_PKZIP_V2);
   }
-  out_len += sprintf (line_buf + out_len, "%i*%i*", pkzip->hash_count, pkzip->checksum_size);
+
+  out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%i*", pkzip->hash_count, pkzip->checksum_size);
 
   for (int cnt = 0; cnt < pkzip->hash_count; cnt++)
   {
     if (cnt > 0)
     {
-      out_len += sprintf (line_buf + out_len, "*");
-    }
-    out_len += sprintf (line_buf + out_len, "%i*%i*", pkzip->hashes[cnt].data_type_enum, pkzip->hashes[cnt].magic_type_enum);
-    if (pkzip->hashes[cnt].data_type_enum > 1)
-    {
-      out_len += sprintf (line_buf + out_len, "%x*%x*%x*%x*%x*", pkzip->hashes[cnt].compressed_length, pkzip->hashes[cnt].uncompressed_length, pkzip->hashes[cnt].crc32, pkzip->hashes[cnt].offset, pkzip->hashes[cnt].additional_offset);
+      out_len += snprintf (line_buf + out_len, line_size - out_len, "*");
     }
 
-    out_len += sprintf (line_buf + out_len, "%i*%x*%04x*", pkzip->hashes[cnt].compression_type, pkzip->hashes[cnt].data_length, pkzip->hashes[cnt].checksum_from_crc);
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%i*", pkzip->hashes[cnt].data_type_enum, pkzip->hashes[cnt].magic_type_enum);
+
+    if (pkzip->hashes[cnt].data_type_enum > 1)
+    {
+      out_len += snprintf (line_buf + out_len, line_size - out_len, "%x*%x*%x*%x*%x*", pkzip->hashes[cnt].compressed_length, pkzip->hashes[cnt].uncompressed_length, pkzip->hashes[cnt].crc32, pkzip->hashes[cnt].offset, pkzip->hashes[cnt].additional_offset);
+    }
+
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "%i*%x*%04x*", pkzip->hashes[cnt].compression_type, pkzip->hashes[cnt].data_length, pkzip->hashes[cnt].checksum_from_crc);
+
     if (pkzip->version == 2)
     {
-      out_len += sprintf (line_buf + out_len, "%04x*", pkzip->hashes[cnt].checksum_from_timestamp);
+      out_len += snprintf (line_buf + out_len, line_size - out_len, "%04x*", pkzip->hashes[cnt].checksum_from_timestamp);
     }
 
     for (u32 i = 0; i < pkzip->hashes[cnt].data_length / 4; i++)
     {
-      out_len += sprintf (line_buf + out_len, "%08x", byte_swap_32 (pkzip->hashes[cnt].data[i]));
+      out_len += snprintf (line_buf + out_len, line_size - out_len, "%08x", byte_swap_32 (pkzip->hashes[cnt].data[i]));
     }
+
     for (u32 i = 0; i < pkzip->hashes[cnt].data_length % 4; i++)
     {
-      out_len += sprintf (line_buf + out_len, "%02x", (pkzip->hashes[cnt].data[pkzip->hashes[cnt].data_length / 4] >> i*8) & 0xff);
+      out_len += snprintf (line_buf + out_len, line_size - out_len, "%02x", (pkzip->hashes[cnt].data[pkzip->hashes[cnt].data_length / 4] >> (i * 8)) & 0xff);
     }
   }
 
   if (pkzip->version == 1)
   {
-    out_len += sprintf (line_buf + out_len, "*$/pkzip$");
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "*$/pkzip$");
   }
   else
   {
-    out_len += sprintf (line_buf + out_len, "*$/pkzip2$");
+    out_len += snprintf (line_buf + out_len, line_size - out_len, "*$/pkzip2$");
   }
 
   return out_len;

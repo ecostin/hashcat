@@ -865,6 +865,19 @@ typedef enum CUdevice_attribute_enum {
     CU_DEVICE_ATTRIBUTE_MAX
 } CUdevice_attribute;
 
+typedef enum CUlimit_enum {
+    CU_LIMIT_STACK_SIZE                       = 0x00, /**< GPU thread stack size */
+    CU_LIMIT_PRINTF_FIFO_SIZE                 = 0x01, /**< GPU printf FIFO size */
+    CU_LIMIT_MALLOC_HEAP_SIZE                 = 0x02, /**< GPU malloc heap size */
+    CU_LIMIT_DEV_RUNTIME_SYNC_DEPTH           = 0x03, /**< GPU device runtime launch synchronize depth */
+    CU_LIMIT_DEV_RUNTIME_PENDING_LAUNCH_COUNT = 0x04, /**< GPU device runtime pending launch count */
+    CU_LIMIT_MAX_L2_FETCH_GRANULARITY         = 0x05, /**< A value between 0 and 128 that indicates the maximum fetch granularity of L2 (in Bytes). This is a hint */
+    CU_LIMIT_PERSISTING_L2_CACHE_SIZE         = 0x06, /**< A size in bytes for L2 persisting lines cache size */
+    CU_LIMIT_SHMEM_SIZE                       = 0x07, /**< A maximum size in bytes of shared memory available to CUDA kernels on a CIG context. Can only be queried, cannot be set */
+    CU_LIMIT_CIG_ENABLED                      = 0x08, /**< A non-zero value indicates this CUDA context is a CIG-enabled context. Can only be queried, cannot be set */
+    CU_LIMIT_CIG_SHMEM_FALLBACK_ENABLED       = 0x09, /**< When set to zero, CUDA will fail to launch a kernel on a CIG context, instead of using the fallback path, if the kernel uses more shared memory than available */
+    CU_LIMIT_MAX
+} CUlimit;
 
 /**
  * Function cache configurations
@@ -1184,6 +1197,9 @@ typedef CUresult (CUDA_API_CALL *CUDA_CULINKADDDATA)            (CUlinkState, CU
 typedef CUresult (CUDA_API_CALL *CUDA_CULINKDESTROY)            (CUlinkState);
 typedef CUresult (CUDA_API_CALL *CUDA_CULINKCOMPLETE)           (CUlinkState, void **, size_t *);
 typedef CUresult (CUDA_API_CALL *CUDA_CUOCCUPANCYMAXBLOCKSPERMULTIPROCESSOR) (int *, CUfunction, int, size_t);
+typedef CUresult (CUDA_API_CALL *CUDA_CUCTXRESETPERSISTINGL2CACHE) (void);
+typedef CUresult (CUDA_API_CALL *CUDA_CUCTXGETLIMIT)            (size_t *, CUlimit);
+typedef CUresult (CUDA_API_CALL *CUDA_CUCTXSETLIMIT)            (CUlimit, size_t);
 
 typedef struct hc_cuda_lib
 {
@@ -1252,6 +1268,9 @@ typedef struct hc_cuda_lib
   CUDA_CULINKDESTROY            cuLinkDestroy;
   CUDA_CULINKCOMPLETE           cuLinkComplete;
   CUDA_CUOCCUPANCYMAXBLOCKSPERMULTIPROCESSOR cuOccupancyMaxActiveBlocksPerMultiprocessor;
+  CUDA_CUCTXRESETPERSISTINGL2CACHE cuCtxResetPersistingL2Cache;
+  CUDA_CUCTXGETLIMIT            cuCtxGetLimit;
+  CUDA_CUCTXSETLIMIT            cuCtxSetLimit;
 
 } hc_cuda_lib_t;
 
@@ -1313,5 +1332,8 @@ int hc_cuLinkAddData           (void *hashcat_ctx, CUlinkState state, CUjitInput
 int hc_cuLinkDestroy           (void *hashcat_ctx, CUlinkState state);
 int hc_cuLinkComplete          (void *hashcat_ctx, CUlinkState state, void **cubinOut, size_t *sizeOut);
 int hc_cuOccupancyMaxActiveBlocksPerMultiprocessor (void *hashcat_ctx, int *numBlocks, CUfunction func, int blockSize, size_t dynamicSMemSize);
+int hc_cuCtxResetPersistingL2Cache (void *hashcat_ctx);
+int hc_cuCtxGetLimit           (void *hashcat_ctx, size_t *pvalue, CUlimit limit);
+int hc_cuCtxSetLimit           (void *hashcat_ctx, CUlimit limit, size_t value);
 
 #endif // HC_EXT_CUDA_H

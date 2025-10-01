@@ -58,9 +58,10 @@ typedef struct telegram
 
 } telegram_t;
 
+#define DATA_LEN_TELEGRAM 288
+#define SALT_LEN_TELEGRAM 32
+
 static const char *SIGNATURE_TELEGRAM = "$telegram$";
-static const int   DATA_LEN_TELEGRAM  = 288;
-static const int   SALT_LEN_TELEGRAM  =  32;
 
 u64 module_esalt_size (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {

@@ -30,8 +30,6 @@ static const u32   SALT_TYPE         = SALT_TYPE_NONE;
 static const char *ST_PASS           = "59887ec9920239bd45b6a9f82b7c4e024f80beaf887e5ee6aac5de0a899d3068";
 static const char *ST_HASH           = "14Fqy5AGRehazZ4NLzxFWy2E4BiNFdH9Ut";
 static const char *BENCHMARK_MASK    = "?h?h?h?h?h?h?h9920239bd45b6a9f82b7c4e024f80beaf887e5ee6aac5de0a899d3068";
-static const u32   PUBKEY_MAXLEN     = 64; // our max is actually always 25 (21 + 4)
-static const u32   RAW_LEN           = 64;
 
 u32         module_attack_exec       (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ATTACK_EXEC;     }
 u32         module_dgst_pos0         (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return DGST_POS0;       }
@@ -48,6 +46,9 @@ u32         module_salt_type         (MAYBE_UNUSED const hashconfig_t *hashconfi
 const char *module_st_hash           (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_HASH;         }
 const char *module_st_pass           (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 const char *module_benchmark_mask    (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return BENCHMARK_MASK;  }
+
+#define PUBKEY_MAXLEN     64 // our max is actually always 25 (21 + 4)
+#define RAW_LEN           64
 
 bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
 {

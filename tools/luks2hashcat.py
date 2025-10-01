@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Script to extract the hash for use with hashcat modes 295xx and 34100
+
 #
 # Author......: See docs/credits.txt
 # License.....: MIT

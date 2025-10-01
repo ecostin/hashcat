@@ -33,6 +33,7 @@ void backend_ctx_devices_sync_tuning        (hashcat_ctx_t *hashcat_ctx);
 void backend_ctx_devices_update_power       (hashcat_ctx_t *hashcat_ctx);
 void backend_ctx_devices_kernel_loops       (hashcat_ctx_t *hashcat_ctx);
 
+void backend_session_context_reset          (hashcat_ctx_t *hashcat_ctx);
 int  backend_session_begin                  (hashcat_ctx_t *hashcat_ctx);
 void backend_session_destroy                (hashcat_ctx_t *hashcat_ctx);
 void backend_session_reset                  (hashcat_ctx_t *hashcat_ctx);

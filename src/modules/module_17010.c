@@ -300,6 +300,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
   const gpg_t *gpg = (const gpg_t *) esalt_buf;
 
   u8 encrypted_data[(384 * 8) + 1];
+  memset(encrypted_data, 0, 384*8+1); // always initialize to zero
 
   hex_encode ((const u8 *) gpg->encrypted_data, gpg->encrypted_data_size, (u8 *) encrypted_data);
 

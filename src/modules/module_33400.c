@@ -22,8 +22,8 @@ static const u32   DGST_POS1      = 1;
 static const u32   DGST_POS2      = 2;
 static const u32   DGST_POS3      = 3;
 static const u32   DGST_SIZE      = DGST_SIZE_4_8;
-// TODO: not sure about this choice
-static const u32   HASH_CATEGORY  = HASH_CATEGORY_ARCHIVE;
+// Mega.nz is a cloud storage service, categorized as network server
+static const u32   HASH_CATEGORY  = HASH_CATEGORY_NETWORK_SERVER;
 static const char *HASH_NAME      = "mega.nz password-protected link (PBKDF2-HMAC-SHA512)";
 static const u64   KERN_TYPE      = 33400;
 static const u32   OPTI_TYPE      = OPTI_TYPE_ZERO_BYTE

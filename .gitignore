@@ -17,6 +17,7 @@ hashcat.dll
 *.log
 *.out
 *.dSYM
+*.su
 kernels/**
 seekdbs/**
 lib/*.a

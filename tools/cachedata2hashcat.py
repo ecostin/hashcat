@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Script to extract the hash from a CacheData-file.
+# Script to extract the hash from a CacheData-file for use with hashcat mode 33700.
 #--MicrosoftAccount
 ### C:\Windows\system32\config\systemprofile\AppData\local\microsoft\windows\CloudAPCache\MicrosoftAccount\<unique_hash>\Cache\CacheData
 #--AzureAD

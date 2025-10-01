@@ -3131,6 +3131,31 @@ DECLSPEC int is_valid_printable_32 (const u32 v)
   return 1;
 }
 
+DECLSPEC int is_valid_printable_8_incl_common_control (const u8 v)
+{
+  int valid=1;
+  // make sure only printables are allowed
+  if (v > (u8) 0x7e) valid=0;
+  if (v < (u8) 0x20) valid=0;
+
+  // but also allow some common control characters
+  if (v == (u8) 0x09) valid=1; // \t
+  if (v == (u8) 0x0a) valid=1; // \n
+  if (v == (u8) 0x0d) valid=1; // \r
+
+  return valid;
+}
+
+DECLSPEC int is_valid_printable_32_incl_common_control (const u32 v)
+{
+  if (is_valid_printable_8_incl_common_control ((u8) (v >>  0)) == 0) return 0;
+  if (is_valid_printable_8_incl_common_control ((u8) (v >>  8)) == 0) return 0;
+  if (is_valid_printable_8_incl_common_control ((u8) (v >> 16)) == 0) return 0;
+  if (is_valid_printable_8_incl_common_control ((u8) (v >> 24)) == 0) return 0;
+
+  return 1;
+}
+
 DECLSPEC int hc_find_keyboard_layout_map (const u32 search, const int search_len, LOCAL_AS keyboard_layout_mapping_t *s_keyboard_layout_mapping_buf, const int keyboard_layout_mapping_cnt)
 {
   for (int idx = 0; idx < keyboard_layout_mapping_cnt; idx++)

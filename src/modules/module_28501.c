@@ -31,8 +31,6 @@ static const char *ST_PASS           = "KxhashcatxhXkULNJYF8Fu46G28SJrC7x2qwFtRu
 static const char *ST_HASH           = "1Jv6EonXm9x4Dw4QjEPAhGfmzFxTL7b3Zj";
 static const char *BENCHMARK_MASK    = "?1?1?1?1?1?1?1atxhXkULNJYF8Fu46G28SJrC7x2qwFtRuf38kVjkWxHg3";
 static const char *BENCHMARK_CHARSET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-static const u32   PUBKEY_MAXLEN     = 64; // our max is actually always 25 (21 + 4)
-static const u32   WIF_LEN           = 52;
 
 u32         module_attack_exec       (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ATTACK_EXEC;     }
 u32         module_dgst_pos0         (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return DGST_POS0;       }
@@ -50,6 +48,9 @@ const char *module_st_hash           (MAYBE_UNUSED const hashconfig_t *hashconfi
 const char *module_st_pass           (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return ST_PASS;         }
 const char *module_benchmark_mask    (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return BENCHMARK_MASK;  }
 const char *module_benchmark_charset (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra) { return BENCHMARK_CHARSET;  }
+
+#define PUBKEY_MAXLEN 64 // our max is actually always 25 (21 + 4)
+#define WIF_LEN       52
 
 bool module_unstable_warning (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra, MAYBE_UNUSED const hc_device_param_t *device_param)
 {

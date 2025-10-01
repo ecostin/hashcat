@@ -17,20 +17,6 @@
 #include M2S(INCLUDE_PATH/inc_cipher_aes.cl)
 #endif
 
-DECLSPEC int is_valid_char (const u32 v)
-{
-  if ((v & 0xff000000) < 0x09000000) return 0;
-  if ((v & 0xff000000) > 0x7e000000) return 0;
-  if ((v & 0x00ff0000) < 0x00090000) return 0;
-  if ((v & 0x00ff0000) > 0x007e0000) return 0;
-  if ((v & 0x0000ff00) < 0x00000900) return 0;
-  if ((v & 0x0000ff00) > 0x00007e00) return 0;
-  if ((v & 0x000000ff) < 0x00000009) return 0;
-  if ((v & 0x000000ff) > 0x0000007e) return 0;
-
-  return 1;
-}
-
 KERNEL_FQ KERNEL_FA void m34700_mxx (KERN_ATTR_RULES ())
 {
   const u64 gid = get_global_id (0);
@@ -209,10 +195,11 @@ KERNEL_FQ KERNEL_FA void m34700_mxx (KERN_ATTR_RULES ())
     pt[2] = ct[2] ^ out[2];
     pt[3] = ct[3] ^ out[3];
 
-    if (is_valid_char (pt[0]) == 0) continue;
-    if (is_valid_char (pt[1]) == 0) continue;
-    if (is_valid_char (pt[2]) == 0) continue;
-    if (is_valid_char (pt[3]) == 0) continue;
+    // decrypted data should be a string consisting only of ASCII chars (including newlines)
+    if (is_valid_printable_32_incl_common_control (pt[0]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[1]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[2]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[3]) == 0) continue;
 
     int i;
 
@@ -225,10 +212,10 @@ KERNEL_FQ KERNEL_FA void m34700_mxx (KERN_ATTR_RULES ())
       pt[2] = salt_bufs[SALT_POS_HOST].salt_buf[i + 2] ^ out[2];
       pt[3] = salt_bufs[SALT_POS_HOST].salt_buf[i + 3] ^ out[3];
 
-      if (is_valid_char (pt[0]) == 0) break;
-      if (is_valid_char (pt[1]) == 0) break;
-      if (is_valid_char (pt[2]) == 0) break;
-      if (is_valid_char (pt[3]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[0]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[1]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[2]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[3]) == 0) break;
     }
 
     if (i < 16) continue;
@@ -432,10 +419,10 @@ KERNEL_FQ KERNEL_FA void m34700_sxx (KERN_ATTR_RULES ())
     pt[2] = ct[2] ^ out[2];
     pt[3] = ct[3] ^ out[3];
 
-    if (is_valid_char (pt[0]) == 0) continue;
-    if (is_valid_char (pt[1]) == 0) continue;
-    if (is_valid_char (pt[2]) == 0) continue;
-    if (is_valid_char (pt[3]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[0]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[1]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[2]) == 0) continue;
+    if (is_valid_printable_32_incl_common_control (pt[3]) == 0) continue;
 
     int i;
 
@@ -448,10 +435,10 @@ KERNEL_FQ KERNEL_FA void m34700_sxx (KERN_ATTR_RULES ())
       pt[2] = salt_bufs[SALT_POS_HOST].salt_buf[i + 2] ^ out[2];
       pt[3] = salt_bufs[SALT_POS_HOST].salt_buf[i + 3] ^ out[3];
 
-      if (is_valid_char (pt[0]) == 0) break;
-      if (is_valid_char (pt[1]) == 0) break;
-      if (is_valid_char (pt[2]) == 0) break;
-      if (is_valid_char (pt[3]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[0]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[1]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[2]) == 0) break;
+      if (is_valid_printable_32_incl_common_control (pt[3]) == 0) break;
     }
 
     if (i < 16) continue;

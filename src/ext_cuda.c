@@ -114,6 +114,9 @@ int cuda_init (void *hashcat_ctx)
   HC_LOAD_FUNC_CUDA (cuda, cuStreamWaitEvent,        cuStreamWaitEvent,         CUDA_CUSTREAMWAITEVENT,         CUDA, 1);
   HC_LOAD_FUNC_CUDA (cuda, cuStreamWaitEvent,        cuStreamWaitEvent,         CUDA_CUSTREAMWAITEVENT,         CUDA, 1);
   HC_LOAD_FUNC_CUDA (cuda, cuOccupancyMaxActiveBlocksPerMultiprocessor, cuOccupancyMaxActiveBlocksPerMultiprocessor, CUDA_CUOCCUPANCYMAXBLOCKSPERMULTIPROCESSOR, CUDA, 1);
+  HC_LOAD_FUNC_CUDA (cuda, cuCtxResetPersistingL2Cache, cuCtxResetPersistingL2Cache, CUDA_CUCTXRESETPERSISTINGL2CACHE, CUDA, 1);
+  HC_LOAD_FUNC_CUDA (cuda, cuCtxGetLimit,            cuCtxGetLimit,             CUDA_CUCTXGETLIMIT            , CUDA, 1);
+  HC_LOAD_FUNC_CUDA (cuda, cuCtxSetLimit,            cuCtxSetLimit,             CUDA_CUCTXSETLIMIT            , CUDA, 1);
 
   #if defined (WITH_CUBIN)
   HC_LOAD_FUNC_CUDA (cuda, cuLinkCreate,             cuLinkCreate_v2,           CUDA_CULINKCREATE,              CUDA, 1);
@@ -215,6 +218,33 @@ int hc_cuInit (void *hashcat_ctx, unsigned int Flags)
     else
     {
       event_log_error (hashcat_ctx, "cuInit(): %d", CU_err);
+    }
+
+    return -1;
+  }
+
+  return 0;
+}
+
+int hc_cuCtxResetPersistingL2Cache (void *hashcat_ctx)
+{
+  backend_ctx_t *backend_ctx = ((hashcat_ctx_t *) hashcat_ctx)->backend_ctx;
+
+  CUDA_PTR *cuda = (CUDA_PTR *) backend_ctx->cuda;
+
+  const CUresult CU_err = cuda->cuCtxResetPersistingL2Cache ();
+
+  if (CU_err != CUDA_SUCCESS)
+  {
+    const char *pStr = NULL;
+
+    if (cuda->cuGetErrorString (CU_err, &pStr) == CUDA_SUCCESS)
+    {
+      event_log_error (hashcat_ctx, "cuCtxResetPersistingL2Cache(): %s", pStr);
+    }
+    else
+    {
+      event_log_error (hashcat_ctx, "cuCtxResetPersistingL2Cache(): %d", CU_err);
     }
 
     return -1;
@@ -1485,6 +1515,60 @@ int hc_cuOccupancyMaxActiveBlocksPerMultiprocessor (void *hashcat_ctx, int *numB
     else
     {
       event_log_error (hashcat_ctx, "cuOccupancyMaxActiveBlocksPerMultiprocessor(): %d", CU_err);
+    }
+
+    return -1;
+  }
+
+  return 0;
+}
+
+int hc_cuCtxGetLimit (void *hashcat_ctx, size_t *pvalue, CUlimit limit)
+{
+  backend_ctx_t *backend_ctx = ((hashcat_ctx_t *) hashcat_ctx)->backend_ctx;
+
+  CUDA_PTR *cuda = (CUDA_PTR *) backend_ctx->cuda;
+
+  const CUresult CU_err = cuda->cuCtxGetLimit (pvalue, limit);
+
+  if (CU_err != CUDA_SUCCESS)
+  {
+    const char *pStr = NULL;
+
+    if (cuda->cuGetErrorString (CU_err, &pStr) == CUDA_SUCCESS)
+    {
+      event_log_error (hashcat_ctx, "cuCtxGetLimit(): %s", pStr);
+    }
+    else
+    {
+      event_log_error (hashcat_ctx, "cuCtxGetLimit(): %d", CU_err);
+    }
+
+    return -1;
+  }
+
+  return 0;
+}
+
+int hc_cuCtxSetLimit (void *hashcat_ctx, CUlimit limit, size_t value)
+{
+  backend_ctx_t *backend_ctx = ((hashcat_ctx_t *) hashcat_ctx)->backend_ctx;
+
+  CUDA_PTR *cuda = (CUDA_PTR *) backend_ctx->cuda;
+
+  const CUresult CU_err = cuda->cuCtxSetLimit (limit, value);
+
+  if (CU_err != CUDA_SUCCESS)
+  {
+    const char *pStr = NULL;
+
+    if (cuda->cuGetErrorString (CU_err, &pStr) == CUDA_SUCCESS)
+    {
+      event_log_error (hashcat_ctx, "cuCtxSetLimit(): %s", pStr);
+    }
+    else
+    {
+      event_log_error (hashcat_ctx, "cuCtxSetLimit(): %d", CU_err);
     }
 
     return -1;

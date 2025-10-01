@@ -48,7 +48,7 @@ const char *module_st_pass        (MAYBE_UNUSED const hashconfig_t *hashconfig, 
 
 const char *module_usage_notice (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSED const user_options_t *user_options, MAYBE_UNUSED const user_options_extra_t *user_options_extra)
 {
-  return "You can use https://github.com/0x6470/bitwarden2hashcat to extract the hashes";
+  return "You can use https://github.com/hashcat/hashcat/blob/master/tools/bitwarden2hashcat.py or the older https://github.com/0x6470/bitwarden2hashcat to extract the hashes";
 }
 
 typedef struct bitwarden_tmp

@@ -207,6 +207,8 @@ KERNEL_FQ KERNEL_FA void m08500_mxx (KERN_ATTR_VECTOR ())
    * shared
    */
 
+  #ifdef REAL_SHM
+
   LOCAL_VK u32 s_SPtrans[8][64];
   LOCAL_VK u32 s_skb[8][64];
 
@@ -232,6 +234,13 @@ KERNEL_FQ KERNEL_FA void m08500_mxx (KERN_ATTR_VECTOR ())
   }
 
   SYNC_THREADS ();
+
+  #else
+
+  CONSTANT_AS u32a (*s_SPtrans)[64] = c_SPtrans;
+  CONSTANT_AS u32a (*s_skb)[64]     = c_skb;
+
+  #endif
 
   if (gid >= GID_CNT) return;
 
@@ -281,6 +290,8 @@ KERNEL_FQ KERNEL_FA void m08500_sxx (KERN_ATTR_VECTOR ())
    * shared
    */
 
+  #ifdef REAL_SHM
+
   LOCAL_VK u32 s_SPtrans[8][64];
   LOCAL_VK u32 s_skb[8][64];
 
@@ -306,6 +317,13 @@ KERNEL_FQ KERNEL_FA void m08500_sxx (KERN_ATTR_VECTOR ())
   }
 
   SYNC_THREADS ();
+
+  #else
+
+  CONSTANT_AS u32a (*s_SPtrans)[64] = c_SPtrans;
+  CONSTANT_AS u32a (*s_skb)[64]     = c_skb;
+
+  #endif
 
   if (gid >= GID_CNT) return;
 
