@@ -82,6 +82,7 @@ static const struct option long_options[] =
   {"generate-rules-seed",       required_argument, NULL, IDX_RP_GEN_SEED},
   {"hwmon-disable",             no_argument,       NULL, IDX_HWMON_DISABLE},
   {"hwmon-temp-abort",          required_argument, NULL, IDX_HWMON_TEMP_ABORT},
+  {"hash-copy",                 no_argument,       NULL, IDX_HASH_COPY},
   {"hash-info",                 no_argument,       NULL, IDX_HASH_INFO},
   {"hash-type",                 required_argument, NULL, IDX_HASH_MODE},
   {"hccapx-message-pair",       required_argument, NULL, IDX_HCCAPX_MESSAGE_PAIR},
@@ -242,6 +243,7 @@ int user_options_init (hashcat_ctx_t *hashcat_ctx)
   user_options->encoding_from             = ENCODING_FROM;
   user_options->encoding_to               = ENCODING_TO;
   user_options->force                     = FORCE;
+  user_options->hash_copy                 = HASH_COPY;
   user_options->hwmon                     = HWMON;
   user_options->hwmon_temp_abort          = HWMON_TEMP_ABORT;
   user_options->hash_info                 = HASH_INFO;
@@ -612,6 +614,7 @@ int user_options_getopt (hashcat_ctx_t *hashcat_ctx, int argc, char **argv)
       case IDX_BRAIN_SESSION_WHITELIST:   user_options->brain_session_whitelist   = optarg;                          break;
       #endif
       case IDX_COLOR_CRACKED:             user_options->color_cracked             = true;                            break;
+      case IDX_HASH_COPY:                 user_options->hash_copy                 = true;                            break;
     }
   }
 

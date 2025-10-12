@@ -51,7 +51,7 @@ DECLSPEC void m32300m (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt1_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt1_len;
 
-  u32x salt1_buf[64] = { 0 };
+  u32x salt1_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt1_len; i += 4, idx += 1)
   {
@@ -64,7 +64,7 @@ DECLSPEC void m32300m (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt2_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt2_len;
 
-  u32x salt2_buf[64] = { 0 };
+  u32x salt2_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt2_len; i += 4, idx += 1)
   {
@@ -77,7 +77,7 @@ DECLSPEC void m32300m (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt3_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt3_len;
 
-  u32x salt3_buf[64] = { 0 };
+  u32x salt3_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt3_len; i += 4, idx += 1)
   {
@@ -398,7 +398,7 @@ DECLSPEC void m32300s (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt1_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt1_len;
 
-  u32x salt1_buf[64] = { 0 };
+  u32x salt1_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt1_len; i += 4, idx += 1)
   {
@@ -411,7 +411,7 @@ DECLSPEC void m32300s (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt2_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt2_len;
 
-  u32x salt2_buf[64] = { 0 };
+  u32x salt2_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt2_len; i += 4, idx += 1)
   {
@@ -424,7 +424,7 @@ DECLSPEC void m32300s (PRIVATE_AS u32 *w0, PRIVATE_AS u32 *w1, PRIVATE_AS u32 *w
 
   const u32 salt3_len = esalt_bufs[DIGESTS_OFFSET_HOST].salt3_len;
 
-  u32x salt3_buf[64] = { 0 };
+  u32x salt3_buf[16] = { 0 };
 
   for (u32 i = 0, idx = 0; i < salt3_len; i += 4, idx += 1)
   {
@@ -829,6 +829,25 @@ KERNEL_FQ KERNEL_FA void m32300_m08 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   const u64 lsz = get_local_size (0);
 
   /**
+   * bin2asc table
+   */
+
+  LOCAL_VK u32 l_bin2asc[256];
+
+  for (u32 i = lid; i < 256; i += lsz)
+  {
+    const u32 i0 = (i >> 0) & 15;
+    const u32 i1 = (i >> 4) & 15;
+
+    l_bin2asc[i] = ((i0 < 10) ? '0' + i0 : 'a' - 10 + i0) << 8
+                 | ((i1 < 10) ? '0' + i1 : 'a' - 10 + i1) << 0;
+  }
+
+  SYNC_THREADS ();
+
+  if (gid >= GID_CNT) return;
+
+  /**
    * modifier
    */
 
@@ -863,6 +882,23 @@ KERNEL_FQ KERNEL_FA void m32300_m08 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   const u32 pw_len = pws[gid].pw_len & 63;
 
   /**
+   * main
+   */
+
+  m32300m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
+}
+
+KERNEL_FQ KERNEL_FA void m32300_m16 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
+{
+  /**
+   * base
+   */
+
+  const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
+
+  /**
    * bin2asc table
    */
 
@@ -880,23 +916,6 @@ KERNEL_FQ KERNEL_FA void m32300_m08 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   SYNC_THREADS ();
 
   if (gid >= GID_CNT) return;
-
-  /**
-   * main
-   */
-
-  m32300m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
-}
-
-KERNEL_FQ KERNEL_FA void m32300_m16 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
-{
-  /**
-   * base
-   */
-
-  const u64 lid = get_local_id (0);
-  const u64 gid = get_global_id (0);
-  const u64 lsz = get_local_size (0);
 
   /**
    * modifier
@@ -933,6 +952,23 @@ KERNEL_FQ KERNEL_FA void m32300_m16 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   const u32 pw_len = pws[gid].pw_len & 63;
 
   /**
+   * main
+   */
+
+  m32300m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
+}
+
+KERNEL_FQ KERNEL_FA void m32300_s04 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
+{
+  /**
+   * base
+   */
+
+  const u64 lid = get_local_id (0);
+  const u64 gid = get_global_id (0);
+  const u64 lsz = get_local_size (0);
+
+  /**
    * bin2asc table
    */
 
@@ -950,23 +986,6 @@ KERNEL_FQ KERNEL_FA void m32300_m16 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   SYNC_THREADS ();
 
   if (gid >= GID_CNT) return;
-
-  /**
-   * main
-   */
-
-  m32300m (w0, w1, w2, w3, pw_len, pws, rules_buf, combs_buf, words_buf_r, tmps, hooks, bitmaps_buf_s1_a, bitmaps_buf_s1_b, bitmaps_buf_s1_c, bitmaps_buf_s1_d, bitmaps_buf_s2_a, bitmaps_buf_s2_b, bitmaps_buf_s2_c, bitmaps_buf_s2_d, plains_buf, digests_buf, hashes_shown, salt_bufs, esalt_bufs, d_return_buf, d_extra0_buf, d_extra1_buf, d_extra2_buf, d_extra3_buf, kernel_param, gid, lid, lsz, l_bin2asc);
-}
-
-KERNEL_FQ KERNEL_FA void m32300_s04 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
-{
-  /**
-   * base
-   */
-
-  const u64 lid = get_local_id (0);
-  const u64 gid = get_global_id (0);
-  const u64 lsz = get_local_size (0);
 
   /**
    * modifier
@@ -1003,25 +1022,6 @@ KERNEL_FQ KERNEL_FA void m32300_s04 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   const u32 pw_len = pws[gid].pw_len & 63;
 
   /**
-   * bin2asc table
-   */
-
-  LOCAL_VK u32 l_bin2asc[256];
-
-  for (u32 i = lid; i < 256; i += lsz)
-  {
-    const u32 i0 = (i >> 0) & 15;
-    const u32 i1 = (i >> 4) & 15;
-
-    l_bin2asc[i] = ((i0 < 10) ? '0' + i0 : 'a' - 10 + i0) << 8
-                 | ((i1 < 10) ? '0' + i1 : 'a' - 10 + i1) << 0;
-  }
-
-  SYNC_THREADS ();
-
-  if (gid >= GID_CNT) return;
-
-  /**
    * main
    */
 
@@ -1037,6 +1037,21 @@ KERNEL_FQ KERNEL_FA void m32300_s08 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   const u64 lid = get_local_id (0);
   const u64 gid = get_global_id (0);
   const u64 lsz = get_local_size (0);
+
+  LOCAL_VK u32 l_bin2asc[256];
+
+  for (u32 i = lid; i < 256; i += lsz)
+  {
+    const u32 i0 = (i >> 0) & 15;
+    const u32 i1 = (i >> 4) & 15;
+
+    l_bin2asc[i] = ((i0 < 10) ? '0' + i0 : 'a' - 10 + i0) << 8
+                 | ((i1 < 10) ? '0' + i1 : 'a' - 10 + i1) << 0;
+  }
+
+  SYNC_THREADS ();
+
+  if (gid >= GID_CNT) return;
 
   /**
    * modifier
@@ -1071,25 +1086,6 @@ KERNEL_FQ KERNEL_FA void m32300_s08 (KERN_ATTR_VECTOR_ESALT (md5_triple_salt_t))
   w3[3] = 0;
 
   const u32 pw_len = pws[gid].pw_len & 63;
-
-  /**
-   * bin2asc table
-   */
-
-  LOCAL_VK u32 l_bin2asc[256];
-
-  for (u32 i = lid; i < 256; i += lsz)
-  {
-    const u32 i0 = (i >> 0) & 15;
-    const u32 i1 = (i >> 4) & 15;
-
-    l_bin2asc[i] = ((i0 < 10) ? '0' + i0 : 'a' - 10 + i0) << 8
-                 | ((i1 < 10) ? '0' + i1 : 'a' - 10 + i1) << 0;
-  }
-
-  SYNC_THREADS ();
-
-  if (gid >= GID_CNT) return;
 
   /**
    * main

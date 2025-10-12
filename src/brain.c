@@ -112,7 +112,7 @@ u32 brain_compute_session (hashcat_ctx_t *hashcat_ctx)
 
       for (u32 digest_idx = 0; digest_idx < salt_buf->digests_cnt; digest_idx++)
       {
-        const int out_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salts_idx, digest_idx);
+        const int out_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salts_idx, digest_idx);
 
         string_sized_buf[string_sized_cnt].buf = (char *) hcmalloc (out_len + 1);
         string_sized_buf[string_sized_cnt].len = out_len;

@@ -728,6 +728,7 @@ typedef enum user_options_defaults
   #else
   HWMON_TEMP_ABORT         = 90,
   #endif
+  HASH_COPY                = false,
   HASH_INFO                = 0,
   HASH_MODE                = 0,
   HCCAPX_MESSAGE_PAIR      = 0,
@@ -860,6 +861,7 @@ typedef enum user_options_map
   IDX_DYNAMIC_X                 = 0xff55,
   IDX_ENCODING_FROM             = 0xff15,
   IDX_ENCODING_TO               = 0xff16,
+  IDX_HASH_COPY                 = 0xff62,
   IDX_HASH_INFO                 = 'H', // 0xff17
   IDX_FORCE                     = 0xff18,
   IDX_HWMON_DISABLE             = 0xff19,
@@ -2611,6 +2613,7 @@ typedef struct user_options
   u32          workload_profile;
   u64          limit;
   u64          skip;
+  bool         hash_copy;
 
 } user_options_t;
 

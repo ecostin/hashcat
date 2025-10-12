@@ -339,12 +339,14 @@ int hc_mtlDeviceGet (void *hashcat_ctx, mtl_device_id *metal_device, int ordinal
     return -1;
   }
 
+  /*
   // parallelize pipeline state object (PSO) compilation internally
 
   if ([device respondsToSelector:@selector(setShouldMaximizeConcurrentCompilation:)])
   {
     ((void (*)(id, SEL, BOOL))objc_msgSend)(device, @selector(setShouldMaximizeConcurrentCompilation:), YES);
   }
+  */
 
   *metal_device = device;
 

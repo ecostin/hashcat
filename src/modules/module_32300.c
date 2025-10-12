@@ -169,6 +169,13 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
   md5_triple_salt->salt3_len = empire_salt2_len + md5_triple_salt->salt1_len;
 
+  if (hashconfig->opti_type & OPTI_TYPE_OPTIMIZED_KERNEL)
+  {
+    if (md5_triple_salt->salt1_len > 64) return (PARSER_SALT_LENGTH);
+    if (md5_triple_salt->salt2_len > 64) return (PARSER_SALT_LENGTH);
+    if (md5_triple_salt->salt3_len > 64) return (PARSER_SALT_LENGTH);
+  }
+
   // make salt sorter happy
 
   md5_ctx_t md5_ctx;

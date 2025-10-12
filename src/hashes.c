@@ -117,7 +117,7 @@ int sort_by_hash_no_salt (const void *v1, const void *v2, void *v3)
   return sort_by_digest_p0p1 (d1, d2, v3);
 }
 
-int hash_encode (const hashconfig_t *hashconfig, const hashes_t *hashes, const module_ctx_t *module_ctx, char *out_buf, const int out_size, const u32 salt_pos, const u32 digest_pos)
+int hash_encode (const user_options_t *user_options, const hashconfig_t *hashconfig, const hashes_t *hashes, const module_ctx_t *module_ctx, char *out_buf, const int out_size, const u32 salt_pos, const u32 digest_pos)
 {
   if (module_ctx->module_hash_encode == MODULE_DEFAULT)
   {
@@ -146,19 +146,28 @@ int hash_encode (const hashconfig_t *hashconfig, const hashes_t *hashes, const m
 
   if (hash_info) hash_info_ptr = hash_info[digest_cur];
 
-  const int out_len = module_ctx->module_hash_encode
-  (
-    hashconfig,
-    digests_buf_ptr,
-    salts_buf,
-    esalts_buf_ptr,
-    hook_salts_buf_ptr,
-    hash_info_ptr,
-    out_buf,
-    out_size
-  );
+  int line_len = 0;
 
-  return out_len;
+  if (user_options->hash_copy == true)
+  {
+    line_len = snprintf (out_buf, out_size, "%s", hash_info_ptr->orighash);
+  }
+  else
+  {
+    line_len = module_ctx->module_hash_encode
+    (
+      hashconfig,
+      digests_buf_ptr,
+      salts_buf,
+      esalts_buf_ptr,
+      hook_salts_buf_ptr,
+      hash_info_ptr,
+      out_buf,
+      out_size
+    );
+  }
+
+  return line_len;
 }
 
 int save_hash (hashcat_ctx_t *hashcat_ctx)
@@ -252,7 +261,7 @@ int save_hash (hashcat_ctx_t *hashcat_ctx)
           hc_fputc (separator, &fp);
         }
 
-        const int out_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salt_pos, digest_pos);
+        const int out_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salt_pos, digest_pos);
 
         out_buf[out_len] = 0;
 
@@ -402,7 +411,7 @@ int check_hash (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, pla
 
   u8 *out_buf = hashes->out_buf;
 
-  int out_len = hash_encode (hashconfig, hashes, module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salt_pos, digest_pos);
+  int out_len = hash_encode (hashcat_ctx->user_options, hashconfig, hashes, module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, salt_pos, digest_pos);
 
   out_buf[out_len] = 0;
 
@@ -1014,7 +1023,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
   void   *esalts_buf     = NULL;
   void   *hook_salts_buf = NULL;
 
-  if ((user_options->dynamic_x == true) || (user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT))
+  if ((user_options->dynamic_x == true) || (user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT) || (user_options->hash_copy == true))
   {
     u64 hash_pos;
 
@@ -1034,7 +1043,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
         hash_info->user = (user_t *) hcmalloc (sizeof (user_t));
       }
 
-      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY)
+      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY || user_options->hash_copy == true)
       {
         if (user_options->benchmark == false)
         {
@@ -1169,7 +1178,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
       }
       else
       {
-        if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY)
+        if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY || user_options->hash_copy == true)
         {
           hashinfo_t *hash_info_tmp = hashes_buf[hashes_cnt].hash_info;
 
@@ -1480,7 +1489,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
           }
         }
 
-        if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY)
+        if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY || user_options->hash_copy == true)
         {
           hashinfo_t *hash_info_tmp = hashes_buf[hashes_cnt].hash_info;
 
@@ -1788,7 +1797,7 @@ int hashes_init_stage1 (hashcat_ctx_t *hashcat_ctx)
 
       size_t input_len = strlen (input_buf);
 
-      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY)
+      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY || user_options->hash_copy == true)
       {
         hashinfo_t *hash_info_tmp = hashes_buf[hashes_cnt].hash_info;
 
@@ -2021,7 +2030,7 @@ int hashes_init_stage2 (hashcat_ctx_t *hashcat_ctx)
 
   hashinfo_t **hash_info = NULL;
 
-  if ((user_options->username == true) || (user_options->dynamic_x == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT))
+  if ((user_options->username == true) || (user_options->dynamic_x == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT) || (user_options->hash_copy == true))
   {
     hash_info = (hashinfo_t **) hccalloc (hashes_cnt, sizeof (hashinfo_t *));
   }
@@ -2072,7 +2081,7 @@ int hashes_init_stage2 (hashcat_ctx_t *hashcat_ctx)
     hashes_buf[0].esalt = esalts_buf_new_ptr;
   }
 
-  if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT))
+  if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT) || (user_options->hash_copy == true))
   {
     hash_info[0] = hashes_buf[0].hash_info;
   }
@@ -2134,7 +2143,7 @@ int hashes_init_stage2 (hashcat_ctx_t *hashcat_ctx)
       hashes_buf[hashes_pos].esalt = esalts_buf_new_ptr;
     }
 
-    if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT))
+    if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (hashconfig->opts_type & OPTS_TYPE_HASH_SPLIT) | (user_options->hash_copy == true))
     {
       hash_info[hashes_pos] = hashes_buf[hashes_pos].hash_info;
     }
@@ -2371,7 +2380,7 @@ int hashes_init_stage5 (hashcat_ctx_t *hashcat_ctx)
 
       char *tmp_buf = (char *) hcmalloc (HCBUFSIZ_LARGE);
 
-      const int tmp_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, salt_pos, 0);
+      const int tmp_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, salt_pos, 0);
 
       tmp_buf[tmp_len] = 0;
 
@@ -2407,7 +2416,7 @@ int hashes_init_stage5 (hashcat_ctx_t *hashcat_ctx)
 
       if (extra_tmp_size & (1ULL << 63))
       {
-        const int tmp_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, 0, 0);
+        const int tmp_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, 0, 0);
 
         tmp_buf[tmp_len] = 0;
 
@@ -2694,7 +2703,7 @@ int hashes_init_zerohash (hashcat_ctx_t *hashcat_ctx)
 
         u8 *out_buf = (u8 *) hcmalloc (HCBUFSIZ_LARGE);
 
-        int out_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, 0, digest_pos);
+        int out_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, (char *) out_buf, HCBUFSIZ_LARGE, 0, digest_pos);
 
         out_buf[out_len] = 0;
 
@@ -2754,7 +2763,7 @@ void hashes_destroy (hashcat_ctx_t *hashcat_ctx)
   hcfree (hashes->salts_buf);
   hcfree (hashes->salts_shown);
 
-  if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY))
+  if ((user_options->username == true) || (hashconfig->opts_type & OPTS_TYPE_HASH_COPY) || (user_options->hash_copy == true))
   {
     for (u32 hash_pos = 0; hash_pos < hashes->hashes_cnt; hash_pos++)
     {
@@ -2763,7 +2772,7 @@ void hashes_destroy (hashcat_ctx_t *hashcat_ctx)
         hcfree (hashes->hash_info[hash_pos]->user);
       }
 
-      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY)
+      if (hashconfig->opts_type & OPTS_TYPE_HASH_COPY || (user_options->hash_copy == true))
       {
         hcfree (hashes->hash_info[hash_pos]->orighash);
       }

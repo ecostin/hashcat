@@ -1,29 +1,47 @@
 diff --git a/src/Makefile b/src/Makefile
-index 1f1987fbe..4f89b8d63 100644
+index 1f1987fbe..d0114b3b8 100644
 --- a/src/Makefile
 +++ b/src/Makefile
-@@ -10,6 +10,7 @@ PRODUCTION_VERSION      := v7.1.2
+@@ -10,6 +10,8 @@ PRODUCTION_VERSION      := v7.1.2
  ENABLE_CUBIN            ?= 1
  ENABLE_BRAIN            ?= 1
  ENABLE_UNRAR            ?= 1
 +ENABLE_LTO              ?= 0
++USE_MOLD                ?= 0
  USE_SYSTEM_LZMA         ?= 0
  USE_SYSTEM_ZLIB         ?= 0
  USE_SYSTEM_OPENCL       ?= 0
-@@ -201,12 +202,23 @@ COMPTIME                := $(shell date +%s)
+@@ -201,12 +203,40 @@ COMPTIME                := $(shell date +%s)
  ## General compiler and linker options
  ##
  
++CC_NATIVE_CLANG         := 0
++
++ifneq (,$(findstring clang, $(CC)))
++CC_NATIVE_CLANG         := 1
++endif
++
 +CFLAGS                  := $(CFLAGS)
  LFLAGS                  := $(LDFLAGS)
  
-+#ifeq ($(DEBUG),1)
++ifeq ($(DEBUG),1)
 +CFLAGS                  += -fstack-usage
-+#endif
++endif
 +
 +ifeq ($(ENABLE_LTO),1)
-+CFLAGS                  += -flto=auto -Wno-unknown-warning-option
++CFLAGS                  += -flto=auto
++ifeq ($(CC_NATIVE_CLANG),1)
++CFLAGS                  += -Wno-unknown-warning-option
++endif
 +LFLAGS                  += -flto=auto -Wno-lto-type-mismatch
++endif
++
++ifeq ($(BUILD_MODE),native)
++ifneq ($(UNAME),Darwin)
++ifeq ($(USE_MOLD),1)
++LFLAGS                  += -fuse-ld=mold
++endif
++endif
 +endif
 +
  ifneq ($(UNAME),Darwin)
@@ -34,16 +52,45 @@ index 1f1987fbe..4f89b8d63 100644
  endif
  endif
  endif
-@@ -284,7 +296,7 @@ endif
+@@ -218,7 +248,7 @@ CFLAGS                  += -Wextra
+ endif
+ 
+ ## because LZMA SDK
+-ifneq (,$(findstring clang, $(CC)))
++ifeq ($(CC_NATIVE_CLANG),1)
+ CFLAGS                  += -Wno-typedef-redefinition
+ else
+ ifeq ($(CC),cc)
+@@ -228,7 +258,7 @@ endif
+ 
+ ifeq ($(USE_SYSTEM_LZMA),0)
+ CFLAGS_LZMA             += -D_7ZIP_ST
+-ifeq (,$(findstring clang, $(CC)))
++ifeq ($(CC_NATIVE_CLANG),0)
+ CFLAGS_LZMA             += -Wno-misleading-indentation
+ endif
+ endif
+@@ -240,7 +270,7 @@ CFLAGS_ZLIB             += -Wno-implicit-function-declaration
+ CFLAGS_ZLIB             += -Wno-unused-parameter
+ CFLAGS_ZLIB             += -DIOAPI_NO_64
+ CFLAGS_ZLIB             += -DUNZ_BUFSIZE=262144
+-ifneq (,$(findstring clang, $(CC)))
++ifeq ($(CC_NATIVE_CLANG),1)
+ CFLAGS_ZLIB             += -Wno-deprecated-non-prototype -Wno-unknown-warning-option
+ endif
+ endif
+@@ -284,8 +314,9 @@ endif
  endif
  
  ifeq ($(DEBUG),0)
 -CFLAGS                  += -O2
-+CFLAGS                  += -O2 -fomit-frame-pointer -fno-plt
++CFLAGS                  += -O2 -fomit-frame-pointer
  ifneq ($(UNAME),Darwin)
++CFLAGS                  += -fno-plt
  LFLAGS                  += -s
  endif
-@@ -354,9 +366,11 @@ CFLAGS                  += -I$(DEPS_UNRAR_PATH)
+ else
+@@ -354,9 +385,11 @@ CFLAGS                  += -I$(DEPS_UNRAR_PATH)
  ifeq ($(UNAME),OpenBSD)
  LFLAGS                  += -lc++
  else
@@ -55,7 +102,7 @@ index 1f1987fbe..4f89b8d63 100644
  
  ##
  ## Native compilation target
-@@ -552,23 +566,31 @@ clean:
+@@ -552,23 +585,31 @@ clean:
  	$(RM) -rf modules/*.dSYM
  	$(RM) -rf bridges/*.dSYM
  	$(RM) -rf feeds/*.dSYM
@@ -93,12 +140,26 @@ index 1f1987fbe..4f89b8d63 100644
  	$(RM) -f core
  	$(RM) -rf *.induct
  	$(RM) -rf *.outfiles
-@@ -917,24 +939,77 @@ WIN_PYTHON              := /opt/win-python
+@@ -914,27 +955,95 @@ WIN_PYTHON              := /opt/win-python
+ ## Compiler options
+ ##
+ 
++CC_LINUX_CLANG          := 0
++CC_WIN_CLANG            := 0
++
++ifneq (,$(findstring clang, $(CC_LINUX)))
++CC_LINUX_CLANG          := 1
++endif
++
++ifneq (,$(findstring clang, $(CC_WIN)))
++CC_WIN_CLANG            := 1
++endif
++
  CFLAGS_CROSS_LINUX      := $(CFLAGS)
  CFLAGS_CROSS_LINUX      += -fPIC
  CFLAGS_CROSS_LINUX      += -DWITH_HWMON
 +
-+ifneq (,$(findstring clang, $(CC_LINUX)))
++ifeq ($(CC_LINUX_CLANG),1)
 +CFLAGS_CROSS_LINUX      += -Wno-typedef-redefinition
 +CFLAGS_CROSS_LINUX      += -Wno-unknown-warning-option
 +endif
@@ -108,7 +169,7 @@ index 1f1987fbe..4f89b8d63 100644
  CFLAGS_CROSS_WIN        += -I$(WIN_ICONV)/include/
  CFLAGS_CROSS_WIN        += -DWITH_HWMON
  
-+ifneq (,$(findstring clang, $(CC_WIN)))
++ifeq ($(CC_WIN_CLANG),1)
 +CFLAGS_CROSS_WIN        := $(filter-out -fno-plt,$(CFLAGS_CROSS_WIN))
 +CFLAGS_CROSS_WIN        += --target=x86_64-w64-mingw32
 +CFLAGS_CROSS_WIN        += -D_CLANG_DISABLE_CRT_DEPRECATION_WARNINGS
@@ -125,17 +186,21 @@ index 1f1987fbe..4f89b8d63 100644
  LFLAGS_CROSS_LINUX      += -lm
 +LFLAGS_CROSS_LINUX      += -static-libgcc
 +
-+ifneq (,$(findstring clang, $(CC_LINUX)))
++ifeq ($(CC_LINUX_CLANG),1)
 +LFLAGS_CROSS_LINUX      += -stdlib=libc++
 +else
 +LFLAGS_CROSS_LINUX      += -static-libstdc++
 +endif
 +
++ifeq ($(USE_MOLD),1)
++LFLAGS_CROSS_LINUX      += -fuse-ld=mold
++else
 +ifeq ($(ENABLE_LTO),1)
-+ifneq (,$(findstring clang, $(CC_LINUX)))
++ifeq ($(CC_LINUX_CLANG),1)
 +LFLAGS_CROSS_LINUX      += -fuse-ld=lld
 +else
 +LFLAGS_CROSS_LINUX      += -fuse-ld=gold
++endif
 +endif
 +endif
 +
@@ -144,7 +209,7 @@ index 1f1987fbe..4f89b8d63 100644
 +LFLAGS_CROSS_WIN        += -lstdc++
 +endif
 +
-+ifeq (,$(findstring clang, $(CC_WIN)))
++ifeq ($(CC_WIN_CLANG),0)
  LFLAGS_CROSS_WIN        += -Wl,--dynamicbase
  LFLAGS_CROSS_WIN        += -Wl,--nxcompat
 +endif
@@ -153,19 +218,19 @@ index 1f1987fbe..4f89b8d63 100644
  LFLAGS_CROSS_WIN        += -lpowrprof
 -LFLAGS_CROSS_WIN        += -static -static-libgcc -static-libstdc++
 +
-+ifeq (,$(findstring clang, $(CC_WIN)))
++ifeq ($(CC_WIN_CLANG),0)
 +LFLAGS_CROSS_WIN        += -static
 +endif
 +LFLAGS_CROSS_WIN        += -static-libgcc
-+ifeq (,$(findstring clang, $(CC_WIN)))
++ifeq ($(CC_WIN_CLANG),0)
 +LFLAGS_CROSS_WIN        += -static-libstdc++
 +endif
  LFLAGS_CROSS_WIN        += -lole32 -loleaut32 -lwbemuuid
  
 +ifeq ($(ENABLE_LTO),1)
-+ifneq (,$(findstring clang, $(CC_WIN)))
++ifeq ($(CC_WIN_CLANG),1)
 +LFLAGS_CROSS_WIN        += -fuse-ld=lld
-+LFLAGS_CROSS_WIN        += -Wl,--stack,16777216
++LFLAGS_CROSS_WIN        += -Wl,--stack,0x200000
 +endif
 +endif
 +

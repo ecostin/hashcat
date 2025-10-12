@@ -3,18 +3,16 @@
  * License.....: MIT
  */
 use std::{
-    ffi::{CStr, c_char, c_int, c_void},
+    ffi::{c_char, c_int, c_void, CStr},
     mem,
     path::Path,
     ptr, slice,
     sync::OnceLock,
 };
 
-use crate::generic_hash::calc_hash;
-use crate::{
-    bindings::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t},
-    generic_hash,
-};
+use hashcat_sys::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t};
+
+use crate::generic_hash;
 
 static INFO: OnceLock<&'static str> = OnceLock::new();
 
@@ -222,7 +220,7 @@ fn process_batch(
         .map(|x| {
             let pw =
                 unsafe { slice::from_raw_parts(x.pw_buf.as_ptr() as *const u8, x.pw_len as usize) };
-            calc_hash(pw, salt)
+            generic_hash::calc_hash(pw, salt)
         })
         .collect()
 }

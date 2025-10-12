@@ -1829,6 +1829,7 @@ int mask_ctx_parse_maskfile (hashcat_ctx_t *hashcat_ctx)
   mfs_buf[5].mf_len = 0;
   mfs_buf[6].mf_len = 0;
   mfs_buf[7].mf_len = 0;
+  mfs_buf[8].mf_len = 0;
 
   size_t mfs_cnt = 0;
 

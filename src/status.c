@@ -367,7 +367,7 @@ char *status_get_hash_target (const hashcat_ctx_t *hashcat_ctx)
 
     char *tmp_buf = (char *) hcmalloc (HCBUFSIZ_LARGE);
 
-    const int tmp_len = hash_encode (hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, 0, 0);
+    const int tmp_len = hash_encode (hashcat_ctx->user_options, hashcat_ctx->hashconfig, hashcat_ctx->hashes, hashcat_ctx->module_ctx, tmp_buf, HCBUFSIZ_LARGE, 0, 0);
 
     tmp_buf[tmp_len] = 0;
 

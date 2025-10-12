@@ -11,7 +11,7 @@ int sort_by_salt         (const void *v1, const void *v2);
 int sort_by_hash         (const void *v1, const void *v2, void *v3);
 int sort_by_hash_no_salt (const void *v1, const void *v2, void *v3);
 
-int hash_encode (const hashconfig_t *hashconfig, const hashes_t *hashes, const module_ctx_t *module_ctx, char *out_buf, const int out_size, const u32 salt_pos, const u32 digest_pos);
+int hash_encode (const user_options_t *user_options, const hashconfig_t *hashconfig, const hashes_t *hashes, const module_ctx_t *module_ctx, char *out_buf, const int out_size, const u32 salt_pos, const u32 digest_pos);
 
 int save_hash (hashcat_ctx_t *hashcat_ctx);
 

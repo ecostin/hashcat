@@ -11,7 +11,7 @@ index e47a4fc76..5e7b72491 100644
  endif
  endif
 diff --git a/src/bridges/bridge_scrypt_jane.mk b/src/bridges/bridge_scrypt_jane.mk
-index d92b99aba..8b59e33cd 100644
+index d92b99aba..a4b87ce9a 100644
 --- a/src/bridges/bridge_scrypt_jane.mk
 +++ b/src/bridges/bridge_scrypt_jane.mk
 @@ -12,6 +12,15 @@ SCRYPT_JANE_CFLAGS += -mavx2
@@ -26,7 +26,7 @@ index d92b99aba..8b59e33cd 100644
 +ifeq ($(ENABLE_LTO),1)
 +ifeq ($(BUILD_MODE),cross)
 +ifneq (,$(findstring clang, $(CC_WIN)))
-+SCRYPT_JANE_CFLAGS += -fno-lto
++bridges/bridge_scrypt_jane.dll: SCRYPT_JANE_CFLAGS += -fno-lto
  endif
  endif
  endif

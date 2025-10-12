@@ -10,7 +10,6 @@
 #include "convert.h"
 #include "shared.h"
 
-static const u32 GPG_S2K_MIN_ITERATIONS = 8u; /* minimal internal loop count for kernel compatibility */
 static const u32   ATTACK_EXEC    = ATTACK_EXEC_OUTSIDE_KERNEL;
 static const u32   DGST_POS0      = 0;
 static const u32   DGST_POS1      = 1;

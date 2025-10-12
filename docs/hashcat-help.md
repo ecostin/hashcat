@@ -144,6 +144,7 @@ Usage: hashcat [options]... hash|hashfile|hccapxfile [dictionary|mask|directory]
      --brain-session            | Hex  | Overrides automatically calculated brain session     | --brain-session=0x2ae611db
      --brain-session-whitelist  | Hex  | Allow given sessions only, separated with commas     | --brain-session-whitelist=0x2ae611db
      --color-cracked            |      | Enables color output for cracked hashes              |
+     --hash-copy                |      | Output hashes identically to the input hash          |
 
 - [ Hash Modes ] -
 

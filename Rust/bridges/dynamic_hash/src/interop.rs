@@ -4,17 +4,16 @@
  */
 use std::{
     cell::OnceCell,
-    ffi::{CStr, c_char, c_int, c_void},
+    ffi::{c_char, c_int, c_void, CStr},
     mem,
     path::Path,
     process, ptr, slice,
     sync::{Once, OnceLock},
 };
 
-use crate::{
-    Expr,
-    bindings::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t},
-};
+use hashcat_sys::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t};
+
+use crate::Expr;
 use crate::{eval::EvalContext, parse};
 
 thread_local! {
