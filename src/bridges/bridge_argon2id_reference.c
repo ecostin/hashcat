@@ -18,7 +18,7 @@
 #include "core.c"
 #include "blake2/blake2b.c"
 
-#if defined(__riscv)
+#if defined (__riscv)
 #include "ref.c"
 #else
 #include "opt.c"
@@ -138,7 +138,7 @@ static void units_term (bridge_argon2id_t *bridge_argon2id)
   }
 }
 
-void *platform_init ()
+void *platform_init (MAYBE_UNUSED user_options_t *user_options)
 {
   // Verify CPU features
 

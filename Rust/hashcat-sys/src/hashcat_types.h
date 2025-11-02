@@ -78,9 +78,7 @@ typedef struct
 
 // Sync with bridge_rust_generic_hash.c:
 
-typedef struct bridge_context bridge_context_t;
-
-struct bridge_context
+typedef struct bridge_context
 {
     unit_t *units_buf;
     int units_cnt;
@@ -101,4 +99,5 @@ struct bridge_context
     const char *bridge_parameter2;
     const char *bridge_parameter3;
     const char *bridge_parameter4;
-};
+
+} bridge_context_t;

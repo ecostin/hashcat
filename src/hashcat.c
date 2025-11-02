@@ -1014,7 +1014,7 @@ static int outer_loop (hashcat_ctx_t *hashcat_ctx, const int iteration)
       inner_threads_cnt++;
     }
 
-    if (module_ctx->module_advice_notice != MODULE_DEFAULT)
+    if (module_ctx->module_advice_notice != MODULE_DEFAULT && user_options->quiet == false)
     {
       char *t_module_advice_notice = (char *) module_ctx->module_advice_notice (hashconfig, hashcat_ctx->user_options, user_options_extra);
       const u64 module_kern_type = module_ctx->module_kern_type (hashconfig, hashcat_ctx->user_options, user_options_extra);

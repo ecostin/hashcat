@@ -20,6 +20,7 @@ static const char grp_op_nop[] =
   RULE_OP_MANGLE_LREST_UFIRST,
   RULE_OP_MANGLE_UREST_LFIRST,
   RULE_OP_MANGLE_TREST,
+  RULE_OP_MANGLE_SHIFT_CASE,
   RULE_OP_MANGLE_REVERSE,
   RULE_OP_MANGLE_DUPEWORD,
   RULE_OP_MANGLE_REFLECT,
@@ -31,6 +32,8 @@ static const char grp_op_nop[] =
   RULE_OP_MANGLE_SWITCH_LAST,
   RULE_OP_MANGLE_DUPECHAR_ALL,
   RULE_OP_MANGLE_TITLE,
+  RULE_OP_MANGLE_TO_HEX_LOWER,
+  RULE_OP_MANGLE_TO_HEX_UPPER
 };
 
 static const char grp_op_pos_p0[] =
@@ -299,6 +302,10 @@ int cpu_rule_to_kernel_rule (char *rule_buf, u32 rule_len, kernel_rule_t *rule)
         SET_NAME (rule, rule_buf[rule_pos]);
         break;
 
+      case RULE_OP_MANGLE_SHIFT_CASE:
+        SET_NAME (rule, rule_buf[rule_pos]);
+        break;
+
       case RULE_OP_MANGLE_TOGGLE_AT:
         SET_NAME    (rule, rule_buf[rule_pos]);
         SET_P0_CONV (rule, rule_buf[rule_pos]);
@@ -478,6 +485,14 @@ int cpu_rule_to_kernel_rule (char *rule_buf, u32 rule_len, kernel_rule_t *rule)
         SET_P1      (rule, rule_buf[rule_pos]);
         break;
 
+      case RULE_OP_MANGLE_TO_HEX_LOWER:
+        SET_NAME    (rule, rule_buf[rule_pos]);
+        break;
+
+      case RULE_OP_MANGLE_TO_HEX_UPPER:
+        SET_NAME    (rule, rule_buf[rule_pos]);
+        break;
+
       case RULE_OP_CLASS_BASED: // ~
         switch (rule_buf[rule_pos+1])
         {
@@ -596,6 +611,10 @@ int kernel_rule_to_cpu_rule (char *rule_buf, kernel_rule_t *rule)
         break;
 
       case RULE_OP_MANGLE_TREST:
+        rule_buf[rule_pos] = rule_cmd;
+        break;
+
+      case RULE_OP_MANGLE_SHIFT_CASE:
         rule_buf[rule_pos] = rule_cmd;
         break;
 
@@ -776,6 +795,14 @@ int kernel_rule_to_cpu_rule (char *rule_buf, kernel_rule_t *rule)
         rule_buf[rule_pos] = rule_cmd;
         GET_P0_CONV (rule);
         GET_P1      (rule);
+        break;
+
+      case RULE_OP_MANGLE_TO_HEX_LOWER:
+        rule_buf[rule_pos] = rule_cmd;
+        break;
+
+      case RULE_OP_MANGLE_TO_HEX_UPPER:
+        rule_buf[rule_pos] = rule_cmd;
         break;
 
       case RULE_OP_MANGLE_REPLACE_CLASS:

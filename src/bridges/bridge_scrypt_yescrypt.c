@@ -13,9 +13,9 @@
 #include "yescrypt.h"
 
 void smix(uint8_t *B, size_t r, uint32_t N, uint32_t p, uint32_t t,
-    yescrypt_flags_t flags,
-    void *V, uint32_t NROM, const void *VROM,
-    void *XY, uint8_t *S, uint8_t *passwd);
+          yescrypt_flags_t flags,
+          void *V, uint32_t NROM, const void *VROM,
+          void *XY, uint8_t *S, uint8_t *passwd);
 
 // good: we can use this multiplier do reduce copy overhead to increase the guessing speed,
 // bad: but we also increase the password candidate batch size.
@@ -108,7 +108,7 @@ static void units_term (bridge_scrypt_yescrypt_t *bridge_scrypt_yescrypt)
   }
 }
 
-void *platform_init ()
+void *platform_init (MAYBE_UNUSED user_options_t *user_options)
 {
   // Verify CPU features
 

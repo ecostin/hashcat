@@ -18,6 +18,7 @@
 #define RULE_OP_MANGLE_LREST_UFIRST      'c'
 #define RULE_OP_MANGLE_UREST_LFIRST      'C'
 #define RULE_OP_MANGLE_TREST             't'
+#define RULE_OP_MANGLE_SHIFT_CASE        'S'
 #define RULE_OP_MANGLE_TOGGLE_AT         'T'
 #define RULE_OP_MANGLE_TOGGLE_AT_SEP     '3'
 #define RULE_OP_MANGLE_REVERSE           'r'
@@ -66,6 +67,9 @@
 #define RULE_OP_MANGLE_DUPEBLOCK_FIRST   'y'
 #define RULE_OP_MANGLE_DUPEBLOCK_LAST    'Y'
 #define RULE_OP_MANGLE_TITLE             'E'
+#define RULE_OP_MANGLE_TO_HEX_LOWER      'h'
+#define RULE_OP_MANGLE_TO_HEX_UPPER      'H'
+
 
 /* using character classes */
 #define RULE_OP_MANGLE_REPLACE_CLASS     0x01

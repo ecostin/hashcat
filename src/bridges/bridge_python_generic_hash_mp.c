@@ -404,7 +404,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
         else
         {
           hcfree (libpython_namelocal);
-        };
+        }
       }
 
       // use %PATH%
@@ -425,7 +425,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_namepath);
-      };
+      }
 
       #elif defined (__MSYS__)
 
@@ -446,7 +446,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #elif defined (__APPLE__)
 
@@ -467,7 +467,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #elif defined (__CYGWIN__)
 
@@ -488,7 +488,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #else
 
@@ -509,7 +509,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #endif
 

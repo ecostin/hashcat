@@ -106,7 +106,7 @@ static void units_term (bridge_scrypt_jane_t *bridge_scrypt_jane)
   }
 }
 
-void *platform_init ()
+void *platform_init (MAYBE_UNUSED user_options_t *user_options)
 {
   // Verify CPU features
 

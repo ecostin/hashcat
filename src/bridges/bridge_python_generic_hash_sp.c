@@ -398,7 +398,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
         else
         {
           hcfree (libpython_namelocal);
-        };
+        }
       }
 
       // use %PATH%
@@ -419,7 +419,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_namepath);
-      };
+      }
 
       #elif defined (__MSYS__)
 
@@ -440,7 +440,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #elif defined (__APPLE__)
 
@@ -461,7 +461,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #elif defined (__CYGWIN__)
 
@@ -482,7 +482,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #else
 
@@ -503,7 +503,7 @@ static bool init_python (hc_python_lib_t *python, user_options_t *user_options)
       else
       {
         hcfree (libpython_name);
-      };
+      }
 
       #endif
 
@@ -855,8 +855,6 @@ bool thread_init (MAYBE_UNUSED void *platform_context, MAYBE_UNUSED hc_device_pa
   const char *module_name = extract_module_name (python_interpreter->source_filename);
 
   int rc = 0;
-
-
 
   rc |= python->PyDict_SetItemString (unit_buf->pContext, "module_name",    python->PyUnicode_FromString ((const char *) module_name));
   rc |= python->PyDict_SetItemString (unit_buf->pContext, "salts_cnt",      python->PyLong_FromLong (hashes->salts_cnt));

@@ -13,8 +13,7 @@ use std::{
 
 use hashcat_sys::{bridge_context_t, generic_io_t, generic_io_tmp_t, salt_t};
 
-use crate::Expr;
-use crate::{eval::EvalContext, parse};
+use crate::{eval::EvalContext, parse, Expr};
 
 thread_local! {
     static AST: OnceCell<Expr> = OnceCell::new();

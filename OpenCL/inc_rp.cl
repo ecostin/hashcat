@@ -244,6 +244,18 @@ DECLSPEC int mangle_trest (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, P
   return len;
 }
 
+DECLSPEC int mangle_shift_case (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, PRIVATE_AS u32 *buf, const int len)
+{
+  for (int i = 0, idx = 0; i < len; i += 4, idx += 1)
+  {
+    const u32 t = buf[idx];
+
+    buf[idx] = t ^ generate_cshift_mask (t);
+  }
+
+  return len;
+}
+
 DECLSPEC int mangle_toggle_at (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, PRIVATE_AS u32 *buf, const int len)
 {
   if (p0 >= len) return len;
@@ -476,6 +488,52 @@ DECLSPEC int mangle_insert (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, 
   }
 
   buf[p0] = p1;
+
+  return out_len;
+}
+
+DECLSPEC int mangle_to_hex_lower (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, PRIVATE_AS u8 *buf, const int len)
+{
+  const int out_len = len * 2;
+
+  if (out_len >= RP_PASSWORD_SIZE) return len;
+
+  for (int pos = len - 1; pos >= 0; pos--)
+  {
+    const u8 c = buf[pos];
+
+    const u8 tbl[0x10] =
+    {
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      'a', 'b', 'c', 'd', 'e', 'f',
+    };
+
+    buf[pos * 2 + 1] = tbl[c >>  0 & 15];
+    buf[pos * 2] = tbl[c >>  4 & 15];
+  }
+
+  return out_len;
+}
+
+DECLSPEC int mangle_to_hex_upper (MAYBE_UNUSED const u8 p0, MAYBE_UNUSED const u8 p1, PRIVATE_AS u8 *buf, const int len)
+{
+  const int out_len = len * 2;
+
+  if (out_len >= RP_PASSWORD_SIZE) return len;
+
+  for (int pos = len - 1; pos >= 0; pos--)
+  {
+    const u8 c = buf[pos];
+
+    const u8 tbl[0x10] =
+    {
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      'A', 'B', 'C', 'D', 'E', 'F',
+    };
+
+    buf[pos * 2 + 1] = tbl[c >>  0 & 15];
+    buf[pos * 2] = tbl[c >>  4 & 15];
+  }
 
   return out_len;
 }
@@ -1140,6 +1198,7 @@ DECLSPEC int apply_rule (const u32 name, MAYBE_UNUSED const u8 p0, MAYBE_UNUSED 
     case RULE_OP_MANGLE_UREST:            out_len = mangle_urest            (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_UREST_LFIRST:     out_len = mangle_urest_lfirst     (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_TREST:            out_len = mangle_trest            (p0, p1,                   buf, out_len); break;
+    case RULE_OP_MANGLE_SHIFT_CASE:       out_len = mangle_shift_case       (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_TOGGLE_AT:        out_len = mangle_toggle_at        (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_TOGGLE_AT_SEP:    out_len = mangle_toggle_at_sep    (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_REVERSE:          out_len = mangle_reverse          (p0, p1,                   buf, out_len); break;
@@ -1179,6 +1238,8 @@ DECLSPEC int apply_rule (const u32 name, MAYBE_UNUSED const u8 p0, MAYBE_UNUSED 
     case RULE_OP_MANGLE_TITLE_SEP:        out_len = mangle_title_sep        (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_TITLE_SEP_CLASS:  out_len = mangle_title_sep_class  (p0, p1,                   buf, out_len); break;
     case RULE_OP_MANGLE_TITLE:            out_len = mangle_title_sep        (' ', p1,                  buf, out_len); break;
+    case RULE_OP_MANGLE_TO_HEX_LOWER:     out_len = mangle_to_hex_lower     (p0, p1, (PRIVATE_AS u8 *) buf, out_len); break;
+    case RULE_OP_MANGLE_TO_HEX_UPPER:     out_len = mangle_to_hex_upper     (p0, p1, (PRIVATE_AS u8 *) buf, out_len); break;
   }
 
   return out_len;
