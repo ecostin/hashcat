@@ -27,6 +27,12 @@ MAINTAINER_MODE         ?= 0
 
 UNAME                   := $(shell uname -s)
 
+# Detect Android
+ANDROID_DETECT := $(findstring Android,$(shell uname -a))
+ifneq (,$(ANDROID_DETECT))
+  UNAME                   := Android
+endif
+
 # we need to strip the windows version number to be able to build hashcat on cygwin hosts
 UNAME                   := $(patsubst CYGWIN_NT-%,CYGWIN,$(UNAME))
 
@@ -35,7 +41,7 @@ UNAME                   := $(patsubst MSYS_NT-%,MSYS2,$(UNAME))
 UNAME                   := $(patsubst MINGW32_NT-%,MSYS2,$(UNAME))
 UNAME                   := $(patsubst MINGW64_NT-%,MSYS2,$(UNAME))
 
-ifeq (,$(filter $(UNAME),Linux OpenBSD FreeBSD NetBSD DragonFly Darwin CYGWIN MSYS2))
+ifeq (,$(filter $(UNAME),Android Linux OpenBSD FreeBSD NetBSD DragonFly Darwin CYGWIN MSYS2))
 $(error "! Your Operating System ($(UNAME)) is not supported by this Makefile")
 endif
 
@@ -120,6 +126,7 @@ endif
 
 IS_AARCH64              := $(shell [ "$$(arch 2>/dev/null)" = "aarch64" ] && echo 1 || echo 0)
 IS_ARM                  := $(or $(filter 1,$(IS_APPLE_SILICON)),$(filter 1,$(IS_AARCH64)))
+IS_PPC                  := $(shell uname -m | grep -q -E '^(ppc|powerpc)' && echo 1 || echo 0)
 
 ifneq (,$(filter $(UNAME),OpenBSD FreeBSD NetBSD DragonFly))
 CC                      := cc
@@ -271,8 +278,13 @@ endif
 ifeq ($(MAINTAINER_MODE),0)
 ifeq ($(BUILD_MODE),native)
 ifneq ($(UNAME),Darwin)
+ifeq ($(IS_PPC),1)
+CFLAGS                  += -mcpu=native
+CFLAGS                  += -mtune=native
+else
 CFLAGS                  += -march=native
 CFLAGS                  += -mtune=native
+endif
 else
 ifeq ($(MACOS_UNIVERSAL_BINARY),0)
 CFLAGS                  += -march=native
@@ -448,7 +460,18 @@ endif
 ## Native compilation target
 ##
 
-ifeq ($(UNAME),Linux)
+ifeq ($(UNAME),Android)
+CFLAGS_NATIVE           := $(CFLAGS)
+CFLAGS_NATIVE           += -D__ANDROID__
+LFLAGS_NATIVE           := $(LFLAGS)
+LFLAGS_NATIVE           += -lpthread
+LFLAGS_NATIVE           += -ldl
+LFLAGS_NATIVE           += -lrt
+LFLAGS_NATIVE           += -lm
+LFLAGS_NATIVE           += -liconv
+LFLAGS_NATIVE           += -L$(PREFIX)/lib
+$(info Android environment detected.)
+else ifeq ($(UNAME),Linux)
 CFLAGS_NATIVE           := $(CFLAGS)
 CFLAGS_NATIVE           += -DWITH_HWMON
 LFLAGS_NATIVE           := $(LFLAGS)

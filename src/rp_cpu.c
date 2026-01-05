@@ -270,6 +270,24 @@ static int mangle_insert (char arr[RP_PASSWORD_SIZE], int arr_len, int upos, cha
   return (arr_len + 1);
 }
 
+static int mangle_insert_every (char arr[RP_PASSWORD_SIZE], int arr_len, int upos, char c)
+{
+  if (upos == 0) return arr_len;
+
+  if (upos >= arr_len + 1) return arr_len;
+
+ const int out_len = arr_len + ((arr_len - (arr_len % upos)) / upos);
+
+  if (out_len >= RP_PASSWORD_SIZE) return arr_len;
+
+  for (u8 src = arr_len, dest = out_len; src > 0; src--, dest--) {
+    if ((src % upos) == 0) { arr[dest-1] = c; dest--; }
+    arr[dest-1] = arr[src-1];
+  }
+
+  return out_len;
+}
+
 static int mangle_to_hex_lower (char arr[RP_PASSWORD_SIZE], int arr_len)
 {
   if (arr_len >= RP_PASSWORD_SIZE) return arr_len;
@@ -685,6 +703,16 @@ static int mangle_chr_decr (char arr[RP_PASSWORD_SIZE], int arr_len, int upos)
   if (upos >= arr_len) return arr_len;
 
   arr[upos] -= 1;
+
+  return arr_len;
+}
+
+static int mangle_chr_add (char arr[RP_PASSWORD_SIZE], int arr_len, int upos, char c)
+{
+  if (upos >= arr_len) return arr_len;
+
+  u8 b = (u8) arr[upos] + (u8) c;
+  arr[upos] = b;
 
   return arr_len;
 }
@@ -1323,6 +1351,13 @@ int _old_apply_rule (const char *rule, int rule_len, char in[RP_PASSWORD_SIZE], 
         out_len = mangle_insert (out, out_len, upos, rule_new[rule_pos]);
         break;
 
+      case RULE_OP_MANGLE_INSERT_EVERY:
+        NEXT_RULEPOS (rule_pos);
+        NEXT_RPTOI (rule_new, rule_pos, upos);
+        NEXT_RULEPOS (rule_pos);
+        out_len = mangle_insert_every (out, out_len, upos, rule_new[rule_pos]);
+        break;
+
       case RULE_OP_MANGLE_OVERSTRIKE:
         NEXT_RULEPOS (rule_pos);
         NEXT_RPTOI (rule_new, rule_pos, upos);
@@ -1417,6 +1452,13 @@ int _old_apply_rule (const char *rule, int rule_len, char in[RP_PASSWORD_SIZE], 
         NEXT_RULEPOS (rule_pos);
         NEXT_RPTOI (rule_new, rule_pos, upos);
         mangle_chr_decr (out, out_len, upos);
+        break;
+
+      case RULE_OP_MANGLE_CHR_ADD:
+        NEXT_RULEPOS (rule_pos);
+        NEXT_RPTOI (rule_new, rule_pos, upos);
+        NEXT_RULEPOS (rule_pos);
+        mangle_chr_add (out, out_len, upos, rule_new[rule_pos]);
         break;
 
       case RULE_OP_MANGLE_REPLACE_NP1:

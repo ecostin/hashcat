@@ -62,6 +62,7 @@
 #define RULE_OP_MANGLE_CHR_SHIFTR        'R'
 #define RULE_OP_MANGLE_CHR_INCR          '+'
 #define RULE_OP_MANGLE_CHR_DECR          '-'
+#define RULE_OP_MANGLE_CHR_ADD           'B'
 #define RULE_OP_MANGLE_REPLACE_NP1       '.'
 #define RULE_OP_MANGLE_REPLACE_NM1       ','
 #define RULE_OP_MANGLE_DUPEBLOCK_FIRST   'y'
@@ -69,6 +70,7 @@
 #define RULE_OP_MANGLE_TITLE             'E'
 #define RULE_OP_MANGLE_TO_HEX_LOWER      'h'
 #define RULE_OP_MANGLE_TO_HEX_UPPER      'H'
+#define RULE_OP_MANGLE_INSERT_EVERY      'v'
 
 
 /* using character classes */

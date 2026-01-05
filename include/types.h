@@ -375,6 +375,7 @@ typedef enum rule_functions
   RULE_OP_MANGLE_CHR_SHIFTR        = 'R',
   RULE_OP_MANGLE_CHR_INCR          = '+',
   RULE_OP_MANGLE_CHR_DECR          = '-',
+  RULE_OP_MANGLE_CHR_ADD           = 'B',
   RULE_OP_MANGLE_REPLACE_NP1       = '.',
   RULE_OP_MANGLE_REPLACE_NM1       = ',',
   RULE_OP_MANGLE_DUPEBLOCK_FIRST   = 'y',
@@ -382,6 +383,7 @@ typedef enum rule_functions
   RULE_OP_MANGLE_TITLE             = 'E',
   RULE_OP_MANGLE_TO_HEX_LOWER      = 'h',
   RULE_OP_MANGLE_TO_HEX_UPPER      = 'H',
+  RULE_OP_MANGLE_INSERT_EVERY      = 'v',
 
 
   /* using character classes */
