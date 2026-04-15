@@ -1,6 +1,13 @@
 * changes v7.1.2 -> v7.1.x
 
 ##
+## New Algorithms
+##
+
+- Added hash-mode 63000: iClass Standard (DES + hash0 + iClass Cipher, dual-MAC)
+- Added hash-mode 64000: iClass Legacy Brute-Force (partial div_key + iClass Cipher, dual-MAC)
+
+##
 ## Improvements
 ##
 
