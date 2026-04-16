@@ -2536,35 +2536,53 @@ KERNEL_FQ KERNEL_FA void m63000_sxx (KERN_ATTR_BASIC ())
 
     for (int tick = 0; tick < 96; tick++)
       bs_iclass_tick(t, bs_b, l, r, kb, y_ccnr[tick]);
+    const u32 mac1_target = digests_buf[DIGESTS_OFFSET_HOST].digest_buf[DGST_R0];
 
-    u32 mac_bp[32];
+    u32 mac1_bs[32];
+
+    for (int i = 0; i < 4; i++)
+    {
+      const u8 target_byte = (u8) (mac1_target >> (24 - i * 8));
+
+      for (int bit = 0; bit < 8; bit++)
+      {
+        mac1_bs[i * 8 + bit] = ((target_byte >> bit) & 1) ? 0xFFFFFFFF : 0;
+      }
+    }
+
+    u32 mac_match = 0xFFFFFFFF;
+
+    if (batch_cnt < 32)
+    {
+      mac_match &= (1u << batch_cnt) - 1;
+    }
+
     for (int tick = 0; tick < 32; tick++)
     {
-      mac_bp[tick] = r[2];
-      if (tick < 31) bs_iclass_tick(t, bs_b, l, r, kb, 0);
+      const u32 target = mac1_bs[(tick / 8) * 8 + (tick % 8)];
+
+      mac_match &= ~(r[2] ^ target);
+
+      if (tick == 7 && mac_match == 0) break;
+      if (tick == 15 && mac_match == 0) break;
+
+      bs_iclass_tick(t, bs_b, l, r, kb, 0);
     }
+
+    if (mac_match == 0) continue;
 
     for (u32 i = 0; i < batch_cnt; i++)
     {
-      u32 computed1 = 0;
-      for (int tick = 0; tick < 32; tick++)
+      if (((mac_match >> i) & 1) == 0) continue;
+
+      const u32 computed2 = iclass_mac(rev_ccnr2, div_keys[i]);
+      if (computed2 != mac2_target) continue;
+
+      const u32 final_hash_pos = DIGESTS_OFFSET_HOST + 0;
+
+      if (hc_atomic_inc(&hashes_shown[final_hash_pos]) == 0)
       {
-        const u32 bit_val = (mac_bp[tick] >> i) & 1;
-        computed1 |= bit_val << ((tick % 8) + (3 - tick / 8) * 8);
-      }
-
-      for (u32 d = 0; d < DIGESTS_CNT; d++)
-      {
-        const u32 final_hash_pos = DIGESTS_OFFSET_HOST + d;
-        if (computed1 != digests_buf[final_hash_pos].digest_buf[DGST_R0]) continue;
-
-        const u32 computed2 = iclass_mac(rev_ccnr2, div_keys[i]);
-        if (computed2 != mac2_target) continue;
-
-        if (hc_atomic_inc(&hashes_shown[final_hash_pos]) == 0)
-        {
-          mark_hash(plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, d, final_hash_pos, gid, il_pos + i, 0, 0);
-        }
+        mark_hash(plains_buf, d_return_buf, SALT_POS_HOST, DIGESTS_CNT, 0, final_hash_pos, gid, il_pos + i, 0, 0);
       }
     }
   }
