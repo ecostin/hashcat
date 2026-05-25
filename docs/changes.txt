@@ -10,6 +10,7 @@ Docker: Add hashcat-toolchain
 ## Bugs
 ##
 
+- Fixed salt_iter underflow to UINT32_MAX in 56 modules when iteration count is 0, causing indefinite hang
 - Added workaround for CUDA memory leak in benchmark mode caused by register spilling
 - Fixed bugs on multiple DES based modules when used with CPU devices
 - Fixed MSYS2 build
