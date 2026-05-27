@@ -184,7 +184,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
       // edata2
       token.sep[4]     = '$';
       token.len_min[4] = 64;
-      token.len_max[4] = 40960;
+      token.len_max[4] = 40958;
       token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
       krb5tgs->format = 1;
@@ -202,7 +202,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
 
       token.sep[3]     = '$';
       token.len_min[3] = 64;
-      token.len_max[3] = 40960;
+      token.len_max[3] = 40958;
       token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
       krb5tgs->format = 2;
@@ -222,7 +222,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
 
     token.sep[3]     = '$';
     token.len_min[3] = 64;
-    token.len_max[3] = 40960;
+    token.len_max[3] = 40958;
     token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
     krb5tgs->format = 3;
