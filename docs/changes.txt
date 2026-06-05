@@ -11,6 +11,7 @@
 - Added hash-mode: MD5(Sun), SunMD5
 - Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-256
 - Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-384
+- Added hash-mode: RACF DES Passphrase
 
 ##
 ## Improvements
