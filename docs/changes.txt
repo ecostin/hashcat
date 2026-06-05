@@ -12,6 +12,7 @@
 - Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-256
 - Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-384
 - Added hash-mode: RACF DES Passphrase
+- Added hash-mode: RACF KDFAES Passphrase
 
 ##
 ## Improvements
