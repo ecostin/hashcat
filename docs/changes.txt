@@ -9,6 +9,8 @@
 - Added hash-mode 64000: iClass Legacy Brute-Force (partial div_key + iClass Cipher, dual-MAC)
 - Added hash-mode: MIFARE Ultralight C 3DES Key Recovery
 - Added hash-mode: MD5(Sun), SunMD5
+- Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-256
+- Added hash-mode: SAP CODVN H (PWDSALTEDHASH) iSSHA-384
 
 ##
 ## Improvements
