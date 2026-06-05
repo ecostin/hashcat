@@ -141,6 +141,8 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
       const int account_info_len = account_info_stop - account_info_start;
 
+      if (account_info_len > (int) sizeof (krb5tgs->account_info)) return (PARSER_SALT_LENGTH);
+
       token.token_cnt++;
 
       // etype
@@ -166,7 +168,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
       token.sep[4]     = '$';
       token.len_min[4] = 64;
-      token.len_max[4] = 40960;
+      token.len_max[4] = 40958;
       token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH
                        | TOKEN_ATTR_VERIFY_HEX;
 
@@ -192,7 +194,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
       token.sep[3]     = '$';
       token.len_min[3] = 64;
-      token.len_max[3] = 40960;
+      token.len_max[3] = 40958;
       token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
                        | TOKEN_ATTR_VERIFY_HEX;
 
@@ -219,7 +221,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 
     token.sep[3]     = '$';
     token.len_min[3] = 64;
-    token.len_max[3] = 40960;
+    token.len_max[3] = 40958;
     token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH
                      | TOKEN_ATTR_VERIFY_HEX;
 
@@ -305,7 +307,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   const krb5tgs_t *krb5tgs = (const krb5tgs_t *) esalt_buf;
 
-  char *data = (char *) hcmalloc (5120 * 4 * 2);
+  char *data = (char *) hcmalloc (5120 * 4 * 2 + 1);
 
   for (u32 i = 0, j = 0; i < krb5tgs->edata2_len; i += 1, j += 2)
   {

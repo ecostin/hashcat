@@ -165,6 +165,8 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
       const char *acct_stop_incl = star2 + 2;                 // include "*$"
       const int   acct_len       = (int) (acct_stop_incl - acct_start);
 
+      if (acct_len > (int) sizeof (krb5tgs->account_info)) return (PARSER_SALT_LENGTH);
+
       token.token_cnt++;
 
       // etype
@@ -184,7 +186,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
       // edata2
       token.sep[4]     = '$';
       token.len_min[4] = 64;
-      token.len_max[4] = 40960;
+      token.len_max[4] = 40958;
       token.attr[4]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
       krb5tgs->format = 1;
@@ -202,7 +204,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
 
       token.sep[3]     = '$';
       token.len_min[3] = 64;
-      token.len_max[3] = 40960;
+      token.len_max[3] = 40958;
       token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
       krb5tgs->format = 2;
@@ -222,7 +224,7 @@ int module_hash_decode (MAYBE_UNUSED const hashconfig_t *hashconfig,
 
     token.sep[3]     = '$';
     token.len_min[3] = 64;
-    token.len_max[3] = 40960;
+    token.len_max[3] = 40958;
     token.attr[3]    = TOKEN_ATTR_VERIFY_LENGTH | TOKEN_ATTR_VERIFY_HEX;
 
     krb5tgs->format = 3;
@@ -303,7 +305,7 @@ int module_hash_encode (MAYBE_UNUSED const hashconfig_t *hashconfig, MAYBE_UNUSE
 {
   const krb5tgs_t *krb5tgs = (const krb5tgs_t *) esalt_buf;
 
-  char data[5120 * 2] = { 0 };
+  char data[5120 * 4 * 2 + 1] = { 0 };
   for (u32 i = 0, j = 0; i < krb5tgs->edata2_len; i++, j += 2)
   {
     const u8 *ptr = (const u8 *) krb5tgs->edata2;
