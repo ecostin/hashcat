@@ -291,27 +291,13 @@ void slow_candidates_next (hashcat_ctx_t *hashcat_ctx, void *extra_info)
 
     while (true)
     {
-      line_len = (u32) fgetl (combs_fp, line_buf, HCBUFSIZ_LARGE);
+      const int raw_len = (int) fgetl (combs_fp, line_buf, HCBUFSIZ_LARGE);
 
-      line_len = convert_from_hex (hashcat_ctx, line_buf, line_len);
+      const int comb_len = comb_word_transform (hashcat_ctx, (u8 *) line_buf, raw_len, hashcat_ctx->wl_data->iconv_enabled, hashcat_ctx->wl_data->iconv_ctx, hashcat_ctx->wl_data->iconv_tmp);
 
-      // post-process rule engine
+      if (comb_len < 0) continue;
 
-      if (run_rule_engine ((int) user_options_extra->rule_len_r, user_options->rule_buf_r))
-      {
-        if (line_len >= RP_PASSWORD_SIZE) continue;
-
-        char rule_buf_out[RP_PASSWORD_SIZE];
-
-        memset (rule_buf_out, 0, sizeof (rule_buf_out));
-
-        const int rule_len_out = _old_apply_rule (user_options->rule_buf_r, (int) user_options_extra->rule_len_r, line_buf, (int) line_len, rule_buf_out);
-
-        if (rule_len_out < 0) continue;
-
-        line_buf = rule_buf_out;
-        line_len = (u32) rule_len_out;
-      }
+      line_len = (u32) comb_len;
 
       break;
     }

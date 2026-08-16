@@ -275,6 +275,56 @@ void get_next_word_std (char *buf, u64 sz, u64 *len, u64 *off)
   *len = sz;
 }
 
+int comb_word_transform (hashcat_ctx_t *hashcat_ctx, u8 *buf, int len, const bool iconv_enabled, const iconv_t iconv_ctx, char *iconv_tmp)
+{
+
+  const hashconfig_t         *hashconfig         = hashcat_ctx->hashconfig;
+  const user_options_t       *user_options       = hashcat_ctx->user_options;
+  const user_options_extra_t *user_options_extra = hashcat_ctx->user_options_extra;
+
+  len = (int) convert_from_hex (hashcat_ctx, (char *) buf, (size_t) len);
+
+  if (len > PW_MAX) return -1;
+
+  if (run_rule_engine ((int) user_options_extra->rule_len_r, user_options->rule_buf_r))
+  {
+    if (len >= RP_PASSWORD_SIZE) return -1;
+
+    char rule_buf_out[RP_PASSWORD_SIZE];
+
+    memset (rule_buf_out, 0, sizeof (rule_buf_out));
+
+    const int rule_len_out = _old_apply_rule (user_options->rule_buf_r, (int) user_options_extra->rule_len_r, (char *) buf, len, rule_buf_out);
+
+    if (rule_len_out < 0) return -1;
+
+    len = rule_len_out;
+
+    memcpy (buf, rule_buf_out, (size_t) len);
+  }
+
+  if (iconv_enabled == true)
+  {
+    char  *iconv_ptr = iconv_tmp;
+    size_t iconv_sz  = HCBUFSIZ_TINY;
+    char  *in_ptr    = (char *) buf;
+    size_t in_len    = (size_t) len;
+
+    if (iconv (iconv_ctx, &in_ptr, &in_len, &iconv_ptr, &iconv_sz) == (size_t) -1) return -1;
+
+    len = (int) (HCBUFSIZ_TINY - iconv_sz);
+
+    memcpy (buf, iconv_tmp, (size_t) len);
+  }
+
+  if (hashconfig->opts_type & OPTS_TYPE_PT_UPPER)
+  {
+    uppercase (buf, (size_t) len);
+  }
+
+  return MIN (len, PW_MAX);
+}
+
 void get_next_word (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, char **out_buf, u32 *out_len)
 {
   user_options_t       *user_options       = hashcat_ctx->user_options;

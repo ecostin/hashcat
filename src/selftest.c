@@ -101,6 +101,11 @@ static int selftest_init (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_
 
     pw.pw_len = (u32) pw_len;
 
+    if (hashconfig->opts_type & OPTS_TYPE_PT_UPPER)
+    {
+      uppercase ((u8 *) pw_ptr, pw.pw_len);
+    }
+
     if (device_param->is_cuda == true)
     {
       if (hc_cuMemcpyHtoD (hashcat_ctx, device_param->cuda_d_pws_buf, &pw, 1 * sizeof (pw_t)) == -1) return -1;

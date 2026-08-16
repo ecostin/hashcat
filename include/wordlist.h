@@ -11,6 +11,8 @@
 
 size_t convert_from_hex (hashcat_ctx_t *hashcat_ctx, char *line_buf, const size_t line_len);
 
+int comb_word_transform (hashcat_ctx_t *hashcat_ctx, u8 *buf, int len, const bool iconv_enabled, const iconv_t iconv_ctx, char *iconv_tmp);
+
 void pw_pre_add       (hc_device_param_t *device_param, const u8 *pw_buf, const int pw_len, const u8 *base_buf, const int base_len, const int rule_idx);
 void pw_base_add      (hc_device_param_t *device_param, pw_pre_t *pw_pre);
 void pw_add_zerocopy  (hc_device_param_t *device_param, u8 *out_buf, const int pw_len);

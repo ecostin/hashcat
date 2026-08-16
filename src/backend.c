@@ -4377,69 +4377,32 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
 
                 size_t line_len = fgetl (combs_fp, line_buf, HCBUFSIZ_LARGE);
 
-                line_len = convert_from_hex (hashcat_ctx, line_buf, line_len);
+                const int comb_len = comb_word_transform (hashcat_ctx, (u8 *) line_buf, (int) line_len, iconv_enabled, iconv_ctx, iconv_tmp);
 
-                if (line_len > PW_MAX) continue;
-
-                char *line_buf_new = line_buf;
-
-                char rule_buf_out[RP_PASSWORD_SIZE];
-
-                if (run_rule_engine (user_options_extra->rule_len_r, user_options->rule_buf_r))
+                if (comb_len < 0)
                 {
-                  if (line_len >= RP_PASSWORD_SIZE) continue;
-
-                  memset (rule_buf_out, 0, sizeof (rule_buf_out));
-
-                  const int rule_len_out = _old_apply_rule (user_options->rule_buf_r, user_options_extra->rule_len_r, line_buf, (u32) line_len, rule_buf_out);
-
-                  if (rule_len_out < 0)
+                  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
                   {
-                    if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+                    for (u32 association_salt_pos = 0; association_salt_pos < pws_cnt; association_salt_pos++)
                     {
-                      for (u32 association_salt_pos = 0; association_salt_pos < pws_cnt; association_salt_pos++)
-                      {
-                        status_ctx->words_progress_rejected[association_salt_pos] += 1;
-                      }
+                      status_ctx->words_progress_rejected[association_salt_pos] += 1;
                     }
-                    else
-                    {
-                      status_ctx->words_progress_rejected[salt_pos] += pws_cnt;
-                    }
-
-                    continue;
+                  }
+                  else
+                  {
+                    status_ctx->words_progress_rejected[salt_pos] += pws_cnt;
                   }
 
-                  line_len = rule_len_out;
-
-                  line_buf_new = rule_buf_out;
+                  continue;
                 }
 
-                // do the on-the-fly encoding
-
-                if (iconv_enabled == true)
-                {
-                  char  *iconv_ptr = iconv_tmp;
-                  size_t iconv_sz  = HCBUFSIZ_TINY;
-
-                  if (iconv (iconv_ctx, &line_buf_new, &line_len, &iconv_ptr, &iconv_sz) == (size_t) -1) continue;
-
-                  line_buf_new = iconv_tmp;
-                  line_len     = HCBUFSIZ_TINY - iconv_sz;
-                }
-
-                line_len = MIN (line_len, PW_MAX);
+                line_len = (size_t) comb_len;
 
                 u8 *ptr = (u8 *) device_param->combs_buf[i].i;
 
-                memcpy (ptr, line_buf_new, line_len);
+                memcpy (ptr, line_buf, line_len);
 
                 memset (ptr + line_len, 0, PW_MAX - line_len);
-
-                if (hashconfig->opts_type & OPTS_TYPE_PT_UPPER)
-                {
-                  uppercase (ptr, line_len);
-                }
 
                 if (combinator_ctx->combs_mode == COMBINATOR_MODE_BASE_LEFT)
                 {
@@ -4568,69 +4531,32 @@ int run_cracker (hashcat_ctx_t *hashcat_ctx, hc_device_param_t *device_param, co
 
                 size_t line_len = fgetl (combs_fp, line_buf, HCBUFSIZ_LARGE);
 
-                line_len = convert_from_hex (hashcat_ctx, line_buf, line_len);
+                const int comb_len = comb_word_transform (hashcat_ctx, (u8 *) line_buf, (int) line_len, iconv_enabled, iconv_ctx, iconv_tmp);
 
-                if (line_len > PW_MAX) continue;
-
-                char *line_buf_new = line_buf;
-
-                char rule_buf_out[RP_PASSWORD_SIZE];
-
-                if (run_rule_engine (user_options_extra->rule_len_r, user_options->rule_buf_r))
+                if (comb_len < 0)
                 {
-                  if (line_len >= RP_PASSWORD_SIZE) continue;
-
-                  memset (rule_buf_out, 0, sizeof (rule_buf_out));
-
-                  const int rule_len_out = _old_apply_rule (user_options->rule_buf_r, user_options_extra->rule_len_r, line_buf, (u32) line_len, rule_buf_out);
-
-                  if (rule_len_out < 0)
+                  if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
                   {
-                    if (user_options->attack_mode == ATTACK_MODE_ASSOCIATION)
+                    for (u32 association_salt_pos = 0; association_salt_pos < pws_cnt; association_salt_pos++)
                     {
-                      for (u32 association_salt_pos = 0; association_salt_pos < pws_cnt; association_salt_pos++)
-                      {
-                        status_ctx->words_progress_rejected[association_salt_pos] += 1;
-                      }
+                      status_ctx->words_progress_rejected[association_salt_pos] += 1;
                     }
-                    else
-                    {
-                      status_ctx->words_progress_rejected[salt_pos] += pws_cnt;
-                    }
-
-                    continue;
+                  }
+                  else
+                  {
+                    status_ctx->words_progress_rejected[salt_pos] += pws_cnt;
                   }
 
-                  line_len = rule_len_out;
-
-                  line_buf_new = rule_buf_out;
+                  continue;
                 }
 
-                // do the on-the-fly encoding
-
-                if (iconv_enabled == true)
-                {
-                  char  *iconv_ptr = iconv_tmp;
-                  size_t iconv_sz  = HCBUFSIZ_TINY;
-
-                  if (iconv (iconv_ctx, &line_buf_new, &line_len, &iconv_ptr, &iconv_sz) == (size_t) -1) continue;
-
-                  line_buf_new = iconv_tmp;
-                  line_len     = HCBUFSIZ_TINY - iconv_sz;
-                }
-
-                line_len = MIN (line_len, PW_MAX);
+                line_len = (size_t) comb_len;
 
                 u8 *ptr = (u8 *) device_param->combs_buf[i].i;
 
-                memcpy (ptr, line_buf_new, line_len);
+                memcpy (ptr, line_buf, line_len);
 
                 memset (ptr + line_len, 0, PW_MAX - line_len);
-
-                if (hashconfig->opts_type & OPTS_TYPE_PT_UPPER)
-                {
-                  uppercase (ptr, line_len);
-                }
 
                 /*
                 if (combinator_ctx->combs_mode == COMBINATOR_MODE_BASE_LEFT)
