@@ -544,6 +544,18 @@ int count_words (hashcat_ctx_t *hashcat_ctx, HCFILE *fp, const char *dictfile, u
   d.stat.st_gid     = 0;
   d.stat.st_rdev    = 0;
   d.stat.st_atime   = 0;
+  
+  //rsync will change some attrs - EPAS
+  d.stat.st_mtime        = 0;
+  d.stat.st_ctime        = 0;
+  d.stat.st_atim.tv_nsec = 0;
+  d.stat.st_mtim.tv_nsec = 0;
+  d.stat.st_ctim.tv_nsec = 0;
+  d.stat.st_ino          = 0;
+  d.stat.st_dev          = 0;
+  d.stat.st_blksize      = 0;
+  d.stat.st_blocks       = 0;
+  
 
   #if defined (STAT_NANOSECONDS_ACCESS_TIME)
   d.stat.STAT_NANOSECONDS_ACCESS_TIME = 0;
