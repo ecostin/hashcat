@@ -162,7 +162,11 @@ else
   pip3 install git+https://github.com/matrix/pygost
   ERRORS=$((ERRORS+$?))
 
-  pip3 install pycryptoplus
+  # pycryptoplus on PyPI was last released in 2015 and imports pkg_resources at module scope.
+  # setuptools 82 removed pkg_resources, so on a python that never carried an older setuptools,
+  # "import CryptoPlus" raises. The DiskCryptor modules read stdout only, so they then emit a hash
+  # with no ciphertext in it rather than failing. The fork imports packaging instead.
+  pip3 install git+https://github.com/matrix/pycryptoplus
   ERRORS=$((ERRORS+$?))
 
   pip3 install pycryptodome
@@ -171,11 +175,25 @@ else
   pip3 install cryptography
   ERRORS=$((ERRORS+$?))
 
-  pip3 install setuptools
-  ERRORS=$((ERRORS+$?))
-
   pip3 install argon2-cffi
   ERRORS=$((ERRORS+$?))
+
+  # A python import that fails inside a test module is invisible from here. The module shells out
+  # to python3 and reads stdout only, so a dead dependency produces a wrong hash rather than an
+  # error. Import each one now, while the cause is still in front of you.
+
+  PYTHON_MODULES="CryptoPlus Crypto pygost cryptography argon2"
+
+  for python_module in ${PYTHON_MODULES}; do
+
+    if python3 -c "import ${python_module}" > /dev/null 2>&1; then
+      echo "  ok      ${python_module}"
+    else
+      echo "  FAILED  ${python_module}"
+      FAILED_MODULES="${FAILED_MODULES} ${python_module}"
+    fi
+
+  done
 
 fi
 
@@ -186,5 +204,26 @@ if [ $ERRORS -gt 0 ]; then
   exit 1
 fi
 
-echo "[  OK  ] All commands were successful"
-exit 0
+# The check that actually matters. tools/test.pl loads only the module for the mode it is asked
+# for, so a missing dependency costs the modes that need it and nothing else. What this catches is
+# the case where the perl environment itself is unusable, which makes the suite report
+# "Error : 0/0 not found" on every mode and reads as hashcat failing rather than as a setup
+# problem.
+
+if perl "${TOOLS_DIR}/test.pl" single 0 2> /dev/null | grep -q hashcat; then
+
+  echo "[  OK  ] tools/test.pl can generate hashes, the suite is usable"
+
+  if [ -n "${FAILED_MODULES}" ]; then
+    echo "         The modules above only affect the hash modes that need them."
+  fi
+
+  exit 0
+
+fi
+
+echo "[ FAIL ] tools/test.pl cannot generate hashes. The suite would report 'Error : 0/0' on"
+echo "         every mode, which is a setup failure and not a hashcat one. Fix the modules above"
+echo "         and run this script again."
+
+exit 1
