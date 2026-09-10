@@ -323,7 +323,7 @@ KERNEL_FQ KERNEL_FA void m03300_loop (KERN_ATTR_TMPS (md5sun_tmp_t))
       sunmd5_update_constant_phrase (&md5_ctx);
     }
 
-    u32 round_buf[4] = { 0 };
+    u32 round_buf[16] = { 0 };
 
     const int round_len = sunmd5_itoa (j, round_buf);
 
